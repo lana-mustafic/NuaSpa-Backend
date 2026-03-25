@@ -1,0 +1,6 @@
+@NuaSpa.Api_HostAddress = http://localhost:5088
+
+GET {{NuaSpa.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

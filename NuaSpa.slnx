@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NuaSpa.Api/NuaSpa.Api.csproj" />
+    <Project Path="src/NuaSpa.Application/NuaSpa.Application.csproj" />
+    <Project Path="src/NuaSpa.Domain/NuaSpa.Domain.csproj" />
+    <Project Path="src/NuaSpa.Infrastructure/NuaSpa.Infrastructure.csproj" />
+    <Project Path="src/NuaSpa.Worker/NuaSpa.Worker.csproj" />
+  </Folder>
+</Solution>
