@@ -1,7 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using Microsoft.EntityFrameworkCore;
 using NuaSpa.Domain.Entities;
-using System;
-using System.Runtime.Intrinsics.X86;
 
 namespace NuaSpa.Infrastructure
 {
@@ -35,7 +34,6 @@ namespace NuaSpa.Infrastructure
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            // Ostavljamo ovo kao "sigurnosni ventil" zbog tvog LocalDB-a
             if (!optionsBuilder.IsConfigured)
             {
                 optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=180081;Trusted_Connection=True;TrustServerCertificate=True;");
@@ -48,7 +46,7 @@ namespace NuaSpa.Infrastructure
 
             var seedDate = new DateTime(2026, 1, 1);
 
-            // --- SEED PODATAKA ---
+            // --- 1. SEED PODATAKA ---
 
             modelBuilder.Entity<Uloga>().HasData(
                 new Uloga { Id = 1, Naziv = "Admin", CreatedAt = seedDate },
@@ -65,10 +63,76 @@ namespace NuaSpa.Infrastructure
                 new Grad { Id = 2, Naziv = "Mostar", PostanskiBroj = "88000", DrzavaId = 1, CreatedAt = seedDate }
             );
 
-            // Dodajemo jednu osnovnu kategoriju da Usluge ne bi pucale
             modelBuilder.Entity<KategorijaUsluga>().HasData(
                 new KategorijaUsluga { Id = 1, Naziv = "Masaže", Opis = "Relaksacione i terapeutske masaže", CreatedAt = seedDate }
             );
+
+            // --- 2. MAPIRANJE RELACIJA (Task 1.3) ---
+
+            // Grad -> Drzava (1:N)
+            modelBuilder.Entity<Grad>()
+                .HasOne(g => g.Drzava)
+                .WithMany()
+                .HasForeignKey(g => g.DrzavaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Korisnik -> Uloga (1:N)
+            modelBuilder.Entity<Korisnik>()
+                .HasOne(k => k.Uloga)
+                .WithMany()
+                .HasForeignKey(k => k.UlogaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Rezervacija -> Korisnik (1:N)
+            modelBuilder.Entity<Rezervacija>()
+                .HasOne(r => r.Korisnik)
+                .WithMany()
+                .HasForeignKey(r => r.KorisnikId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Rezervacija -> Usluga (1:N)
+            modelBuilder.Entity<Rezervacija>()
+                .HasOne(r => r.Usluga)
+                .WithMany()
+                .HasForeignKey(r => r.UslugaId);
+
+            // NarudzbaProizvoda (Spojna tabela za M:N veza između Korisnika i Proizvoda)
+            modelBuilder.Entity<NarudzbaProizvoda>()
+                .HasOne(np => np.Korisnik)
+                .WithMany()
+                .HasForeignKey(np => np.KorisnikId);
+
+            modelBuilder.Entity<NarudzbaProizvoda>()
+                .HasOne(np => np.Proizvod)
+                .WithMany()
+                .HasForeignKey(np => np.ProizvodId);
+
+            // Skladiste -> Proizvod (1:N)
+            modelBuilder.Entity<Skladiste>()
+                .HasOne(s => s.Proizvod)
+                .WithMany()
+                .HasForeignKey(s => s.ProizvodId);
+
+            // Recenzija -> Usluga i Korisnik
+            modelBuilder.Entity<Recenzija>()
+                .HasOne(r => r.Usluga)
+                .WithMany()
+                .HasForeignKey(r => r.UslugaId);
+
+            modelBuilder.Entity<Recenzija>()
+                .HasOne(r => r.Korisnik)
+                .WithMany()
+                .HasForeignKey(r => r.KorisnikId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Unikatni indeksi
+            modelBuilder.Entity<Korisnik>()
+                .HasIndex(k => k.Email)
+                .IsUnique();
+
+            modelBuilder.Entity<Korisnik>()
+                .HasIndex(k => k.KorisnickoIme)
+                .IsUnique();
         }
     }
 }
