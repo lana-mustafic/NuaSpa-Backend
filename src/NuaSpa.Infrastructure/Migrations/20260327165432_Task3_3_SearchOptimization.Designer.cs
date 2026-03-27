@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NuaSpa.Infrastructure;
 
@@ -11,9 +12,11 @@ using NuaSpa.Infrastructure;
 namespace NuaSpa.Infrastructure.Migrations
 {
     [DbContext(typeof(NuaSpaContext))]
-    partial class NuaSpaContextModelSnapshot : ModelSnapshot
+    [Migration("20260327165432_Task3_3_SearchOptimization")]
+    partial class Task3_3_SearchOptimization
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -106,12 +109,12 @@ namespace NuaSpa.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = 3,
+                            Id = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             DrzavaId = 1,
                             IsDeleted = false,
-                            Naziv = "Konjic",
-                            PostanskiBroj = "88400"
+                            Naziv = "Mostar",
+                            PostanskiBroj = "88000"
                         });
                 });
 
@@ -141,6 +144,16 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("KategorijeUsluga");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            IsDeleted = false,
+                            Naziv = "Masaže",
+                            Opis = "Relaksacione i terapeutske masaže"
+                        });
                 });
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.Korisnik", b =>
@@ -158,9 +171,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("GradId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Ime")
                         .IsRequired()
@@ -204,48 +214,16 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.HasIndex("GradId");
+                    b.HasIndex("Ime");
 
                     b.HasIndex("KorisnickoIme")
                         .IsUnique();
 
+                    b.HasIndex("Prezime");
+
                     b.HasIndex("UlogaId");
 
                     b.ToTable("Korisnici");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            Email = "admin@nuaspa.ba",
-                            GradId = 1,
-                            Ime = "Admin",
-                            IsDeleted = false,
-                            KorisnickoIme = "admin",
-                            PasswordHash = "dummy_hash_123",
-                            PasswordSalt = "dummy_salt_123",
-                            Prezime = "NuaSpa",
-                            Status = true,
-                            Telefon = "033123456",
-                            UlogaId = 1
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            Email = "lana@test.ba",
-                            GradId = 3,
-                            Ime = "Lana",
-                            IsDeleted = false,
-                            KorisnickoIme = "lana",
-                            PasswordHash = "dummy_hash_456",
-                            PasswordSalt = "dummy_salt_456",
-                            Prezime = "Korisnik",
-                            Status = true,
-                            Telefon = "061222333",
-                            UlogaId = 2
-                        });
                 });
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.NarudzbaProizvoda", b =>
@@ -272,6 +250,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("UkupnaCijena")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
@@ -301,6 +280,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("Iznos")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("MetodaPlacanja")
@@ -346,6 +326,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<decimal>("Procenat")
+                        .HasPrecision(5, 2)
                         .HasColumnType("decimal(5,2)");
 
                     b.Property<DateTime>("VrijediDo")
@@ -368,6 +349,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Cijena")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -395,6 +377,9 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasColumnType("varbinary(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Sifra")
+                        .IsUnique();
 
                     b.ToTable("Proizvodi");
                 });
@@ -544,14 +529,14 @@ namespace NuaSpa.Infrastructure.Migrations
                             Id = 2,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             IsDeleted = false,
-                            Naziv = "Klijent"
+                            Naziv = "Desktop"
                         },
                         new
                         {
                             Id = 3,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             IsDeleted = false,
-                            Naziv = "Zaposlenik"
+                            Naziv = "Mobile"
                         });
                 });
 
@@ -593,6 +578,8 @@ namespace NuaSpa.Infrastructure.Migrations
 
                     b.HasIndex("KategorijaUslugaId");
 
+                    b.HasIndex("Naziv");
+
                     b.ToTable("Usluge");
                 });
 
@@ -630,6 +617,8 @@ namespace NuaSpa.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Specijalizacija");
+
                     b.ToTable("Zaposlenici");
                 });
 
@@ -638,7 +627,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Drzava", "Drzava")
                         .WithMany()
                         .HasForeignKey("DrzavaId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Drzava");
@@ -646,19 +635,11 @@ namespace NuaSpa.Infrastructure.Migrations
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.Korisnik", b =>
                 {
-                    b.HasOne("NuaSpa.Domain.Entities.Grad", "Grad")
-                        .WithMany()
-                        .HasForeignKey("GradId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("NuaSpa.Domain.Entities.Uloga", "Uloga")
                         .WithMany()
                         .HasForeignKey("UlogaId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Grad");
 
                     b.Navigation("Uloga");
                 });
@@ -674,7 +655,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Proizvod", "Proizvod")
                         .WithMany()
                         .HasForeignKey("ProizvodId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Korisnik");
@@ -696,7 +677,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Korisnik", "Korisnik")
                         .WithMany()
                         .HasForeignKey("KorisnikId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("NuaSpa.Domain.Entities.Usluga", "Usluga")
@@ -715,7 +696,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Korisnik", "Korisnik")
                         .WithMany()
                         .HasForeignKey("KorisnikId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("NuaSpa.Domain.Entities.Usluga", "Usluga")
@@ -727,7 +708,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Zaposlenik", "Zaposlenik")
                         .WithMany()
                         .HasForeignKey("ZaposlenikId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Korisnik");

@@ -38,9 +38,18 @@ namespace NuaSpa.Domain.Entities
         [Required]
         public bool Status { get; set; } = true;
 
+        // --- Relacije ---
+
         [Required]
-        [ForeignKey("Uloga")]
+        public int GradId { get; set; }
+
+        [ForeignKey("GradId")]
+        public virtual Grad Grad { get; set; } = null!;
+
+        [Required]
         public int UlogaId { get; set; }
-        public Uloga Uloga { get; set; } = null!;
+
+        [ForeignKey("UlogaId")]
+        public virtual Uloga Uloga { get; set; } = null!;
     }
 }
