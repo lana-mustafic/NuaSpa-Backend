@@ -46,18 +46,21 @@ namespace NuaSpa.Infrastructure
 
             var seedDate = new DateTime(2026, 1, 1);
 
-            // --- 1. SEED PODATAKA (Task 4.1) ---
+            // --- 1. SEED PODATAKA (Task 4.1 & 4.2) ---
 
+            // Uloge
             modelBuilder.Entity<Uloga>().HasData(
                 new Uloga { Id = 1, Naziv = "Admin", CreatedAt = seedDate },
                 new Uloga { Id = 2, Naziv = "Klijent", CreatedAt = seedDate },
                 new Uloga { Id = 3, Naziv = "Zaposlenik", CreatedAt = seedDate }
             );
 
+            // Drzava
             modelBuilder.Entity<Drzava>().HasData(
                 new Drzava { Id = 1, Naziv = "Bosna i Hercegovina", PozivniBroj = "387", CreatedAt = seedDate }
             );
 
+            // Gradovi (10 gradova uključujući Konjic)
             modelBuilder.Entity<Grad>().HasData(
                 new Grad { Id = 1, Naziv = "Sarajevo", PostanskiBroj = "71000", DrzavaId = 1, CreatedAt = seedDate },
                 new Grad { Id = 2, Naziv = "Mostar", PostanskiBroj = "88000", DrzavaId = 1, CreatedAt = seedDate },
@@ -71,8 +74,16 @@ namespace NuaSpa.Infrastructure
                 new Grad { Id = 10, Naziv = "Jablanica", PostanskiBroj = "88420", DrzavaId = 1, CreatedAt = seedDate }
             );
 
+            // Kategorije Usluga
             modelBuilder.Entity<KategorijaUsluga>().HasData(
-                new KategorijaUsluga { Id = 1, Naziv = "Masaže", Opis = "Relaksacione i terapeutske masaže", CreatedAt = seedDate }
+                new KategorijaUsluga { Id = 1, Naziv = "Masaže", Opis = "Relaksacione i terapeutske masaže", CreatedAt = seedDate },
+                new KategorijaUsluga { Id = 2, Naziv = "Tretmani lica", Opis = "Njegujući tretmani za kožu", CreatedAt = seedDate }
+            );
+
+            // Usluge (Task 4.2 implementacija HasData)
+            modelBuilder.Entity<Usluga>().HasData(
+                new Usluga { Id = 1, Naziv = "Švedska masaža", Opis = "Klasična masaža tijela", Cijena = 50.00m, TrajanjeMinuta = 60, KategorijaUslugaId = 1, CreatedAt = seedDate },
+                new Usluga { Id = 2, Naziv = "Hidratacija lica", Opis = "Dubinska hidratacija", Cijena = 45.00m, TrajanjeMinuta = 45, KategorijaUslugaId = 2, CreatedAt = seedDate }
             );
 
             // --- 2. FLUENT API KONFIGURACIJA ---
@@ -89,7 +100,7 @@ namespace NuaSpa.Infrastructure
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.KorisnickoIme).IsUnique();
             modelBuilder.Entity<Proizvod>().HasIndex(p => p.Sifra).IsUnique();
 
-            // Indeksi za optimizaciju pretrage
+            // Indeksi za optimizaciju pretrage (Task 3.3)
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.Ime);
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.Prezime);
             modelBuilder.Entity<Zaposlenik>().HasIndex(z => z.Specijalizacija);
