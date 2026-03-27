@@ -46,11 +46,12 @@ namespace NuaSpa.Infrastructure
 
             var seedDate = new DateTime(2026, 1, 1);
 
-            // --- 1. SEED PODATAKA ---
+            // --- 1. SEED PODATAKA (Task 4.1) ---
+
             modelBuilder.Entity<Uloga>().HasData(
                 new Uloga { Id = 1, Naziv = "Admin", CreatedAt = seedDate },
-                new Uloga { Id = 2, Naziv = "Desktop", CreatedAt = seedDate },
-                new Uloga { Id = 3, Naziv = "Mobile", CreatedAt = seedDate }
+                new Uloga { Id = 2, Naziv = "Klijent", CreatedAt = seedDate },
+                new Uloga { Id = 3, Naziv = "Zaposlenik", CreatedAt = seedDate }
             );
 
             modelBuilder.Entity<Drzava>().HasData(
@@ -59,14 +60,22 @@ namespace NuaSpa.Infrastructure
 
             modelBuilder.Entity<Grad>().HasData(
                 new Grad { Id = 1, Naziv = "Sarajevo", PostanskiBroj = "71000", DrzavaId = 1, CreatedAt = seedDate },
-                new Grad { Id = 2, Naziv = "Mostar", PostanskiBroj = "88000", DrzavaId = 1, CreatedAt = seedDate }
+                new Grad { Id = 2, Naziv = "Mostar", PostanskiBroj = "88000", DrzavaId = 1, CreatedAt = seedDate },
+                new Grad { Id = 3, Naziv = "Konjic", PostanskiBroj = "88400", DrzavaId = 1, CreatedAt = seedDate },
+                new Grad { Id = 4, Naziv = "Banja Luka", PostanskiBroj = "78000", DrzavaId = 1, CreatedAt = seedDate },
+                new Grad { Id = 5, Naziv = "Tuzla", PostanskiBroj = "75000", DrzavaId = 1, CreatedAt = seedDate },
+                new Grad { Id = 6, Naziv = "Zenica", PostanskiBroj = "72000", DrzavaId = 1, CreatedAt = seedDate },
+                new Grad { Id = 7, Naziv = "Bihać", PostanskiBroj = "77000", DrzavaId = 1, CreatedAt = seedDate },
+                new Grad { Id = 8, Naziv = "Trebinje", PostanskiBroj = "89000", DrzavaId = 1, CreatedAt = seedDate },
+                new Grad { Id = 9, Naziv = "Bijeljina", PostanskiBroj = "76300", DrzavaId = 1, CreatedAt = seedDate },
+                new Grad { Id = 10, Naziv = "Jablanica", PostanskiBroj = "88420", DrzavaId = 1, CreatedAt = seedDate }
             );
 
             modelBuilder.Entity<KategorijaUsluga>().HasData(
                 new KategorijaUsluga { Id = 1, Naziv = "Masaže", Opis = "Relaksacione i terapeutske masaže", CreatedAt = seedDate }
             );
 
-            // --- 2. FLUENT API KONFIGURACIJA (Task 3.2 & 3.3) ---
+            // --- 2. FLUENT API KONFIGURACIJA ---
 
             // Preciznost za Decimal tipove
             modelBuilder.Entity<Usluga>().Property(u => u.Cijena).HasPrecision(18, 2);
@@ -75,12 +84,12 @@ namespace NuaSpa.Infrastructure
             modelBuilder.Entity<Popust>().Property(p => p.Procenat).HasPrecision(5, 2);
             modelBuilder.Entity<NarudzbaProizvoda>().Property(n => n.UkupnaCijena).HasPrecision(18, 2);
 
-            // Task 3.2: Unikatni indeksi (Validacija)
+            // Unikatni indeksi
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.Email).IsUnique();
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.KorisnickoIme).IsUnique();
             modelBuilder.Entity<Proizvod>().HasIndex(p => p.Sifra).IsUnique();
 
-            // Task 3.3: Indeksi za optimizaciju pretrage
+            // Indeksi za optimizaciju pretrage
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.Ime);
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.Prezime);
             modelBuilder.Entity<Zaposlenik>().HasIndex(z => z.Specijalizacija);
@@ -117,7 +126,7 @@ namespace NuaSpa.Infrastructure
                 .HasForeignKey(r => r.KorisnikId)
                 .OnDelete(DeleteBehavior.NoAction);
 
-            // Spojna tabela M:N (NarudzbaProizvoda)
+            // Spojna tabela M:N
             modelBuilder.Entity<NarudzbaProizvoda>()
                 .HasOne(np => np.Korisnik)
                 .WithMany()
