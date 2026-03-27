@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NuaSpa.Infrastructure;
 
@@ -11,9 +12,11 @@ using NuaSpa.Infrastructure;
 namespace NuaSpa.Infrastructure.Migrations
 {
     [DbContext(typeof(NuaSpaContext))]
-    partial class NuaSpaContextModelSnapshot : ModelSnapshot
+    [Migration("20260327165432_Task3_3_SearchOptimization")]
+    partial class Task3_3_SearchOptimization
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

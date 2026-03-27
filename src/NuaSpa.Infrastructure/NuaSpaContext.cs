@@ -36,7 +36,6 @@ namespace NuaSpa.Infrastructure
         {
             if (!optionsBuilder.IsConfigured)
             {
-                // Napomena: Ovo će se kasnije premjestiti u appsettings.json u Tasku 3.3
                 optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=180081;Trusted_Connection=True;TrustServerCertificate=True;");
             }
         }
@@ -67,19 +66,25 @@ namespace NuaSpa.Infrastructure
                 new KategorijaUsluga { Id = 1, Naziv = "Masaže", Opis = "Relaksacione i terapeutske masaže", CreatedAt = seedDate }
             );
 
-            // --- 2. FLUENT API KONFIGURACIJA (Task 3.2) ---
+            // --- 2. FLUENT API KONFIGURACIJA (Task 3.2 & 3.3) ---
 
-            // Preciznost za Decimal tipove (Finansije)
+            // Preciznost za Decimal tipove
             modelBuilder.Entity<Usluga>().Property(u => u.Cijena).HasPrecision(18, 2);
             modelBuilder.Entity<Proizvod>().Property(p => p.Cijena).HasPrecision(18, 2);
             modelBuilder.Entity<Placanje>().Property(p => p.Iznos).HasPrecision(18, 2);
             modelBuilder.Entity<Popust>().Property(p => p.Procenat).HasPrecision(5, 2);
             modelBuilder.Entity<NarudzbaProizvoda>().Property(n => n.UkupnaCijena).HasPrecision(18, 2);
 
-            // Unikatni indeksi
+            // Task 3.2: Unikatni indeksi (Validacija)
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.Email).IsUnique();
             modelBuilder.Entity<Korisnik>().HasIndex(k => k.KorisnickoIme).IsUnique();
             modelBuilder.Entity<Proizvod>().HasIndex(p => p.Sifra).IsUnique();
+
+            // Task 3.3: Indeksi za optimizaciju pretrage
+            modelBuilder.Entity<Korisnik>().HasIndex(k => k.Ime);
+            modelBuilder.Entity<Korisnik>().HasIndex(k => k.Prezime);
+            modelBuilder.Entity<Zaposlenik>().HasIndex(z => z.Specijalizacija);
+            modelBuilder.Entity<Usluga>().HasIndex(u => u.Naziv);
 
             // Relacije i DeleteBehavior
             modelBuilder.Entity<Grad>()
