@@ -16,7 +16,7 @@ namespace NuaSpa.Infrastructure
         public DbSet<Uloga> Uloge { get; set; }
         public DbSet<KategorijaUsluga> KategorijeUsluga { get; set; }
 
-        // --- Core tabele (Task 1.2) ---
+        // --- Core tabele ---
         public DbSet<Korisnik> Korisnici { get; set; }
         public DbSet<Zaposlenik> Zaposlenici { get; set; }
         public DbSet<Usluga> Usluge { get; set; }
@@ -36,6 +36,7 @@ namespace NuaSpa.Infrastructure
         {
             if (!optionsBuilder.IsConfigured)
             {
+                // Napomena: Ovo će se kasnije premjestiti u appsettings.json u Tasku 3.3
                 optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=180081;Trusted_Connection=True;TrustServerCertificate=True;");
             }
         }
@@ -47,7 +48,6 @@ namespace NuaSpa.Infrastructure
             var seedDate = new DateTime(2026, 1, 1);
 
             // --- 1. SEED PODATAKA ---
-
             modelBuilder.Entity<Uloga>().HasData(
                 new Uloga { Id = 1, Naziv = "Admin", CreatedAt = seedDate },
                 new Uloga { Id = 2, Naziv = "Desktop", CreatedAt = seedDate },
@@ -67,72 +67,63 @@ namespace NuaSpa.Infrastructure
                 new KategorijaUsluga { Id = 1, Naziv = "Masaže", Opis = "Relaksacione i terapeutske masaže", CreatedAt = seedDate }
             );
 
-            // --- 2. MAPIRANJE RELACIJA (Task 1.3) ---
+            // --- 2. FLUENT API KONFIGURACIJA (Task 3.2) ---
 
-            // Grad -> Drzava (1:N)
+            // Preciznost za Decimal tipove (Finansije)
+            modelBuilder.Entity<Usluga>().Property(u => u.Cijena).HasPrecision(18, 2);
+            modelBuilder.Entity<Proizvod>().Property(p => p.Cijena).HasPrecision(18, 2);
+            modelBuilder.Entity<Placanje>().Property(p => p.Iznos).HasPrecision(18, 2);
+            modelBuilder.Entity<Popust>().Property(p => p.Procenat).HasPrecision(5, 2);
+            modelBuilder.Entity<NarudzbaProizvoda>().Property(n => n.UkupnaCijena).HasPrecision(18, 2);
+
+            // Unikatni indeksi
+            modelBuilder.Entity<Korisnik>().HasIndex(k => k.Email).IsUnique();
+            modelBuilder.Entity<Korisnik>().HasIndex(k => k.KorisnickoIme).IsUnique();
+            modelBuilder.Entity<Proizvod>().HasIndex(p => p.Sifra).IsUnique();
+
+            // Relacije i DeleteBehavior
             modelBuilder.Entity<Grad>()
                 .HasOne(g => g.Drzava)
                 .WithMany()
                 .HasForeignKey(g => g.DrzavaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Korisnik -> Uloga (1:N)
             modelBuilder.Entity<Korisnik>()
                 .HasOne(k => k.Uloga)
                 .WithMany()
                 .HasForeignKey(k => k.UlogaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Rezervacija -> Korisnik (1:N)
             modelBuilder.Entity<Rezervacija>()
                 .HasOne(r => r.Korisnik)
                 .WithMany()
                 .HasForeignKey(r => r.KorisnikId)
                 .OnDelete(DeleteBehavior.NoAction);
 
-            // Rezervacija -> Usluga (1:N)
             modelBuilder.Entity<Rezervacija>()
-                .HasOne(r => r.Usluga)
+                .HasOne(r => r.Zaposlenik)
                 .WithMany()
-                .HasForeignKey(r => r.UslugaId);
+                .HasForeignKey(r => r.ZaposlenikId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-            // NarudzbaProizvoda (Spojna tabela za M:N veza između Korisnika i Proizvoda)
+            modelBuilder.Entity<Recenzija>()
+                .HasOne(r => r.Korisnik)
+                .WithMany()
+                .HasForeignKey(r => r.KorisnikId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // Spojna tabela M:N (NarudzbaProizvoda)
             modelBuilder.Entity<NarudzbaProizvoda>()
                 .HasOne(np => np.Korisnik)
                 .WithMany()
-                .HasForeignKey(np => np.KorisnikId);
+                .HasForeignKey(np => np.KorisnikId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<NarudzbaProizvoda>()
                 .HasOne(np => np.Proizvod)
                 .WithMany()
-                .HasForeignKey(np => np.ProizvodId);
-
-            // Skladiste -> Proizvod (1:N)
-            modelBuilder.Entity<Skladiste>()
-                .HasOne(s => s.Proizvod)
-                .WithMany()
-                .HasForeignKey(s => s.ProizvodId);
-
-            // Recenzija -> Usluga i Korisnik
-            modelBuilder.Entity<Recenzija>()
-                .HasOne(r => r.Usluga)
-                .WithMany()
-                .HasForeignKey(r => r.UslugaId);
-
-            modelBuilder.Entity<Recenzija>()
-                .HasOne(r => r.Korisnik)
-                .WithMany()
-                .HasForeignKey(r => r.KorisnikId)
-                .OnDelete(DeleteBehavior.NoAction);
-
-            // Unikatni indeksi
-            modelBuilder.Entity<Korisnik>()
-                .HasIndex(k => k.Email)
-                .IsUnique();
-
-            modelBuilder.Entity<Korisnik>()
-                .HasIndex(k => k.KorisnickoIme)
-                .IsUnique();
+                .HasForeignKey(np => np.ProizvodId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }
