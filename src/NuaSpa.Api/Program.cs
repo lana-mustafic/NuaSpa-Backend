@@ -2,14 +2,16 @@
 using Microsoft.OpenApi.Models;
 using NuaSpa.Infrastructure;
 using System.Text.Json.Serialization;
+// DODAJ OVO:
+using NuaSpa.Application;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Podrška za Controllere + IgnoreCycles (sprječava beskonačne petlje u JSON-u)
+// 1. Podrška za Controllere + IgnoreCycles
 builder.Services.AddControllers()
     .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
-// 2. Swagger konfiguracija (US-4.1.3: Setup Swagger/OpenAPI)
+// 2. Swagger konfiguracija
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -20,7 +22,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "Backend API for Wellness & Spa System (Desktop & Mobile)"
     });
 
-    // Definisanje Security šeme (Bearer Token)
     var securityScheme = new OpenApiSecurityScheme
     {
         Name = "JWT Authentication",
@@ -33,7 +34,6 @@ builder.Services.AddSwaggerGen(c =>
 
     c.AddSecurityDefinition("Bearer", securityScheme);
 
-    // FIX: Ispravna implementacija Security Requirementa za novije verzije
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -45,17 +45,18 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "Bearer"
                 }
             },
-            new List<string>() // Koristimo List<string> umjesto string[] da izbjegnemo grešku
+            new List<string>()
         }
     });
 });
 
-// 3. Registracija DbContext-a (Konekcija na SQL Server)
+// 3. Registracija DbContext-a
 builder.Services.AddDbContext<NuaSpaContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 4. Registracija AutoMapper-a (Otkomentariši kada kreiraš MappingProfile)
-// builder.Services.AddAutoMapper(typeof(Program)); 
+// 4. POPRAVLJENA Registracija AutoMapper-a 
+// Koristimo typeof(MappingProfile) da bi AutoMapper znao da pretraži Application sloj
+builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
 
 var app = builder.Build();
 
@@ -71,7 +72,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Redoslijed je kritičan za sigurnost!
+// BITNO: Authentication mora ići PRIJE Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
