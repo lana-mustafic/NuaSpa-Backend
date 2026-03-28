@@ -1,47 +1,80 @@
 ﻿using Microsoft.EntityFrameworkCore;
- // Za OpenApiInfo grešku
-using NuaSpa.Application.DTOs;
-using NuaSpa.Application.Interfaces;
-using NuaSpa.Application.SearchObjects;
-using NuaSpa.Infrastructure; // POPRAVLJENO: Izbačeno .Database jer je tvoj Context ovdje
-//using NuaSpa.Infrastructure.Services;
+using Microsoft.OpenApi.Models;
+using NuaSpa.Infrastructure;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Dodaj podršku za Controllere
-builder.Services.AddControllers();
+// 1. Podrška za Controllere + IgnoreCycles (sprječava beskonačne petlje u JSON-u)
+builder.Services.AddControllers()
+    .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
-// 2. Swagger konfiguracija (Ovo će ti trebati za Task 2.5)
+// 2. Swagger konfiguracija (US-4.1.3: Setup Swagger/OpenAPI)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-   // c.SwaggerDoc("v1", new OpenApiInfo { Title = "NuaSpa API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "NuaSpa API",
+        Version = "v1",
+        Description = "Backend API for Wellness & Spa System (Desktop & Mobile)"
+    });
+
+    // Definisanje Security šeme (Bearer Token)
+    var securityScheme = new OpenApiSecurityScheme
+    {
+        Name = "JWT Authentication",
+        Description = "Unesite token u formatu: Bearer {vaš_token}",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    };
+
+    c.AddSecurityDefinition("Bearer", securityScheme);
+
+    // FIX: Ispravna implementacija Security Requirementa za novije verzije
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new List<string>() // Koristimo List<string> umjesto string[] da izbjegnemo grešku
+        }
+    });
 });
 
 // 3. Registracija DbContext-a (Konekcija na SQL Server)
 builder.Services.AddDbContext<NuaSpaContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 4. Registracija AutoMapper-a (Koristi tvoj MappingProfile)
-builder.Services.AddAutoMapper(typeof(NuaSpa.Application.MappingProfile));
-
-// 5. Registracija Servisa (Dependency Injection)
-// Ovdje mapiramo Interfejs na konkretnu klasu Servisa
-//builder.Services.AddScoped<IBaseService<UslugaDTO, UslugaSearchObject>, UslugaService>();
+// 4. Registracija AutoMapper-a (Otkomentariši kada kreiraš MappingProfile)
+// builder.Services.AddAutoMapper(typeof(Program)); 
 
 var app = builder.Build();
 
-// 6. Konfiguracija HTTP pipeline-a
+// 5. Middleware Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "NuaSpa API v1");
+    });
 }
 
 app.UseHttpsRedirection();
+
+// Redoslijed je kritičan za sigurnost!
+app.UseAuthentication();
 app.UseAuthorization();
 
-// 7. Mapiranje ruta controllera
 app.MapControllers();
 
 app.Run();
