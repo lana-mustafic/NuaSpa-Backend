@@ -11,7 +11,7 @@ using NuaSpa.Infrastructure;
 
 namespace NuaSpa.Infrastructure.Migrations
 {
-    [DbContext(typeof(NuaSpaContext))]
+  
     [Migration("20260327165042_Task3_2_FluentApi_Update")]
     partial class Task3_2_FluentApi_Update
     {

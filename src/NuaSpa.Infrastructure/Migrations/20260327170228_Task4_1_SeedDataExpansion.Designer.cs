@@ -11,7 +11,7 @@ using NuaSpa.Infrastructure;
 
 namespace NuaSpa.Infrastructure.Migrations
 {
-    [DbContext(typeof(NuaSpaContext))]
+  
     [Migration("20260327170228_Task4_1_SeedDataExpansion")]
     partial class Task4_1_SeedDataExpansion
     {

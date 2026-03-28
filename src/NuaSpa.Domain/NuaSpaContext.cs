@@ -1,8 +1,10 @@
-﻿using System;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using NuaSpa.Domain.Entities;
+using System;
+using System.Collections.Generic;
+using System.Reflection.Emit;
 
-namespace NuaSpa.Infrastructure
+namespace NuaSpa.Domain
 {
     public class NuaSpaContext : DbContext
     {

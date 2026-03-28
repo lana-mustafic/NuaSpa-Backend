@@ -1,4 +1,5 @@
 ﻿using System;
+using NuaSpa.Domain;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
