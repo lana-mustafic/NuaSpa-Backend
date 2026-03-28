@@ -11,7 +11,7 @@ using NuaSpa.Infrastructure;
 
 namespace NuaSpa.Infrastructure.Migrations
 {
-    [DbContext(typeof(NuaSpaContext))]
+  
     [Migration("20260327171442_Task4_3_FixSeedPropertyNames")]
     partial class Task4_3_FixSeedPropertyNames
     {

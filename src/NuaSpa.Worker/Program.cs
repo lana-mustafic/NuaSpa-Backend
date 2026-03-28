@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using NuaSpa.Infrastructure;
+using NuaSpa.Domain;
 using NuaSpa.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);

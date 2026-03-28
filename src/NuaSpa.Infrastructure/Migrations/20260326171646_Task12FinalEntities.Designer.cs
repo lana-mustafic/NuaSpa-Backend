@@ -11,7 +11,7 @@ using NuaSpa.Infrastructure;
 
 namespace NuaSpa.Infrastructure.Migrations
 {
-    [DbContext(typeof(NuaSpaContext))]
+  
     [Migration("20260326171646_Task12FinalEntities")]
     partial class Task12FinalEntities
     {

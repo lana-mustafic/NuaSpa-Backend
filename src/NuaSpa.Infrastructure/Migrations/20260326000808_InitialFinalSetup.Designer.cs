@@ -11,7 +11,7 @@ using NuaSpa.Infrastructure;
 
 namespace NuaSpa.Infrastructure.Migrations
 {
-    [DbContext(typeof(NuaSpaContext))]
+  
     [Migration("20260326000808_InitialFinalSetup")]
     partial class InitialFinalSetup
     {

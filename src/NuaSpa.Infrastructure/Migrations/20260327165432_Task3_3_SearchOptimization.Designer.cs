@@ -11,7 +11,7 @@ using NuaSpa.Infrastructure;
 
 namespace NuaSpa.Infrastructure.Migrations
 {
-    [DbContext(typeof(NuaSpaContext))]
+  
     [Migration("20260327165432_Task3_3_SearchOptimization")]
     partial class Task3_3_SearchOptimization
     {

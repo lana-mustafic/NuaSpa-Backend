@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.Interfaces; 
+using NuaSpa.Application.DTOs; 
 
 namespace NuaSpa.Api.Controllers;
 
