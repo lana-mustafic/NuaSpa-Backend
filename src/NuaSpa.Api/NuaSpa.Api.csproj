@@ -1,27 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
-  </PropertyGroup>
-	
-	
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="AutoMapper" Version="13.0.1" />
-		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0-preview.1.25120.3" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0-preview.1.25120.3">
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
 	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\NuaSpa.Infrastructure\NuaSpa.Infrastructure.csproj" />
-    <ProjectReference Include="..\NuaSpa.Application\NuaSpa.Application.csproj" />
-    <ProjectReference Include="..\NuaSpa.Domain\NuaSpa.Domain.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\NuaSpa.Infrastructure\NuaSpa.Infrastructure.csproj" />
+		<ProjectReference Include="..\NuaSpa.Application\NuaSpa.Application.csproj" />
+		<ProjectReference Include="..\NuaSpa.Domain\NuaSpa.Domain.csproj" />
+	</ItemGroup>
 
 </Project>
