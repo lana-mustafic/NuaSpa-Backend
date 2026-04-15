@@ -1,9 +1,16 @@
-﻿using Microsoft.EntityFrameworkCore;
-using NuaSpa.Domain;
-using System.Text.Json.Serialization;
-using NuaSpa.Application;
-using System.Reflection;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.OpenApi.Models;
+using NuaSpa.Application;
+using NuaSpa.Domain;
+using NuaSpa.Domain.Entities;
+using System.Reflection;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using NuaSpa.Application.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
     .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
-// --- 2. SWAGGER / OPENAPI (Task 1.1, 1.3) ---
+// --- 2. SWAGGER / OPENAPI ---
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -22,7 +29,6 @@ builder.Services.AddSwaggerGen(c =>
         Description = "NuaSpa Wellness & Spa Management System API"
     });
 
-    // JWT Security Definition
     var securityScheme = new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -34,39 +40,71 @@ builder.Services.AddSwaggerGen(c =>
     };
 
     c.AddSecurityDefinition("Bearer", securityScheme);
-
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
             },
             new List<string>()
         }
     });
 
-    // XML dokumentacija (Task 1.3)
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
 });
 
-// --- 3. INFRASTRUKTURA (Baza i AutoMapper) ---
+// --- 3. INFRASTRUKTURA (Baza, Identity i JWT) ---
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddDbContext<NuaSpaContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    options.UseSqlServer(connectionString, x => x.MigrationsAssembly("NuaSpa.Infrastructure"));
+    options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+});
+
+// Identity postavke
+builder.Services.AddIdentity<Korisnik, Uloga>(options =>
+{
+    options.Password.RequireDigit = false;
+    options.Password.RequiredLength = 3;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireLowercase = false;
+})
+.AddEntityFrameworkStores<NuaSpaContext>()
+.AddDefaultTokenProviders();
+
+// --- NOVO: JWT KONFIGURACIJA ---
+var jwtSettings = new JwtSettings();
+builder.Configuration.GetSection("JwtSettings").Bind(jwtSettings);
+builder.Services.AddSingleton(jwtSettings);
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidAudience = jwtSettings.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key))
+    };
+});
 
 builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
 
-// --- 4. DEPENDENCY INJECTION (Task 1.4 - Senior Level Automation) ---
-// Automatski registrujemo sve servise iz Application projekta
-// Pravilo: Klasa mora završavati na "Service" i imati pripadajući interfejs (npr. KorisniciService -> IKorisniciService)
+// --- 4. DEPENDENCY INJECTION (Automation) ---
 var applicationAssembly = typeof(MappingProfile).Assembly;
-
 var serviceTypes = applicationAssembly.GetTypes()
     .Where(t => t.Name.EndsWith("Service") && !t.IsInterface && !t.IsAbstract);
 
@@ -88,13 +126,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "NuaSpa API v1");
-        c.RoutePrefix = string.Empty; // Postavlja Swagger kao početnu stranicu (localhost:XXXX/)
+        c.RoutePrefix = string.Empty;
     });
 }
 
 app.UseHttpsRedirection();
 
-// Redoslijed je bitan: Authentication pa Authorization
+// Redoslijed je ovdje presudan!
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -1,40 +1,40 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using NuaSpa.Domain.Entities;
 using System;
-using System.Collections.Generic;
-using System.Reflection.Emit;
 
 namespace NuaSpa.Domain
 {
-    public class NuaSpaContext : DbContext
+    public class NuaSpaContext : IdentityDbContext<Korisnik, Uloga, int>
     {
         public NuaSpaContext(DbContextOptions<NuaSpaContext> options) : base(options) { }
 
-        public DbSet<Drzava> Drzave { get; set; }
-        public DbSet<Grad> Gradovi { get; set; }
-        public DbSet<Uloga> Uloge { get; set; }
-        public DbSet<KategorijaUsluga> KategorijeUsluga { get; set; }
-        public DbSet<Korisnik> Korisnici { get; set; }
-        public DbSet<Zaposlenik> Zaposlenici { get; set; }
-        public DbSet<Usluga> Usluge { get; set; }
-        public DbSet<Rezervacija> Rezervacije { get; set; }
-        public DbSet<Recenzija> Recenzije { get; set; }
-        public DbSet<Proizvod> Proizvodi { get; set; }
-        public DbSet<Skladiste> Skladista { get; set; }
-        public DbSet<NarudzbaProizvoda> NarudzbeProizvoda { get; set; }
-        public DbSet<Placanje> Placanja { get; set; }
-        public DbSet<Popust> Popusti { get; set; }
+        public DbSet<Drzava> Drzave { get; set; } = null!;
+        public DbSet<Grad> Gradovi { get; set; } = null!;
+        public DbSet<KategorijaUsluga> KategorijeUsluga { get; set; } = null!;
+        public DbSet<Zaposlenik> Zaposlenici { get; set; } = null!;
+        public DbSet<Usluga> Usluge { get; set; } = null!;
+        public DbSet<Rezervacija> Rezervacije { get; set; } = null!;
+        public DbSet<Recenzija> Recenzije { get; set; } = null!;
+        public DbSet<Proizvod> Proizvodi { get; set; } = null!;
+        public DbSet<Skladiste> Skladista { get; set; } = null!;
+        public DbSet<NarudzbaProizvoda> NarudzbeProizvoda { get; set; } = null!;
+        public DbSet<Placanje> Placanja { get; set; } = null!;
+        public DbSet<Popust> Popusti { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // OVO MORA BITI PRVO!
             base.OnModelCreating(modelBuilder);
+
             var seedDate = new DateTime(2026, 1, 1);
 
-            // 1. SEED PODATAKA
+            // 1. SEED ZA ULOGE
             modelBuilder.Entity<Uloga>().HasData(
-                new Uloga { Id = 1, Naziv = "Admin", CreatedAt = seedDate },
-                new Uloga { Id = 2, Naziv = "Klijent", CreatedAt = seedDate },
-                new Uloga { Id = 3, Naziv = "Zaposlenik", CreatedAt = seedDate }
+                new Uloga { Id = 1, Name = "Admin", NormalizedName = "ADMIN", CreatedAt = seedDate, ConcurrencyStamp = Guid.NewGuid().ToString() },
+                new Uloga { Id = 2, Name = "Klijent", NormalizedName = "KLIJENT", CreatedAt = seedDate, ConcurrencyStamp = Guid.NewGuid().ToString() },
+                new Uloga { Id = 3, Name = "Zaposlenik", NormalizedName = "ZAPOSLENIK", CreatedAt = seedDate, ConcurrencyStamp = Guid.NewGuid().ToString() }
             );
 
             modelBuilder.Entity<Drzava>().HasData(
@@ -44,49 +44,56 @@ namespace NuaSpa.Domain
             modelBuilder.Entity<Grad>().HasData(
                 new Grad { Id = 1, Naziv = "Sarajevo", PostanskiBroj = "71000", DrzavaId = 1, CreatedAt = seedDate },
                 new Grad { Id = 3, Naziv = "Konjic", PostanskiBroj = "88400", DrzavaId = 1, CreatedAt = seedDate }
-                // Dodaj ostale gradove po potrebi...
             );
 
-            // --- Task 4.3: ISPRAVLJEN SEED ZA KORISNIKE ---
+            // 2. SEED ZA KORISNIKE (SecurityStamp je OBAVEZAN za Identity)
+            var adminId = 1;
+            var lanaId = 2;
+
             modelBuilder.Entity<Korisnik>().HasData(
                 new Korisnik
                 {
-                    Id = 1,
+                    Id = adminId,
                     Ime = "Admin",
                     Prezime = "NuaSpa",
                     Email = "admin@nuaspa.ba",
-                    KorisnickoIme = "admin",
-                    PasswordHash = "dummy_hash_123", // Usklađeno sa klasom
-                    PasswordSalt = "dummy_salt_123", // Usklađeno sa klasom
-                    Telefon = "033123456",
-                    UlogaId = 1,
+                    NormalizedEmail = "ADMIN@NUASPA.BA",
+                    UserName = "admin",
+                    NormalizedUserName = "ADMIN",
+                    PasswordHash = "AQAAAAEAACcQAAAAE...dummy_hash",
+                    SecurityStamp = Guid.NewGuid().ToString(), // Dodano!
+                    PhoneNumber = "033123456",
                     GradId = 1,
                     Status = true,
-                    CreatedAt = seedDate
+                    DatumRegistracije = seedDate
                 },
                 new Korisnik
                 {
-                    Id = 2,
+                    Id = lanaId,
                     Ime = "Lana",
                     Prezime = "Korisnik",
                     Email = "lana@test.ba",
-                    KorisnickoIme = "lana",
-                    PasswordHash = "dummy_hash_456",
-                    PasswordSalt = "dummy_salt_456",
-                    Telefon = "061222333",
-                    UlogaId = 2,
-                    GradId = 3, // Konjic
+                    NormalizedEmail = "LANA@TEST.BA",
+                    UserName = "lana",
+                    NormalizedUserName = "LANA",
+                    PasswordHash = "AQAAAAEAACcQAAAAE...dummy_hash",
+                    SecurityStamp = Guid.NewGuid().ToString(), // Dodano!
+                    PhoneNumber = "061222333",
+                    GradId = 3,
                     Status = true,
-                    CreatedAt = seedDate
+                    DatumRegistracije = seedDate
                 }
             );
 
-            // 2. FLUENT API (Decimali i Indeksi)
-            modelBuilder.Entity<Usluga>().Property(u => u.Cijena).HasPrecision(18, 2);
-            modelBuilder.Entity<Korisnik>().HasIndex(k => k.Email).IsUnique();
-            modelBuilder.Entity<Korisnik>().HasIndex(k => k.KorisnickoIme).IsUnique();
+            // 3. POVEZIVANJE KORISNIKA I ULOGA (Ovo ti je falilo!)
+            modelBuilder.Entity<IdentityUserRole<int>>().HasData(
+                new IdentityUserRole<int> { UserId = adminId, RoleId = 1 }, // Admin je Admin
+                new IdentityUserRole<int> { UserId = lanaId, RoleId = 2 }   // Lana je Klijent
+            );
 
-            // Relacije
+            // 4. FLUENT API
+            modelBuilder.Entity<Usluga>().Property(u => u.Cijena).HasPrecision(18, 2);
+
             modelBuilder.Entity<Korisnik>()
                 .HasOne(k => k.Grad)
                 .WithMany()
