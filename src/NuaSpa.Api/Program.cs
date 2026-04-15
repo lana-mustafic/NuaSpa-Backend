@@ -1,12 +1,16 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics; // Dodano za rješavanje warninga
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.OpenApi.Models;
 using NuaSpa.Application;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using NuaSpa.Application.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,17 +56,16 @@ builder.Services.AddSwaggerGen(c =>
     if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
 });
 
-// --- 3. INFRASTRUKTURA (Baza, Identity i AutoMapper) ---
+// --- 3. INFRASTRUKTURA (Baza, Identity i JWT) ---
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 builder.Services.AddDbContext<NuaSpaContext>(options =>
 {
     options.UseSqlServer(connectionString, x => x.MigrationsAssembly("NuaSpa.Infrastructure"));
-
-    // KLJUČNO ZA .NET 9: Ignorišemo warning o pending changes kako bi database update prošao
     options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
 });
 
+// Identity postavke
 builder.Services.AddIdentity<Korisnik, Uloga>(options =>
 {
     options.Password.RequireDigit = false;
@@ -73,6 +76,30 @@ builder.Services.AddIdentity<Korisnik, Uloga>(options =>
 })
 .AddEntityFrameworkStores<NuaSpaContext>()
 .AddDefaultTokenProviders();
+
+// --- NOVO: JWT KONFIGURACIJA ---
+var jwtSettings = new JwtSettings();
+builder.Configuration.GetSection("JwtSettings").Bind(jwtSettings);
+builder.Services.AddSingleton(jwtSettings);
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidAudience = jwtSettings.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key))
+    };
+});
 
 builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
 
@@ -105,7 +132,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication(); // Mora biti prije Authorization
+// Redoslijed je ovdje presudan!
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
