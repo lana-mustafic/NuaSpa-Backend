@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # 1. SQL Server Baza
+  nuaspa-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: nuaspa-db-container
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrongPassword123!
+    ports:
+      - "1433:1433"
+    networks:
+      - nuaspa-network
+
+  # 2. Tvoj .NET API
+  nuaspa-api:
+    image: nuaspa-api-image
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nuaspa-api-container
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=nuaspa-db;Database=NuaSpaDb;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
+    ports:
+      - "8080:8080"
+    depends_on:
+      - nuaspa-db
+    networks:
+      - nuaspa-network
+
+networks:
+  nuaspa-network:
+    driver: bridge

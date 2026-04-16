@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using NuaSpa.Application.Common;
+using NuaSpa.Infrastructure; // Provjeri da li je ovo ispravan namespace za tvoj Context
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,7 +66,6 @@ builder.Services.AddDbContext<NuaSpaContext>(options =>
     options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
 });
 
-// Identity postavke
 builder.Services.AddIdentity<Korisnik, Uloga>(options =>
 {
     options.Password.RequireDigit = false;
@@ -77,7 +77,6 @@ builder.Services.AddIdentity<Korisnik, Uloga>(options =>
 .AddEntityFrameworkStores<NuaSpaContext>()
 .AddDefaultTokenProviders();
 
-// --- NOVO: JWT KONFIGURACIJA ---
 var jwtSettings = new JwtSettings();
 builder.Configuration.GetSection("JwtSettings").Bind(jwtSettings);
 builder.Services.AddSingleton(jwtSettings);
@@ -117,9 +116,30 @@ foreach (var serviceType in serviceTypes)
     }
 }
 
-// --- 5. BUILD I MIDDLEWARE PIPELINE ---
 var app = builder.Build();
 
+// --- NOVO: AUTOMATSKE MIGRACIJE ---
+// Ovaj dio koda osigurava da se baza kreira i migracije izvrše pri pokretanju
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<NuaSpaContext>();
+        // Čeka bazu ako se još nije podigla (pokušava 5 puta)
+        if (context.Database.GetPendingMigrations().Any())
+        {
+            context.Database.Migrate();
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Došlo je do greške prilikom migracije baze podataka.");
+    }
+}
+
+// --- 5. MIDDLEWARE PIPELINE ---
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -131,11 +151,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-// Redoslijed je ovdje presudan!
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
