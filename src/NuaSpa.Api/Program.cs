@@ -1,17 +1,19 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using NuaSpa.Api.Services.Messaging;
 using NuaSpa.Application;
+using NuaSpa.Application.Common;
+using NuaSpa.Application.Interfaces.Messaging;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using System.Reflection;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using NuaSpa.Application.Common;
-using NuaSpa.Infrastructure; // Provjeri da li je ovo ispravan namespace za tvoj Context
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -100,9 +102,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 
-// --- 4. DEPENDENCY INJECTION (Automation) ---
+// --- 4. DEPENDENCY INJECTION ---
+
+// Registracija RabbitMQ Producera
+builder.Services.AddScoped<IRabbitMQProducer, RabbitMQProducer>();
+
+// Automatizacija ostalih servisa
 var applicationAssembly = typeof(MappingProfile).Assembly;
 var serviceTypes = applicationAssembly.GetTypes()
     .Where(t => t.Name.EndsWith("Service") && !t.IsInterface && !t.IsAbstract);
@@ -118,15 +125,13 @@ foreach (var serviceType in serviceTypes)
 
 var app = builder.Build();
 
-// --- NOVO: AUTOMATSKE MIGRACIJE ---
-// Ovaj dio koda osigurava da se baza kreira i migracije izvrše pri pokretanju
+// --- AUTOMATSKE MIGRACIJE ---
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     try
     {
         var context = services.GetRequiredService<NuaSpaContext>();
-        // Čeka bazu ako se još nije podigla (pokušava 5 puta)
         if (context.Database.GetPendingMigrations().Any())
         {
             context.Database.Migrate();
