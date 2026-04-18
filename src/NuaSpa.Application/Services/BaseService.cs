@@ -29,5 +29,16 @@ namespace NuaSpa.Application.Services
             var entity = await _context.Set<TDb>().FindAsync(id);
             return _mapper.Map<T>(entity);
         }
+
+        public virtual async Task<T> Insert(T dto)
+        {
+            var set = _context.Set<TDb>();
+            TDb entity = _mapper.Map<TDb>(dto);
+
+            set.Add(entity);
+            await _context.SaveChangesAsync();
+
+            return _mapper.Map<T>(entity);
+        }
     }
 }

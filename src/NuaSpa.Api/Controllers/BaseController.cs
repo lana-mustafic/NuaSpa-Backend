@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using NuaSpa.Application.Interfaces; 
-using NuaSpa.Application.DTOs; 
+using NuaSpa.Application.Interfaces;
 
 namespace NuaSpa.Api.Controllers;
 
@@ -25,5 +24,11 @@ public class BaseController<TModel, TSearch> : ControllerBase where TModel : cla
     public virtual async Task<TModel> GetById(int id)
     {
         return await _service.GetById(id);
+    }
+
+    [HttpPost]
+    public virtual async Task<TModel> Insert([FromBody] TModel dto)
+    {
+        return await _service.Insert(dto);
     }
 }

@@ -20,6 +20,7 @@ namespace NuaSpa.Application
             CreateMap<Recenzija, RecenzijaDTO>().ReverseMap();
             CreateMap<Rezervacija, RezervacijaDTO>().ReverseMap();
             CreateMap<Korisnik, KorisnikDTO>().ReverseMap();
+            CreateMap<KategorijaUslugaDTO, KategorijaUsluga>().ReverseMap();
 
             // --- 2. Specifična pravila za polja (Identity usklađivanje) ---
 

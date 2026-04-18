@@ -1,17 +1,19 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using NuaSpa.Api.Services.Messaging;
 using NuaSpa.Application;
+using NuaSpa.Application.Common;
+using NuaSpa.Application.Interfaces.Messaging;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using System.Reflection;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using NuaSpa.Application.Common;
-using NuaSpa.Infrastructure; // Provjeri da li je ovo ispravan namespace za tvoj Context
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -100,15 +102,19 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 
-// --- 4. DEPENDENCY INJECTION (Automation) ---
+// --- 4. DEPENDENCY INJECTION ---
+builder.Services.AddScoped<IRabbitMQProducer, RabbitMQProducer>();
+builder.Services.AddScoped<IKategorijaUslugaService, KategorijaUslugaService>();
+
 var applicationAssembly = typeof(MappingProfile).Assembly;
 var serviceTypes = applicationAssembly.GetTypes()
     .Where(t => t.Name.EndsWith("Service") && !t.IsInterface && !t.IsAbstract);
 
 foreach (var serviceType in serviceTypes)
 {
+    // Ovo će naći IUslugaService za UslugaService
     var interfaceType = serviceType.GetInterface($"I{serviceType.Name}");
     if (interfaceType != null)
     {
@@ -118,15 +124,13 @@ foreach (var serviceType in serviceTypes)
 
 var app = builder.Build();
 
-// --- NOVO: AUTOMATSKE MIGRACIJE ---
-// Ovaj dio koda osigurava da se baza kreira i migracije izvrše pri pokretanju
+// --- AUTOMATSKE MIGRACIJE ---
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     try
     {
         var context = services.GetRequiredService<NuaSpaContext>();
-        // Čeka bazu ako se još nije podigla (pokušava 5 puta)
         if (context.Database.GetPendingMigrations().Any())
         {
             context.Database.Migrate();
@@ -148,6 +152,16 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "NuaSpa API v1");
         c.RoutePrefix = string.Empty;
     });
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<NuaSpaContext>(); // Zamijeni 'NuaSpaContext' imenom tvog Context-a ako je drugačije
+    if (!context.KategorijeUsluga.Any())
+    {
+        context.KategorijeUsluga.Add(new NuaSpa.Domain.Entities.KategorijaUsluga { Naziv = "Automatska", IsDeleted = false, CreatedAt = DateTime.Now });
+        context.SaveChanges();
+    }
 }
 
 app.UseHttpsRedirection();

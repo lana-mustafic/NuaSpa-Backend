@@ -8,5 +8,6 @@ namespace NuaSpa.Application.Interfaces
     {
         Task<IEnumerable<T>> Get(TSearch? search = null);
         Task<T> GetById(int id);
+        Task<T> Insert(T dto);
     }
 }
