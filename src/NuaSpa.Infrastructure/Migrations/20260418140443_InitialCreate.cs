@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace NuaSpa.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddIdentitySupport : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -458,9 +458,9 @@ namespace NuaSpa.Infrastructure.Migrations
                 columns: new[] { "Id", "ConcurrencyStamp", "CreatedAt", "Name", "NormalizedName", "Opis" },
                 values: new object[,]
                 {
-                    { 1, "5e26b376-bee7-4fae-a9a3-352bde4da436", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "Admin", "ADMIN", null },
-                    { 2, "16f0bd13-8aab-4935-bbe9-f180483afa10", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "Klijent", "KLIJENT", null },
-                    { 3, "f7043d9c-d421-455e-92ae-60efaf3eeccf", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "Zaposlenik", "ZAPOSLENIK", null }
+                    { 1, "40892b8d-6851-4799-add0-3730dadb3e78", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "Admin", "ADMIN", null },
+                    { 2, "8225401a-610b-4d9e-98ee-58c8eba85b41", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "Klijent", "KLIJENT", null },
+                    { 3, "6a5209b0-1370-4f93-aa6b-b0700ba4dd08", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "Zaposlenik", "ZAPOSLENIK", null }
                 });
 
             migrationBuilder.InsertData(
@@ -482,8 +482,8 @@ namespace NuaSpa.Infrastructure.Migrations
                 columns: new[] { "Id", "AccessFailedCount", "ConcurrencyStamp", "DatumRegistracije", "Email", "EmailConfirmed", "GradId", "Ime", "LockoutEnabled", "LockoutEnd", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "PhoneNumber", "PhoneNumberConfirmed", "Prezime", "SecurityStamp", "Status", "TwoFactorEnabled", "UserName" },
                 values: new object[,]
                 {
-                    { 1, 0, "e888d013-e236-4e5b-8fe1-30398d9e56ae", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "admin@nuaspa.ba", false, 1, "Admin", false, null, "ADMIN@NUASPA.BA", "ADMIN", "AQAAAAEAACcQAAAAE...dummy_hash", "033123456", false, "NuaSpa", "c1177cee-0340-4a49-958c-94e2d3d35a34", true, false, "admin" },
-                    { 2, 0, "244eaca4-2caa-4c76-9719-68b6a0c3d7da", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "lana@test.ba", false, 3, "Lana", false, null, "LANA@TEST.BA", "LANA", "AQAAAAEAACcQAAAAE...dummy_hash", "061222333", false, "Korisnik", "24effc42-cfe0-4a60-9484-f365b0145eb7", true, false, "lana" }
+                    { 1, 0, "149b035a-fa2c-4330-9ed3-1d78f31e9281", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "admin@nuaspa.ba", false, 1, "Admin", false, null, "ADMIN@NUASPA.BA", "ADMIN", "AQAAAAEAACcQAAAAE...dummy_hash", "033123456", false, "NuaSpa", "5be352ce-2f10-4c9b-876a-61d8e7397360", true, false, "admin" },
+                    { 2, 0, "2cd57901-e68d-42e1-8338-4efe404b08c2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), "lana@test.ba", false, 3, "Lana", false, null, "LANA@TEST.BA", "LANA", "AQAAAAEAACcQAAAAE...dummy_hash", "061222333", false, "Korisnik", "edb8e66a-2eea-422d-ac63-5298033cfab5", true, false, "lana" }
                 });
 
             migrationBuilder.InsertData(

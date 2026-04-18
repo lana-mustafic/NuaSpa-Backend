@@ -13,7 +13,20 @@ services:
     networks:
       - nuaspa-network
 
-  # 2. Tvoj .NET API
+  # 2. RabbitMQ - Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-nuaspa
+    ports:
+      - "5672:5672"   # Port za komunikaciju (AMQP)
+      - "15672:15672" # Port za Management Dashboard (UI)
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    networks:
+      - nuaspa-network
+
+  # 3. Tvoj .NET API
   nuaspa-api:
     image: nuaspa-api-image
     build:
@@ -23,10 +36,13 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=nuaspa-db;Database=NuaSpaDb;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
+      # Dodajemo adresu za RabbitMQ (unutar mreže koristimo ime servisa)
+      - RabbitMQ__Host=rabbitmq
     ports:
       - "8080:8080"
     depends_on:
       - nuaspa-db
+      - rabbitmq
     networks:
       - nuaspa-network
 

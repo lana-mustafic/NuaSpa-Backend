@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace NuaSpa.Application.DTOs
+﻿namespace NuaSpa.Application.DTOs
 {
     public class UslugaDTO
     {
@@ -10,5 +6,9 @@ namespace NuaSpa.Application.DTOs
         public string Naziv { get; set; } = null!;
         public decimal Cijena { get; set; }
         public int TrajanjeMinuta { get; set; }
+        public string Opis { get; set; } = null!;
+
+        // DODAJ OVO LINIJU:
+        public int KategorijaUslugaId { get; set; }
     }
 }

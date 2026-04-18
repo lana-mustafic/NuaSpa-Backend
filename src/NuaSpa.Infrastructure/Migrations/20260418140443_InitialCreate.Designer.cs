@@ -5,25 +5,140 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using NuaSpa.Infrastructure;
+using NuaSpa.Domain;
 
 #nullable disable
 
 namespace NuaSpa.Infrastructure.Migrations
 {
-  
-    [Migration("20260327170228_Task4_1_SeedDataExpansion")]
-    partial class Task4_1_SeedDataExpansion
+    [DbContext(typeof(NuaSpaContext))]
+    [Migration("20260418140443_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.5")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClaimValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("AspNetRoleClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClaimValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AspNetUserClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
+                {
+                    b.Property<string>("LoginProvider")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ProviderKey")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ProviderDisplayName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("LoginProvider", "ProviderKey");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AspNetUserLogins", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<int>", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("AspNetUserRoles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            UserId = 1,
+                            RoleId = 1
+                        },
+                        new
+                        {
+                            UserId = 2,
+                            RoleId = 2
+                        });
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LoginProvider")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("UserId", "LoginProvider", "Name");
+
+                    b.ToTable("AspNetUserTokens", (string)null);
+                });
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.Drzava", b =>
                 {
@@ -109,84 +224,12 @@ namespace NuaSpa.Infrastructure.Migrations
                         },
                         new
                         {
-                            Id = 2,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            DrzavaId = 1,
-                            IsDeleted = false,
-                            Naziv = "Mostar",
-                            PostanskiBroj = "88000"
-                        },
-                        new
-                        {
                             Id = 3,
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             DrzavaId = 1,
                             IsDeleted = false,
                             Naziv = "Konjic",
                             PostanskiBroj = "88400"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            DrzavaId = 1,
-                            IsDeleted = false,
-                            Naziv = "Banja Luka",
-                            PostanskiBroj = "78000"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            DrzavaId = 1,
-                            IsDeleted = false,
-                            Naziv = "Tuzla",
-                            PostanskiBroj = "75000"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            DrzavaId = 1,
-                            IsDeleted = false,
-                            Naziv = "Zenica",
-                            PostanskiBroj = "72000"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            DrzavaId = 1,
-                            IsDeleted = false,
-                            Naziv = "Bihać",
-                            PostanskiBroj = "77000"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            DrzavaId = 1,
-                            IsDeleted = false,
-                            Naziv = "Trebinje",
-                            PostanskiBroj = "89000"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            DrzavaId = 1,
-                            IsDeleted = false,
-                            Naziv = "Bijeljina",
-                            PostanskiBroj = "76300"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            DrzavaId = 1,
-                            IsDeleted = false,
-                            Naziv = "Jablanica",
-                            PostanskiBroj = "88420"
                         });
                 });
 
@@ -216,16 +259,6 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("KategorijeUsluga");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsDeleted = false,
-                            Naziv = "Masaže",
-                            Opis = "Relaksacione i terapeutske masaže"
-                        });
                 });
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.Korisnik", b =>
@@ -236,66 +269,131 @@ namespace NuaSpa.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("DatumRegistracije")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("GradId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Ime")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<bool>("IsDeleted")
+                    b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
 
-                    b.Property<string>("KorisnickoIme")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("NormalizedUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("PasswordSalt")
-                        .IsRequired()
+                    b.Property<string>("PhoneNumber")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("PhoneNumberConfirmed")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Prezime")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("SecurityStamp")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("Status")
                         .HasColumnType("bit");
 
-                    b.Property<string>("Telefon")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("bit");
 
-                    b.Property<int>("UlogaId")
-                        .HasColumnType("int");
+                    b.Property<string>("UserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
+                    b.HasIndex("GradId");
 
-                    b.HasIndex("Ime");
+                    b.HasIndex("NormalizedEmail")
+                        .HasDatabaseName("EmailIndex");
 
-                    b.HasIndex("KorisnickoIme")
-                        .IsUnique();
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique()
+                        .HasDatabaseName("UserNameIndex")
+                        .HasFilter("[NormalizedUserName] IS NOT NULL");
 
-                    b.HasIndex("Prezime");
+                    b.ToTable("AspNetUsers", (string)null);
 
-                    b.HasIndex("UlogaId");
-
-                    b.ToTable("Korisnici");
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            AccessFailedCount = 0,
+                            ConcurrencyStamp = "149b035a-fa2c-4330-9ed3-1d78f31e9281",
+                            DatumRegistracije = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Email = "admin@nuaspa.ba",
+                            EmailConfirmed = false,
+                            GradId = 1,
+                            Ime = "Admin",
+                            LockoutEnabled = false,
+                            NormalizedEmail = "ADMIN@NUASPA.BA",
+                            NormalizedUserName = "ADMIN",
+                            PasswordHash = "AQAAAAEAACcQAAAAE...dummy_hash",
+                            PhoneNumber = "033123456",
+                            PhoneNumberConfirmed = false,
+                            Prezime = "NuaSpa",
+                            SecurityStamp = "5be352ce-2f10-4c9b-876a-61d8e7397360",
+                            Status = true,
+                            TwoFactorEnabled = false,
+                            UserName = "admin"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            AccessFailedCount = 0,
+                            ConcurrencyStamp = "2cd57901-e68d-42e1-8338-4efe404b08c2",
+                            DatumRegistracije = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Email = "lana@test.ba",
+                            EmailConfirmed = false,
+                            GradId = 3,
+                            Ime = "Lana",
+                            LockoutEnabled = false,
+                            NormalizedEmail = "LANA@TEST.BA",
+                            NormalizedUserName = "LANA",
+                            PasswordHash = "AQAAAAEAACcQAAAAE...dummy_hash",
+                            PhoneNumber = "061222333",
+                            PhoneNumberConfirmed = false,
+                            Prezime = "Korisnik",
+                            SecurityStamp = "edb8e66a-2eea-422d-ac63-5298033cfab5",
+                            Status = true,
+                            TwoFactorEnabled = false,
+                            UserName = "lana"
+                        });
                 });
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.NarudzbaProizvoda", b =>
@@ -322,7 +420,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("UkupnaCijena")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
@@ -352,7 +449,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("Iznos")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("MetodaPlacanja")
@@ -398,7 +494,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<decimal>("Procenat")
-                        .HasPrecision(5, 2)
                         .HasColumnType("decimal(5,2)");
 
                     b.Property<DateTime>("VrijediDo")
@@ -421,7 +516,6 @@ namespace NuaSpa.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Cijena")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
@@ -449,9 +543,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasColumnType("varbinary(max)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Sifra")
-                        .IsUnique();
 
                     b.ToTable("Proizvodi");
                 });
@@ -573,42 +664,58 @@ namespace NuaSpa.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
-                    b.Property<string>("Naziv")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<string>("NormalizedName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Opis")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Uloge");
+                    b.HasIndex("NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("RoleNameIndex")
+                        .HasFilter("[NormalizedName] IS NOT NULL");
+
+                    b.ToTable("AspNetRoles", (string)null);
 
                     b.HasData(
                         new
                         {
                             Id = 1,
+                            ConcurrencyStamp = "40892b8d-6851-4799-add0-3730dadb3e78",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsDeleted = false,
-                            Naziv = "Admin"
+                            Name = "Admin",
+                            NormalizedName = "ADMIN"
                         },
                         new
                         {
                             Id = 2,
+                            ConcurrencyStamp = "8225401a-610b-4d9e-98ee-58c8eba85b41",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsDeleted = false,
-                            Naziv = "Klijent"
+                            Name = "Klijent",
+                            NormalizedName = "KLIJENT"
                         },
                         new
                         {
                             Id = 3,
+                            ConcurrencyStamp = "6a5209b0-1370-4f93-aa6b-b0700ba4dd08",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
-                            IsDeleted = false,
-                            Naziv = "Zaposlenik"
+                            Name = "Zaposlenik",
+                            NormalizedName = "ZAPOSLENIK"
                         });
                 });
 
@@ -650,8 +757,6 @@ namespace NuaSpa.Infrastructure.Migrations
 
                     b.HasIndex("KategorijaUslugaId");
 
-                    b.HasIndex("Naziv");
-
                     b.ToTable("Usluge");
                 });
 
@@ -689,9 +794,58 @@ namespace NuaSpa.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Specijalizacija");
-
                     b.ToTable("Zaposlenici");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
+                {
+                    b.HasOne("NuaSpa.Domain.Entities.Uloga", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
+                {
+                    b.HasOne("NuaSpa.Domain.Entities.Korisnik", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
+                {
+                    b.HasOne("NuaSpa.Domain.Entities.Korisnik", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<int>", b =>
+                {
+                    b.HasOne("NuaSpa.Domain.Entities.Uloga", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("NuaSpa.Domain.Entities.Korisnik", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
+                {
+                    b.HasOne("NuaSpa.Domain.Entities.Korisnik", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.Grad", b =>
@@ -699,7 +853,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Drzava", "Drzava")
                         .WithMany()
                         .HasForeignKey("DrzavaId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Drzava");
@@ -707,13 +861,13 @@ namespace NuaSpa.Infrastructure.Migrations
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.Korisnik", b =>
                 {
-                    b.HasOne("NuaSpa.Domain.Entities.Uloga", "Uloga")
+                    b.HasOne("NuaSpa.Domain.Entities.Grad", "Grad")
                         .WithMany()
-                        .HasForeignKey("UlogaId")
+                        .HasForeignKey("GradId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Uloga");
+                    b.Navigation("Grad");
                 });
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.NarudzbaProizvoda", b =>
@@ -727,7 +881,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Proizvod", "Proizvod")
                         .WithMany()
                         .HasForeignKey("ProizvodId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Korisnik");
@@ -749,7 +903,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Korisnik", "Korisnik")
                         .WithMany()
                         .HasForeignKey("KorisnikId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("NuaSpa.Domain.Entities.Usluga", "Usluga")
@@ -768,7 +922,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Korisnik", "Korisnik")
                         .WithMany()
                         .HasForeignKey("KorisnikId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("NuaSpa.Domain.Entities.Usluga", "Usluga")
@@ -780,7 +934,7 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasOne("NuaSpa.Domain.Entities.Zaposlenik", "Zaposlenik")
                         .WithMany()
                         .HasForeignKey("ZaposlenikId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Korisnik");

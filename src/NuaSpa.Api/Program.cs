@@ -105,17 +105,16 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 // --- 4. DEPENDENCY INJECTION ---
-
-// Registracija RabbitMQ Producera
 builder.Services.AddScoped<IRabbitMQProducer, RabbitMQProducer>();
+builder.Services.AddScoped<IKategorijaUslugaService, KategorijaUslugaService>();
 
-// Automatizacija ostalih servisa
 var applicationAssembly = typeof(MappingProfile).Assembly;
 var serviceTypes = applicationAssembly.GetTypes()
     .Where(t => t.Name.EndsWith("Service") && !t.IsInterface && !t.IsAbstract);
 
 foreach (var serviceType in serviceTypes)
 {
+    // Ovo će naći IUslugaService za UslugaService
     var interfaceType = serviceType.GetInterface($"I{serviceType.Name}");
     if (interfaceType != null)
     {
@@ -153,6 +152,16 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "NuaSpa API v1");
         c.RoutePrefix = string.Empty;
     });
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<NuaSpaContext>(); // Zamijeni 'NuaSpaContext' imenom tvog Context-a ako je drugačije
+    if (!context.KategorijeUsluga.Any())
+    {
+        context.KategorijeUsluga.Add(new NuaSpa.Domain.Entities.KategorijaUsluga { Naziv = "Automatska", IsDeleted = false, CreatedAt = DateTime.Now });
+        context.SaveChanges();
+    }
 }
 
 app.UseHttpsRedirection();
