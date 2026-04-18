@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NuaSpa.Api.Services.Messaging;
@@ -14,6 +13,7 @@ using NuaSpa.Domain.Entities;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,6 +107,8 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 // --- 4. DEPENDENCY INJECTION ---
 builder.Services.AddScoped<IRabbitMQProducer, RabbitMQProducer>();
 builder.Services.AddScoped<IKategorijaUslugaService, KategorijaUslugaService>();
+builder.Services.AddScoped<NuaSpa.Application.Interfaces.IReportingService, NuaSpa.Application.Services.ReportingService>();
+
 
 var applicationAssembly = typeof(MappingProfile).Assembly;
 var serviceTypes = applicationAssembly.GetTypes()
