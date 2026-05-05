@@ -5,6 +5,7 @@ namespace NuaSpa.Application.Interfaces
 {
     public interface IUslugaService : IBaseService<UslugaDTO, UslugaSearchObject>
     {
-        // Ovdje možeš dodati specifične metode za usluge ako zatrebaju
+        Task<UslugaDTO> UpdateAsync(UslugaDTO dto);
+        Task<(bool Ok, string? Message)> DeleteAsync(int id);
     }
 }

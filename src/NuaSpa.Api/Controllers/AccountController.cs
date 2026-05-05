@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
@@ -8,6 +9,7 @@ namespace NuaSpa.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[AllowAnonymous]
 public class AccountController : ControllerBase
 {
     private readonly UserManager<Korisnik> _userManager;

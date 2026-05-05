@@ -16,6 +16,9 @@ namespace NuaSpa.Domain.Entities
         public bool IsPotvrdjena { get; set; }
 
         [Required]
+        public bool IsPlacena { get; set; }
+
+        [Required]
         [ForeignKey("Korisnik")]
         public int KorisnikId { get; set; }
         public Korisnik Korisnik { get; set; } = null!;

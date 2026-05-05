@@ -30,6 +30,11 @@ public class TokenService : ITokenService
             new Claim("Prezime", korisnik.Prezime)
         };
 
+        if (korisnik.ZaposlenikId.HasValue)
+        {
+            claims.Add(new Claim("ZaposlenikId", korisnik.ZaposlenikId.Value.ToString()));
+        }
+
         // Dodavanje uloga u token
         foreach (var uloga in uloge)
         {

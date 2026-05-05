@@ -4,7 +4,7 @@ using NuaSpa.Application.Interfaces;
 namespace NuaSpa.Api.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class BaseController<TModel, TSearch> : ControllerBase where TModel : class where TSearch : class
 {
     protected readonly IBaseService<TModel, TSearch> _service;

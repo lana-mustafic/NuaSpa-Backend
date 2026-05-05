@@ -27,5 +27,8 @@ namespace NuaSpa.Domain.Entities
         [ForeignKey("KategorijaUsluga")]
         public int KategorijaUslugaId { get; set; }
         public KategorijaUsluga KategorijaUsluga { get; set; } = null!;
+
+        [MaxLength(500)]
+        public string? SlikaUrl { get; set; }
     }
 }

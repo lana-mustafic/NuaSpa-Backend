@@ -12,7 +12,13 @@ namespace NuaSpa.Application
             // Koristimo "DTO" (velika slova) jer su ti takvi nazivi fajlova na slici
 
             CreateMap<Uloga, UlogaDTO>().ReverseMap();
-            CreateMap<Usluga, UslugaDTO>().ReverseMap();
+
+            CreateMap<Usluga, UslugaDTO>()
+                .ForMember(dest => dest.KategorijaNaziv, opt => opt.MapFrom(src => src.KategorijaUsluga.Naziv))
+                .ForMember(dest => dest.TrajanjeTekst, opt => opt.MapFrom(src => $"{src.TrajanjeMinuta} min"))
+                .ForMember(dest => dest.SlikaUrl, opt => opt.MapFrom(src => src.SlikaUrl));
+            CreateMap<UslugaDTO, Usluga>()
+                .ForMember(dest => dest.KategorijaUsluga, opt => opt.Ignore());
             CreateMap<Proizvod, ProizvodDTO>().ReverseMap();
             CreateMap<Popust, PopustDTO>().ReverseMap();
             CreateMap<Zaposlenik, ZaposlenikDTO>().ReverseMap();

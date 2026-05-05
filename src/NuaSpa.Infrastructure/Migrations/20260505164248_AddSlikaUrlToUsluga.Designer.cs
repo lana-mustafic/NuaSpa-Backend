@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NuaSpa.Domain;
 
@@ -11,9 +12,11 @@ using NuaSpa.Domain;
 namespace NuaSpa.Infrastructure.Migrations
 {
     [DbContext(typeof(NuaSpaContext))]
-    partial class NuaSpaContextModelSnapshot : ModelSnapshot
+    [Migration("20260505164248_AddSlikaUrlToUsluga")]
+    partial class AddSlikaUrlToUsluga
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -176,36 +179,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("NuaSpa.Domain.Entities.Favorit", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("KorisnikId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("UslugaId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UslugaId");
-
-                    b.HasIndex("KorisnikId", "UslugaId")
-                        .IsUnique();
-
-                    b.ToTable("Favoriti");
-                });
-
             modelBuilder.Entity("NuaSpa.Domain.Entities.Grad", b =>
                 {
                     b.Property<int>("Id")
@@ -362,9 +335,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
-                    b.Property<int?>("ZaposlenikId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("GradId");
@@ -377,8 +347,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasDatabaseName("UserNameIndex")
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
-                    b.HasIndex("ZaposlenikId");
-
                     b.ToTable("AspNetUsers", (string)null);
 
                     b.HasData(
@@ -386,7 +354,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         {
                             Id = 1,
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "2fea3636-6a56-4cdc-bfb4-5396199ad94e",
+                            ConcurrencyStamp = "32d8742f-0161-48cc-a719-ca969b08e425",
                             DatumRegistracije = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@nuaspa.ba",
                             EmailConfirmed = false,
@@ -399,7 +367,7 @@ namespace NuaSpa.Infrastructure.Migrations
                             PhoneNumber = "033123456",
                             PhoneNumberConfirmed = false,
                             Prezime = "NuaSpa",
-                            SecurityStamp = "4a804082-4b3f-480e-bffd-f41dbd1aab44",
+                            SecurityStamp = "bc68eed8-147b-4614-b1a1-17cc3528f085",
                             Status = true,
                             TwoFactorEnabled = false,
                             UserName = "admin"
@@ -408,7 +376,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         {
                             Id = 2,
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "561ee2d5-2291-4d74-8305-1e31226700e0",
+                            ConcurrencyStamp = "d83f4739-b879-4e56-aba9-5a44c76d34c9",
                             DatumRegistracije = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "lana@test.ba",
                             EmailConfirmed = false,
@@ -421,7 +389,7 @@ namespace NuaSpa.Infrastructure.Migrations
                             PhoneNumber = "061222333",
                             PhoneNumberConfirmed = false,
                             Prezime = "Korisnik",
-                            SecurityStamp = "db0397cc-9d49-435f-8aa0-77ebf71c222c",
+                            SecurityStamp = "8a006b88-3127-4c29-b324-a0aefdbc18c7",
                             Status = true,
                             TwoFactorEnabled = false,
                             UserName = "lana"
@@ -633,9 +601,6 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("IsPlacena")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("IsPotvrdjena")
                         .HasColumnType("bit");
 
@@ -731,7 +696,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
-                            ConcurrencyStamp = "e70170b2-6ec7-4f27-bb3e-86bccb7f8b7e",
+                            ConcurrencyStamp = "b1532409-4d7a-42e9-9254-f59c2efd6173",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Name = "Admin",
                             NormalizedName = "ADMIN"
@@ -739,7 +704,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         new
                         {
                             Id = 2,
-                            ConcurrencyStamp = "66908310-f54d-4da6-a191-a354a95bd9d3",
+                            ConcurrencyStamp = "a431a21c-e0d9-4b8d-9b59-f907a285c366",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Name = "Klijent",
                             NormalizedName = "KLIJENT"
@@ -747,7 +712,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         new
                         {
                             Id = 3,
-                            ConcurrencyStamp = "0b9f5afc-fa5f-4a6f-82bb-4d52ba088dd3",
+                            ConcurrencyStamp = "4c479290-7544-4a7b-acbd-25b45847f8e9",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Name = "Zaposlenik",
                             NormalizedName = "ZAPOSLENIK"
@@ -887,25 +852,6 @@ namespace NuaSpa.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("NuaSpa.Domain.Entities.Favorit", b =>
-                {
-                    b.HasOne("NuaSpa.Domain.Entities.Korisnik", "Korisnik")
-                        .WithMany()
-                        .HasForeignKey("KorisnikId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("NuaSpa.Domain.Entities.Usluga", "Usluga")
-                        .WithMany()
-                        .HasForeignKey("UslugaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Korisnik");
-
-                    b.Navigation("Usluga");
-                });
-
             modelBuilder.Entity("NuaSpa.Domain.Entities.Grad", b =>
                 {
                     b.HasOne("NuaSpa.Domain.Entities.Drzava", "Drzava")
@@ -925,13 +871,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("NuaSpa.Domain.Entities.Zaposlenik", "Zaposlenik")
-                        .WithMany()
-                        .HasForeignKey("ZaposlenikId");
-
                     b.Navigation("Grad");
-
-                    b.Navigation("Zaposlenik");
                 });
 
             modelBuilder.Entity("NuaSpa.Domain.Entities.NarudzbaProizvoda", b =>
