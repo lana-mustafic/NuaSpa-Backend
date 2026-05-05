@@ -1,8 +1,7 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Api.Extensions;
 using NuaSpa.Application.Common;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
@@ -33,7 +32,6 @@ namespace NuaSpa.Api.Controllers
         {
             public string ClientSecret { get; set; } = string.Empty;
             public string PaymentIntentId { get; set; } = string.Empty;
-            public string PublishableKey { get; set; } = string.Empty;
             public string Currency { get; set; } = string.Empty;
             public long Amount { get; set; }
         }
@@ -44,7 +42,7 @@ namespace NuaSpa.Api.Controllers
             if (string.IsNullOrWhiteSpace(_stripe.SecretKey))
                 return BadRequest("Stripe SecretKey nije konfigurisan (appsettings Stripe:SecretKey).");
 
-            var userId = GetUserId();
+            var userId = User.GetNuaSpaUserId();
 
             var rezervacija = await _context.Rezervacije
                 .Include(r => r.Usluga)
@@ -91,7 +89,6 @@ namespace NuaSpa.Api.Controllers
             {
                 ClientSecret = intent.ClientSecret,
                 PaymentIntentId = intent.Id,
-                PublishableKey = _stripe.PublishableKey,
                 Currency = _stripe.Currency,
                 Amount = amount
             });
@@ -137,17 +134,6 @@ namespace NuaSpa.Api.Controllers
             }
 
             return Ok();
-        }
-
-        private int GetUserId()
-        {
-            var idStr = User.FindFirstValue(JwtRegisteredClaimNames.NameId)
-                         ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (!int.TryParse(idStr, out var userId))
-                throw new UnauthorizedAccessException("Ne mogu pročitati korisnički id iz JWT-a.");
-
-            return userId;
         }
     }
 }

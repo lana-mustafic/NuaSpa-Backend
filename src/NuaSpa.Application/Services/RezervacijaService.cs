@@ -142,14 +142,12 @@ namespace NuaSpa.Application.Services
                 .Select(r => r.DatumRezervacije)
                 .ToListAsync();
 
-            var takenSet = new HashSet<DateTime>(taken.Select(t => t.ToUniversalTime()));
+            var takenSet = taken.ToHashSet();
 
             var slots = new List<DateTime>();
             for (var t = start; t < end; t = t.AddMinutes(slotMinutes))
             {
-                // Normalizuj na UTC za poređenje (jer klijenti mogu slati lokalno vrijeme)
-                var utc = DateTime.SpecifyKind(t, DateTimeKind.Local).ToUniversalTime();
-                if (!takenSet.Contains(utc))
+                if (!takenSet.Contains(t))
                 {
                     slots.Add(t);
                 }

@@ -64,6 +64,12 @@ builder.Services.AddSwaggerGen(c =>
 
 // --- 3. INFRASTRUKTURA (Baza, Identity i JWT) ---
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' nije postavljen. Za Development: postavite u appsettings.Development.json ili " +
+        "dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" \"...\" / env ConnectionStrings__DefaultConnection.");
+}
 
 builder.Services.AddDbContext<NuaSpaContext>(options =>
 {
@@ -84,6 +90,13 @@ builder.Services.AddIdentity<Korisnik, Uloga>(options =>
 
 var jwtSettings = new JwtSettings();
 builder.Configuration.GetSection("JwtSettings").Bind(jwtSettings);
+if (string.IsNullOrWhiteSpace(jwtSettings.Key) || jwtSettings.Key.Length < 32)
+{
+    throw new InvalidOperationException(
+        "JwtSettings:Key mora biti postavljen (najmanje 32 znaka). Za Development: appsettings.Development.json ili " +
+        "dotnet user-secrets set \"JwtSettings:Key\" \"...\" / env JwtSettings__Key.");
+}
+
 builder.Services.AddSingleton(jwtSettings);
 
 var stripeSettings = new StripeSettings();

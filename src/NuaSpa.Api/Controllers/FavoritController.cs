@@ -1,9 +1,8 @@
 using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 
@@ -24,7 +23,7 @@ namespace NuaSpa.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UslugaDTO>>> GetMyFavorites()
         {
-            var userId = GetUserId();
+            var userId = User.GetNuaSpaUserId();
             var list = await _service.GetMyFavoritesAsync(userId);
             return Ok(list);
         }
@@ -32,7 +31,7 @@ namespace NuaSpa.Api.Controllers
         [HttpGet("ids")]
         public async Task<ActionResult<HashSet<int>>> GetMyFavoriteIds()
         {
-            var userId = GetUserId();
+            var userId = User.GetNuaSpaUserId();
             var ids = await _service.GetMyFavoriteIdsAsync(userId);
             return Ok(ids);
         }
@@ -40,7 +39,7 @@ namespace NuaSpa.Api.Controllers
         [HttpPost]
         public async Task<ActionResult> Add([FromBody] FavoritCreateDTO dto)
         {
-            var userId = GetUserId();
+            var userId = User.GetNuaSpaUserId();
             await _service.AddAsync(userId, dto.UslugaId);
             return Ok();
         }
@@ -48,22 +47,9 @@ namespace NuaSpa.Api.Controllers
         [HttpDelete("{uslugaId}")]
         public async Task<ActionResult> Remove(int uslugaId)
         {
-            var userId = GetUserId();
+            var userId = User.GetNuaSpaUserId();
             await _service.RemoveAsync(userId, uslugaId);
             return Ok();
-        }
-
-        private int GetUserId()
-        {
-            var idStr = User.FindFirstValue(JwtRegisteredClaimNames.NameId)
-                         ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (!int.TryParse(idStr, out var userId))
-            {
-                throw new UnauthorizedAccessException("Ne mogu pročitati korisnički id iz JWT-a.");
-            }
-
-            return userId;
         }
     }
 }

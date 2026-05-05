@@ -8,6 +8,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\NuaSpa.Application\NuaSpa.Application.csproj" />
+		<ProjectReference Include="..\NuaSpa.Domain\NuaSpa.Domain.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -11,10 +11,14 @@ namespace NuaSpa.Api.Controllers
     public class IzvjestajController : ControllerBase
     {
         private readonly IReportingService _reportingService;
+        private readonly ILogger<IzvjestajController> _logger;
 
-        public IzvjestajController(IReportingService reportingService)
+        public IzvjestajController(
+            IReportingService reportingService,
+            ILogger<IzvjestajController> logger)
         {
             _reportingService = reportingService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -39,8 +43,8 @@ namespace NuaSpa.Api.Controllers
             }
             catch (Exception ex)
             {
-                // U logovima ćeš vidjeti pravi error, a korisniku vraćamo 400
-                return BadRequest($"Greška pri generisanju PDF-a: {ex.Message}");
+                _logger.LogError(ex, "Greška pri generisanju PDF izvještaja top-usluge.");
+                return BadRequest("Greška pri generisanju izvještaja. Pokušajte ponovo ili kontaktirajte administratora.");
             }
         }
     }

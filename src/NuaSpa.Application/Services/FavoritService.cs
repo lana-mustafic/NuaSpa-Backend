@@ -23,14 +23,17 @@ namespace NuaSpa.Application.Services
 
         public async Task<IEnumerable<UslugaDTO>> GetMyFavoritesAsync(int korisnikId)
         {
-            var usluge = await _context.Favoriti
+            // Prvo materijalizuj entitete s Include; projekcija .Select(f => f.Usluga) prije ToListAsync
+            // može ukinuti ThenInclude u generisanom SQL-u pa KategorijaUsluga ostane null.
+            var favoriti = await _context.Favoriti
                 .AsNoTracking()
                 .Where(f => f.KorisnikId == korisnikId)
                 .Include(f => f.Usluga)
                     .ThenInclude(u => u.KategorijaUsluga)
                 .OrderByDescending(f => f.CreatedAt)
-                .Select(f => f.Usluga)
                 .ToListAsync();
+
+            var usluge = favoriti.Select(f => f.Usluga).ToList();
 
             return _mapper.Map<IEnumerable<UslugaDTO>>(usluge);
         }
