@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NuaSpa.Api.Services.Messaging;
@@ -12,8 +11,12 @@ using NuaSpa.Application.Interfaces.Messaging;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.IdentityModel.Tokens.Jwt;
+using Stripe;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,7 +59,7 @@ builder.Services.AddSwaggerGen(c =>
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
+    if (System.IO.File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
 });
 
 // --- 3. INFRASTRUKTURA (Baza, Identity i JWT) ---
@@ -83,6 +86,10 @@ var jwtSettings = new JwtSettings();
 builder.Configuration.GetSection("JwtSettings").Bind(jwtSettings);
 builder.Services.AddSingleton(jwtSettings);
 
+var stripeSettings = new StripeSettings();
+builder.Configuration.GetSection("Stripe").Bind(stripeSettings);
+builder.Services.AddSingleton(stripeSettings);
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -98,7 +105,9 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings.Issuer,
         ValidAudience = jwtSettings.Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key)),
+        RoleClaimType = ClaimTypes.Role,
+        NameClaimType = JwtRegisteredClaimNames.NameId
     };
 });
 
@@ -106,7 +115,8 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 // --- 4. DEPENDENCY INJECTION ---
 builder.Services.AddScoped<IRabbitMQProducer, RabbitMQProducer>();
-builder.Services.AddScoped<IKategorijaUslugaService, KategorijaUslugaService>();
+builder.Services.AddScoped<NuaSpa.Application.Interfaces.IReportingService, NuaSpa.Application.Services.ReportingService>();
+
 
 var applicationAssembly = typeof(MappingProfile).Assembly;
 var serviceTypes = applicationAssembly.GetTypes()
@@ -123,6 +133,12 @@ foreach (var serviceType in serviceTypes)
 }
 
 var app = builder.Build();
+
+// Stripe global configuration
+if (!string.IsNullOrWhiteSpace(stripeSettings.SecretKey))
+{
+    StripeConfiguration.ApiKey = stripeSettings.SecretKey;
+}
 
 // --- AUTOMATSKE MIGRACIJE ---
 using (var scope = app.Services.CreateScope())

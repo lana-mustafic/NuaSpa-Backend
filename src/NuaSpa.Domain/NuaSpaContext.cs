@@ -17,6 +17,7 @@ namespace NuaSpa.Domain
         public DbSet<Usluga> Usluge { get; set; } = null!;
         public DbSet<Rezervacija> Rezervacije { get; set; } = null!;
         public DbSet<Recenzija> Recenzije { get; set; } = null!;
+        public DbSet<Favorit> Favoriti { get; set; } = null!;
         public DbSet<Proizvod> Proizvodi { get; set; } = null!;
         public DbSet<Skladiste> Skladista { get; set; } = null!;
         public DbSet<NarudzbaProizvoda> NarudzbeProizvoda { get; set; } = null!;
@@ -99,6 +100,10 @@ namespace NuaSpa.Domain
                 .WithMany()
                 .HasForeignKey(k => k.GradId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Favorit>()
+                .HasIndex(x => new { x.KorisnikId, x.UslugaId })
+                .IsUnique();
         }
     }
 }

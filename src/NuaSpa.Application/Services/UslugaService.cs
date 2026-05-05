@@ -1,9 +1,10 @@
 ﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.SearchObjects;
 using NuaSpa.Domain;
-using NuaSpa.Domain.Entities; 
+using NuaSpa.Domain.Entities;
 
 namespace NuaSpa.Application.Services
 {
@@ -11,7 +12,90 @@ namespace NuaSpa.Application.Services
     {
         public UslugaService(NuaSpaContext context, IMapper mapper) : base(context, mapper)
         {
+        }
 
+        public override async Task<IEnumerable<UslugaDTO>> Get(UslugaSearchObject? search = null)
+        {
+            var query = _context.Usluge
+                .AsNoTracking()
+                .Include(u => u.KategorijaUsluga)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search?.Naziv))
+            {
+                var naziv = search.Naziv.Trim();
+                query = query.Where(u => u.Naziv.Contains(naziv));
+            }
+
+            if (search?.MaxCijena is decimal maxCijena)
+            {
+                query = query.Where(u => u.Cijena <= maxCijena);
+            }
+
+            var list = await query.OrderBy(u => u.Naziv).ToListAsync();
+            return _mapper.Map<IEnumerable<UslugaDTO>>(list);
+        }
+
+        public override async Task<UslugaDTO> GetById(int id)
+        {
+            var entity = await _context.Usluge
+                .AsNoTracking()
+                .Include(u => u.KategorijaUsluga)
+                .FirstOrDefaultAsync(u => u.Id == id);
+
+            if (entity == null)
+            {
+                throw new KeyNotFoundException($"Usluga sa id={id} ne postoji.");
+            }
+
+            return _mapper.Map<UslugaDTO>(entity);
+        }
+
+        public async Task<UslugaDTO> UpdateAsync(UslugaDTO dto)
+        {
+            var entity = await _context.Usluge.FindAsync(dto.Id);
+            if (entity == null)
+            {
+                throw new KeyNotFoundException($"Usluga sa id={dto.Id} ne postoji.");
+            }
+
+            entity.Naziv = dto.Naziv;
+            entity.Cijena = dto.Cijena;
+            entity.TrajanjeMinuta = dto.TrajanjeMinuta;
+            entity.Opis = dto.Opis;
+            entity.KategorijaUslugaId = dto.KategorijaUslugaId;
+            entity.SlikaUrl = dto.SlikaUrl;
+
+            await _context.SaveChangesAsync();
+            return await GetById(entity.Id);
+        }
+
+        public async Task<(bool Ok, string? Message)> DeleteAsync(int id)
+        {
+            if (await _context.Rezervacije.AsNoTracking().AnyAsync(r => r.UslugaId == id))
+            {
+                return (false, "Usluga ima rezervacije i ne može se obrisati.");
+            }
+
+            if (await _context.Favoriti.AsNoTracking().AnyAsync(f => f.UslugaId == id))
+            {
+                return (false, "Usluga je u favoritima korisnika.");
+            }
+
+            if (await _context.Recenzije.AsNoTracking().AnyAsync(r => r.UslugaId == id))
+            {
+                return (false, "Usluga ima recenzije.");
+            }
+
+            var entity = await _context.Usluge.FindAsync(id);
+            if (entity == null)
+            {
+                return (false, "Usluga ne postoji.");
+            }
+
+            _context.Usluge.Remove(entity);
+            await _context.SaveChangesAsync();
+            return (true, null);
         }
     }
 }

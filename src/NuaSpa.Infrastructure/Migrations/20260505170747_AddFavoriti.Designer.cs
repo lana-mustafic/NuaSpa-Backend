@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NuaSpa.Domain;
 
@@ -11,9 +12,11 @@ using NuaSpa.Domain;
 namespace NuaSpa.Infrastructure.Migrations
 {
     [DbContext(typeof(NuaSpaContext))]
-    partial class NuaSpaContextModelSnapshot : ModelSnapshot
+    [Migration("20260505170747_AddFavoriti")]
+    partial class AddFavoriti
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -386,7 +389,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         {
                             Id = 1,
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "2fea3636-6a56-4cdc-bfb4-5396199ad94e",
+                            ConcurrencyStamp = "6dcdfddc-42cd-4d17-a543-8d8100fa27e7",
                             DatumRegistracije = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "admin@nuaspa.ba",
                             EmailConfirmed = false,
@@ -399,7 +402,7 @@ namespace NuaSpa.Infrastructure.Migrations
                             PhoneNumber = "033123456",
                             PhoneNumberConfirmed = false,
                             Prezime = "NuaSpa",
-                            SecurityStamp = "4a804082-4b3f-480e-bffd-f41dbd1aab44",
+                            SecurityStamp = "ca820990-5e99-4e76-9332-7db0e116d16d",
                             Status = true,
                             TwoFactorEnabled = false,
                             UserName = "admin"
@@ -408,7 +411,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         {
                             Id = 2,
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "561ee2d5-2291-4d74-8305-1e31226700e0",
+                            ConcurrencyStamp = "d04fcc05-4c25-4849-9383-88bf5292be29",
                             DatumRegistracije = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Email = "lana@test.ba",
                             EmailConfirmed = false,
@@ -421,7 +424,7 @@ namespace NuaSpa.Infrastructure.Migrations
                             PhoneNumber = "061222333",
                             PhoneNumberConfirmed = false,
                             Prezime = "Korisnik",
-                            SecurityStamp = "db0397cc-9d49-435f-8aa0-77ebf71c222c",
+                            SecurityStamp = "e1eb022a-6a66-441e-9fec-0c60f3b20b80",
                             Status = true,
                             TwoFactorEnabled = false,
                             UserName = "lana"
@@ -633,9 +636,6 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("IsPlacena")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("IsPotvrdjena")
                         .HasColumnType("bit");
 
@@ -731,7 +731,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
-                            ConcurrencyStamp = "e70170b2-6ec7-4f27-bb3e-86bccb7f8b7e",
+                            ConcurrencyStamp = "298d29a5-81d0-414e-8e44-da732875b398",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Name = "Admin",
                             NormalizedName = "ADMIN"
@@ -739,7 +739,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         new
                         {
                             Id = 2,
-                            ConcurrencyStamp = "66908310-f54d-4da6-a191-a354a95bd9d3",
+                            ConcurrencyStamp = "a47ccd58-3919-4e67-b022-aaff699529cd",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Name = "Klijent",
                             NormalizedName = "KLIJENT"
@@ -747,7 +747,7 @@ namespace NuaSpa.Infrastructure.Migrations
                         new
                         {
                             Id = 3,
-                            ConcurrencyStamp = "0b9f5afc-fa5f-4a6f-82bb-4d52ba088dd3",
+                            ConcurrencyStamp = "e7116597-5c7e-4970-a8dc-3f045ba063f2",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
                             Name = "Zaposlenik",
                             NormalizedName = "ZAPOSLENIK"

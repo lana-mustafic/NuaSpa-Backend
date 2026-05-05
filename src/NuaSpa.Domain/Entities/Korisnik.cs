@@ -30,6 +30,11 @@ namespace NuaSpa.Domain.Entities
         [ForeignKey("GradId")]
         public virtual Grad Grad { get; set; } = null!;
 
+        public int? ZaposlenikId { get; set; }
+
+        [ForeignKey("ZaposlenikId")]
+        public virtual Zaposlenik? Zaposlenik { get; set; }
+
         // Napomena: UlogaId je uklonjen jer Identity koristi tabelu AspNetUserRoles 
         // za povezivanje korisnika i uloga.
     }
