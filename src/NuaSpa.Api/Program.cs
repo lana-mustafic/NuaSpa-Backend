@@ -124,7 +124,18 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAutoMapper(typeof(MappingProfile));
+// AutoMapper 15+: prvi argument je Action; skenira assembly gdje je MappingProfile.
+// Opcionalno: AutoMapper:LicenseKey u konfiguraciji (vidi https://automapper.io).
+builder.Services.AddAutoMapper(
+    cfg =>
+    {
+        var lic = builder.Configuration["AutoMapper:LicenseKey"];
+        if (!string.IsNullOrWhiteSpace(lic))
+        {
+            cfg.LicenseKey = lic;
+        }
+    },
+    typeof(MappingProfile));
 
 // --- 4. DEPENDENCY INJECTION ---
 builder.Services.AddScoped<IRabbitMQProducer, RabbitMQProducer>();
