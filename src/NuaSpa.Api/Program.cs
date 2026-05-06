@@ -172,6 +172,100 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// --- DEV SEED LOGIN KORISNIKA (dummy hash iz migracija ne radi za login) ---
+// U Development okruženju osiguraj radne test kredencijale:
+// - admin / Admin123!
+// - lana  / Lana123!
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    try
+    {
+        var userManager = services.GetRequiredService<UserManager<Korisnik>>();
+        var roleManager = services.GetRequiredService<RoleManager<Uloga>>();
+
+        // Uloge bi trebale već postojati iz seed-a, ali osiguraj ih za svaki slučaj.
+        var rolesToEnsure = new[] { "Admin", "Klijent", "Zaposlenik" };
+        foreach (var roleName in rolesToEnsure)
+        {
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                await roleManager.CreateAsync(new Uloga { Name = roleName, NormalizedName = roleName.ToUpperInvariant() });
+            }
+        }
+
+        async Task EnsureUserAsync(
+            string username,
+            string email,
+            string ime,
+            string prezime,
+            int gradId,
+            string password,
+            string roleName)
+        {
+            var user = await userManager.FindByNameAsync(username);
+            if (user == null)
+            {
+                user = new Korisnik
+                {
+                    UserName = username,
+                    Email = email,
+                    Ime = ime,
+                    Prezime = prezime,
+                    GradId = gradId,
+                    Status = true,
+                    DatumRegistracije = DateTime.Now
+                };
+
+                var create = await userManager.CreateAsync(user, password);
+                if (!create.Succeeded)
+                {
+                    var msg = string.Join("; ", create.Errors.Select(e => $"{e.Code}:{e.Description}"));
+                    throw new Exception($"Dev seed: CreateAsync({username}) failed: {msg}");
+                }
+            }
+
+            // Force-set lozinke na poznatu vrijednost (radi čak i ako je seed ubacio dummy hash).
+            var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+            var reset = await userManager.ResetPasswordAsync(user, resetToken, password);
+            if (!reset.Succeeded)
+            {
+                var msg = string.Join("; ", reset.Errors.Select(e => $"{e.Code}:{e.Description}"));
+                throw new Exception($"Dev seed: ResetPasswordAsync({username}) failed: {msg}");
+            }
+
+            if (!await userManager.IsInRoleAsync(user, roleName))
+            {
+                await userManager.AddToRoleAsync(user, roleName);
+            }
+        }
+
+        await EnsureUserAsync(
+            username: "admin",
+            email: "admin@nuaspa.ba",
+            ime: "Admin",
+            prezime: "NuaSpa",
+            gradId: 1,
+            password: "Admin123!",
+            roleName: "Admin");
+
+        await EnsureUserAsync(
+            username: "lana",
+            email: "lana@test.ba",
+            ime: "Lana",
+            prezime: "Korisnik",
+            gradId: 3,
+            password: "Lana123!",
+            roleName: "Klijent");
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Dev seed login korisnika nije uspio.");
+    }
+}
+
 // --- 5. MIDDLEWARE PIPELINE ---
 if (app.Environment.IsDevelopment())
 {
