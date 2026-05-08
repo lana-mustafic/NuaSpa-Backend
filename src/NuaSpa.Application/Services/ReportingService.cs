@@ -88,4 +88,147 @@ public class ReportingService : IReportingService
 
         return document.GeneratePdf();
     }
+
+    public async Task<AdminKpiDTO> GetAdminKpisAsync(DateTime date)
+    {
+        var day = date.Date;
+        var next = day.AddDays(1);
+
+        var ukupnoRezervacija = await _context.Rezervacije.CountAsync();
+        var rezervacijeDanas = await _context.Rezervacije
+            .Where(r => r.DatumRezervacije >= day && r.DatumRezervacije < next)
+            .CountAsync();
+
+        // Prihod računamo na osnovu plaćenih rezervacija (IsPlacena).
+        var prihodDanas = await _context.Rezervacije
+            .Where(r => r.IsPlacena && r.DatumRezervacije >= day && r.DatumRezervacije < next)
+            .Join(
+                _context.Usluge,
+                r => r.UslugaId,
+                u => u.Id,
+                (r, u) => u.Cijena
+            )
+            .SumAsync(x => (decimal?)x) ?? 0m;
+
+        var aktivniTerapeuti = await _context.Zaposlenici.CountAsync();
+
+        var prosjecnaOcjena = await _context.Recenzije
+            .Select(r => (double?)r.Ocjena)
+            .AverageAsync() ?? 0.0;
+
+        return new AdminKpiDTO
+        {
+            UkupnoRezervacija = ukupnoRezervacija,
+            RezervacijeDanas = rezervacijeDanas,
+            PrihodDanas = prihodDanas,
+            AktivniTerapeuti = aktivniTerapeuti,
+            ProsjecnaOcjena = Math.Round(prosjecnaOcjena, 2),
+        };
+    }
+
+    public async Task<List<RevenuePointDTO>> GetRevenueSeriesAsync(DateTime from, DateTime to)
+    {
+        var start = from.Date;
+        var end = to.Date.AddDays(1);
+
+        // Group by date, sum paid reservations.
+        var points = await _context.Rezervacije
+            .Where(r => r.IsPlacena && r.DatumRezervacije >= start && r.DatumRezervacije < end)
+            .Join(
+                _context.Usluge,
+                r => r.UslugaId,
+                u => u.Id,
+                (r, u) => new { r.DatumRezervacije, u.Cijena }
+            )
+            .GroupBy(x => x.DatumRezervacije.Date)
+            .Select(g => new RevenuePointDTO
+            {
+                Datum = g.Key,
+                BrojRezervacija = g.Count(),
+                Prihod = g.Sum(x => x.Cijena)
+            })
+            .OrderBy(p => p.Datum)
+            .ToListAsync();
+
+        return points;
+    }
+
+    public async Task<List<ServicePopularityDTO>> GetServicePopularityAsync(DateTime from, DateTime to, int take)
+    {
+        var start = from.Date;
+        var end = to.Date.AddDays(1);
+        var safeTake = take <= 0 ? 8 : Math.Min(take, 30);
+
+        var items = await _context.Rezervacije
+            .Where(r => r.IsPlacena && r.DatumRezervacije >= start && r.DatumRezervacije < end)
+            .Join(
+                _context.Usluge,
+                r => r.UslugaId,
+                u => u.Id,
+                (r, u) => new { u.Id, u.Naziv, u.Cijena }
+            )
+            .GroupBy(x => new { x.Id, x.Naziv })
+            .Select(g => new ServicePopularityDTO
+            {
+                UslugaId = g.Key.Id,
+                Naziv = g.Key.Naziv,
+                BrojRezervacija = g.Count(),
+                Prihod = g.Sum(x => x.Cijena),
+            })
+            .OrderByDescending(x => x.BrojRezervacija)
+            .ThenByDescending(x => x.Prihod)
+            .Take(safeTake)
+            .ToListAsync();
+
+        return items;
+    }
+
+    public async Task<List<TopSpenderDTO>> GetTopSpendersAsync(DateTime from, DateTime to, int take)
+    {
+        var start = from.Date;
+        var end = to.Date.AddDays(1);
+        var safeTake = take <= 0 ? 10 : Math.Min(take, 50);
+
+        var query = _context.Rezervacije
+            .Where(r => r.IsPlacena && r.DatumRezervacije >= start && r.DatumRezervacije < end)
+            .Join(
+                _context.Usluge,
+                r => r.UslugaId,
+                u => u.Id,
+                (r, u) => new { r.KorisnikId, r.DatumRezervacije, u.Cijena }
+            )
+            .GroupBy(x => x.KorisnikId)
+            .Select(g => new
+            {
+                KorisnikId = g.Key,
+                BrojPosjeta = g.Count(),
+                Ukupno = g.Sum(x => x.Cijena),
+                Zadnja = g.Max(x => x.DatumRezervacije)
+            })
+            .OrderByDescending(x => x.Ukupno)
+            .ThenByDescending(x => x.BrojPosjeta)
+            .Take(safeTake);
+
+        var top = await query.ToListAsync();
+        var ids = top.Select(x => x.KorisnikId).ToList();
+        var users = await _context.Users
+            .Where(k => ids.Contains(k.Id))
+            .Select(k => new { k.Id, k.Ime, k.Prezime, k.Email })
+            .ToListAsync();
+
+        var map = users.ToDictionary(x => x.Id, x => x);
+        return top.Select(x =>
+        {
+            map.TryGetValue(x.KorisnikId, out var u);
+            return new TopSpenderDTO
+            {
+                KorisnikId = x.KorisnikId,
+                ImePrezime = u == null ? $"#{x.KorisnikId}" : $"{u.Ime} {u.Prezime}",
+                Email = u?.Email,
+                BrojPosjeta = x.BrojPosjeta,
+                UkupnoPotroseno = x.Ukupno,
+                ZadnjaPosjeta = x.Zadnja,
+            };
+        }).ToList();
+    }
 }

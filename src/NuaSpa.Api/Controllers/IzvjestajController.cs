@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using System.Net.Mime;
 
@@ -46,6 +47,50 @@ namespace NuaSpa.Api.Controllers
                 _logger.LogError(ex, "Greška pri generisanju PDF izvještaja top-usluge.");
                 return BadRequest("Greška pri generisanju izvještaja. Pokušajte ponovo ili kontaktirajte administratora.");
             }
+        }
+
+        [HttpGet("kpi")]
+        [ProducesResponseType(typeof(AdminKpiDTO), StatusCodes.Status200OK)]
+        public async Task<ActionResult<AdminKpiDTO>> GetKpis([FromQuery] DateTime? date = null)
+        {
+            var d = (date ?? DateTime.UtcNow).Date;
+            var kpis = await _reportingService.GetAdminKpisAsync(d);
+            return Ok(kpis);
+        }
+
+        [HttpGet("revenue")]
+        [ProducesResponseType(typeof(List<RevenuePointDTO>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<List<RevenuePointDTO>>> GetRevenue(
+            [FromQuery] DateTime from,
+            [FromQuery] DateTime to)
+        {
+            if (to < from) return BadRequest("Neispravan period (to < from).");
+            var data = await _reportingService.GetRevenueSeriesAsync(from, to);
+            return Ok(data);
+        }
+
+        [HttpGet("service-popularity")]
+        [ProducesResponseType(typeof(List<ServicePopularityDTO>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<List<ServicePopularityDTO>>> GetServicePopularity(
+            [FromQuery] DateTime from,
+            [FromQuery] DateTime to,
+            [FromQuery] int take = 8)
+        {
+            if (to < from) return BadRequest("Neispravan period (to < from).");
+            var data = await _reportingService.GetServicePopularityAsync(from, to, take);
+            return Ok(data);
+        }
+
+        [HttpGet("top-spenders")]
+        [ProducesResponseType(typeof(List<TopSpenderDTO>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<List<TopSpenderDTO>>> GetTopSpenders(
+            [FromQuery] DateTime from,
+            [FromQuery] DateTime to,
+            [FromQuery] int take = 10)
+        {
+            if (to < from) return BadRequest("Neispravan period (to < from).");
+            var data = await _reportingService.GetTopSpendersAsync(from, to, take);
+            return Ok(data);
         }
     }
 }
