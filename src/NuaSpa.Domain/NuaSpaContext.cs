@@ -24,6 +24,11 @@ namespace NuaSpa.Domain
         public DbSet<Placanje> Placanja { get; set; } = null!;
         public DbSet<Popust> Popusti { get; set; } = null!;
 
+        public DbSet<SpaCentar> SpaCentri { get; set; } = null!;
+        public DbSet<RadnoVrijeme> RadnaVremena { get; set; } = null!;
+        public DbSet<Prostorija> Prostorije { get; set; } = null!;
+        public DbSet<Oprema> Oprema { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // OVO MORA BITI PRVO!
@@ -104,6 +109,31 @@ namespace NuaSpa.Domain
             modelBuilder.Entity<Favorit>()
                 .HasIndex(x => new { x.KorisnikId, x.UslugaId })
                 .IsUnique();
+
+            // Seed a single default spa center (id=1) + default working hours.
+            modelBuilder.Entity<SpaCentar>().HasData(
+                new SpaCentar
+                {
+                    Id = 1,
+                    Naziv = "NuaSpa",
+                    Adresa = "Sarajevo",
+                    Email = "info@nuaspa.ba",
+                    Telefon = "033 000 000",
+                    Opis = "Luksuzni spa centar. Relax. Renew. Rejuvenate.",
+                    CreatedAt = seedDate
+                }
+            );
+
+            // 09:00–17:00 Mon–Fri, closed Sat/Sun by default.
+            modelBuilder.Entity<RadnoVrijeme>().HasData(
+                new RadnoVrijeme { Id = 1, SpaCentarId = 1, DanUSedmici = 1, IsClosed = false, OtvaraMin = 9 * 60, ZatvaraMin = 17 * 60, CreatedAt = seedDate },
+                new RadnoVrijeme { Id = 2, SpaCentarId = 1, DanUSedmici = 2, IsClosed = false, OtvaraMin = 9 * 60, ZatvaraMin = 17 * 60, CreatedAt = seedDate },
+                new RadnoVrijeme { Id = 3, SpaCentarId = 1, DanUSedmici = 3, IsClosed = false, OtvaraMin = 9 * 60, ZatvaraMin = 17 * 60, CreatedAt = seedDate },
+                new RadnoVrijeme { Id = 4, SpaCentarId = 1, DanUSedmici = 4, IsClosed = false, OtvaraMin = 9 * 60, ZatvaraMin = 17 * 60, CreatedAt = seedDate },
+                new RadnoVrijeme { Id = 5, SpaCentarId = 1, DanUSedmici = 5, IsClosed = false, OtvaraMin = 9 * 60, ZatvaraMin = 17 * 60, CreatedAt = seedDate },
+                new RadnoVrijeme { Id = 6, SpaCentarId = 1, DanUSedmici = 6, IsClosed = true, OtvaraMin = null, ZatvaraMin = null, CreatedAt = seedDate },
+                new RadnoVrijeme { Id = 7, SpaCentarId = 1, DanUSedmici = 7, IsClosed = true, OtvaraMin = null, ZatvaraMin = null, CreatedAt = seedDate }
+            );
         }
     }
 }
