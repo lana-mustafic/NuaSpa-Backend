@@ -213,6 +213,52 @@ namespace NuaSpa.Application.Services
             await _context.SaveChangesAsync();
             return true;
         }
+
+        public async Task<List<RezervacijaCalendarItemDTO>> GetCalendarAsync(
+            DateTime from,
+            DateTime to,
+            int? zaposlenikId,
+            bool includeOtkazane = false)
+        {
+            var start = from.Date;
+            var endExclusive = to.Date.AddDays(1);
+
+            var query = _context.Rezervacije
+                .AsNoTracking()
+                .Include(r => r.Korisnik)
+                .Include(r => r.Usluga)
+                .Include(r => r.Zaposlenik)
+                .Where(r => r.DatumRezervacije >= start && r.DatumRezervacije < endExclusive)
+                .AsQueryable();
+
+            if (!includeOtkazane)
+            {
+                query = query.Where(r => !r.IsOtkazana);
+            }
+
+            if (zaposlenikId.HasValue)
+            {
+                query = query.Where(r => r.ZaposlenikId == zaposlenikId.Value);
+            }
+
+            var list = await query
+                .OrderBy(r => r.DatumRezervacije)
+                .Select(r => new RezervacijaCalendarItemDTO
+                {
+                    Id = r.Id,
+                    DatumRezervacije = r.DatumRezervacije,
+                    IsPotvrdjena = r.IsPotvrdjena,
+                    IsPlacena = r.IsPlacena,
+                    IsOtkazana = r.IsOtkazana,
+                    ZaposlenikId = r.ZaposlenikId,
+                    ZaposlenikIme = r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime,
+                    KorisnikIme = r.Korisnik.Ime + " " + r.Korisnik.Prezime,
+                    UslugaNaziv = r.Usluga.Naziv,
+                })
+                .ToListAsync();
+
+            return list;
+        }
     }
 }
 
