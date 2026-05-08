@@ -49,7 +49,8 @@ namespace NuaSpa.Api.Controllers
                 var zaposResult = await _rezervacijaService.GetForZaposlenikAsync(
                     zaposlenikId,
                     search?.Datum,
-                    search?.IsPotvrdjena
+                    search?.IsPotvrdjena,
+                    search?.IncludeOtkazane ?? false
                 );
 
                 return Ok(zaposResult);
@@ -68,7 +69,8 @@ namespace NuaSpa.Api.Controllers
             var result = await _rezervacijaService.GetAsync(
                 korisnikId,
                 search?.Datum,
-                search?.IsPotvrdjena
+                search?.IsPotvrdjena,
+                search?.IncludeOtkazane ?? false
             );
 
             return Ok(result);
@@ -88,6 +90,33 @@ namespace NuaSpa.Api.Controllers
             var zaposlenikId = User.GetNuaSpaZaposlenikId();
             var updated = await _rezervacijaService.UpdatePotvrdjenaForZaposlenikAsync(id, zaposlenikId, dto.IsPotvrdjena);
             if (!updated) return NotFound("Rezervacija nije pronađena (ili nemate pristup).");
+            return Ok();
+        }
+
+        [HttpPatch("{id}/cancel")]
+        [Authorize(Roles = "Admin,Klijent,Zaposlenik")]
+        public async Task<ActionResult> Cancel(int id, [FromBody] RezervacijaCancelDTO dto)
+        {
+            int? requireKorisnikId = null;
+            int? requireZaposlenikId = null;
+
+            if (User.IsInRole("Klijent") && !User.IsInRole("Admin"))
+            {
+                requireKorisnikId = User.GetNuaSpaUserId();
+            }
+            if (User.IsInRole("Zaposlenik") && !User.IsInRole("Admin"))
+            {
+                requireZaposlenikId = User.GetNuaSpaZaposlenikId();
+            }
+
+            var ok = await _rezervacijaService.CancelAsync(
+                id,
+                requireKorisnikId,
+                requireZaposlenikId,
+                dto?.RazlogOtkaza
+            );
+
+            if (!ok) return BadRequest("Nije moguće otkazati rezervaciju.");
             return Ok();
         }
 
