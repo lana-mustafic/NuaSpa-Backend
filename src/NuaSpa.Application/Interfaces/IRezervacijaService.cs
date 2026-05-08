@@ -21,6 +21,8 @@ namespace NuaSpa.Application.Interfaces
 
         Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto);
 
+        Task<RezervacijaDTO?> EditAsync(int rezervacijaId, RezervacijaEditDTO dto);
+
         Task<bool> UpdatePotvrdjenaAsync(int rezervacijaId, bool isPotvrdjena);
 
         Task<bool> UpdatePotvrdjenaForZaposlenikAsync(int rezervacijaId, int zaposlenikId, bool isPotvrdjena);
