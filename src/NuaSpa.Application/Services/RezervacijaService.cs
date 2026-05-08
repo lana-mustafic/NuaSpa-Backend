@@ -13,6 +13,7 @@ namespace NuaSpa.Application.Services
 {
     public class RezervacijaService : IRezervacijaService
     {
+        private const int DefaultSpaCentarId = 1;
         private readonly NuaSpaContext _context;
         private readonly IMapper _mapper;
 
@@ -107,6 +108,14 @@ namespace NuaSpa.Application.Services
 
         public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto)
         {
+            // Validate working hours (SpaCentarId = 1)
+            var hours = await GetWorkingHoursAsync(dto.DatumRezervacije);
+            if (hours.IsClosed)
+                throw new InvalidOperationException("Spa centar je zatvoren za odabrani dan.");
+
+            if (!IsWithinWorkingHours(dto.DatumRezervacije, hours.OpenMin, hours.CloseMin))
+                throw new InvalidOperationException("Termin je van radnog vremena spa centra.");
+
             // Validate selected room (optional) + equipment availability for the slot.
             Prostorija? prostorija = null;
             if (dto.ProstorijaId.HasValue)
@@ -116,7 +125,7 @@ namespace NuaSpa.Application.Services
                     .FirstOrDefaultAsync(x =>
                         x.Id == dto.ProstorijaId.Value &&
                         x.IsAktivna &&
-                        x.SpaCentarId == 1);
+                        x.SpaCentarId == DefaultSpaCentarId);
                 if (prostorija == null)
                     throw new InvalidOperationException("Prostorija nije dostupna.");
 
@@ -141,7 +150,7 @@ namespace NuaSpa.Application.Services
                 var opremaIds = opremaItems.Select(x => x.OpremaId).ToList();
                 var opremaInDb = await _context.Oprema
                     .AsNoTracking()
-                    .Where(x => x.SpaCentarId == 1 && x.IsIspravna && opremaIds.Contains(x.Id))
+                    .Where(x => x.SpaCentarId == DefaultSpaCentarId && x.IsIspravna && opremaIds.Contains(x.Id))
                     .Select(x => new { x.Id, x.Kolicina })
                     .ToListAsync();
 
@@ -234,8 +243,11 @@ namespace NuaSpa.Application.Services
         public async Task<List<DateTime>> GetAvailableSlotsAsync(int zaposlenikId, DateTime date, int slotMinutes = 60)
         {
             var day = date.Date;
-            var start = day.AddHours(9);
-            var end = day.AddHours(17);
+            var hours = await GetWorkingHoursAsync(day);
+            if (hours.IsClosed) return new List<DateTime>();
+
+            var start = day.AddMinutes(hours.OpenMin);
+            var end = day.AddMinutes(hours.CloseMin);
 
             var taken = await _context.Rezervacije
                 .AsNoTracking()
@@ -258,6 +270,29 @@ namespace NuaSpa.Application.Services
             }
 
             return slots;
+        }
+
+        private async Task<(bool IsClosed, int OpenMin, int CloseMin)> GetWorkingHoursAsync(DateTime date)
+        {
+            var d = date.Date;
+            // 1=Mon..7=Sun
+            var dayOfWeek = ((int)d.DayOfWeek + 6) % 7 + 1;
+
+            var hours = await _context.RadnaVremena
+                .AsNoTracking()
+                .Where(x => x.SpaCentarId == DefaultSpaCentarId && x.DanUSedmici == dayOfWeek)
+                .Select(x => new { x.IsClosed, x.OtvaraMin, x.ZatvaraMin })
+                .FirstOrDefaultAsync();
+
+            if (hours == null) return (false, 9 * 60, 17 * 60); // fallback
+            if (hours.IsClosed) return (true, 0, 0);
+            return (false, hours.OtvaraMin ?? 9 * 60, hours.ZatvaraMin ?? 17 * 60);
+        }
+
+        private static bool IsWithinWorkingHours(DateTime slot, int openMin, int closeMin)
+        {
+            var minutes = slot.Hour * 60 + slot.Minute;
+            return minutes >= openMin && minutes < closeMin;
         }
 
         public async Task<bool> CancelAsync(
