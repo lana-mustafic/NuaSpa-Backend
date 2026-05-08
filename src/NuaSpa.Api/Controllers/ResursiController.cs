@@ -187,6 +187,83 @@ public class ResursiController : ControllerBase
         return Ok(list);
     }
 
+    [HttpGet("availability")]
+    public async Task<ActionResult<ResourceAvailabilityDTO>> GetAvailability(
+        [FromQuery] DateTime slot,
+        [FromQuery] int? excludeRezervacijaId = null)
+    {
+        var takenRoomIds = await _context.Rezervacije
+            .AsNoTracking()
+            .Where(r =>
+                !r.IsOtkazana &&
+                r.ProstorijaId != null &&
+                r.DatumRezervacije == slot &&
+                (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value))
+            .Select(r => r.ProstorijaId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        var freeRooms = await _context.Prostorije
+            .AsNoTracking()
+            .Where(p =>
+                p.SpaCentarId == DefaultSpaCentarId &&
+                p.IsAktivna &&
+                !takenRoomIds.Contains(p.Id))
+            .OrderBy(p => p.Naziv)
+            .Select(p => new ProstorijaDTO
+            {
+                Id = p.Id,
+                SpaCentarId = p.SpaCentarId,
+                Naziv = p.Naziv,
+                Opis = p.Opis,
+                Kapacitet = p.Kapacitet,
+                IsAktivna = p.IsAktivna
+            })
+            .ToListAsync();
+
+        var reserved = await _context.RezervacijeOprema
+            .AsNoTracking()
+            .Where(x =>
+                !x.Rezervacija.IsOtkazana &&
+                x.Rezervacija.DatumRezervacije == slot &&
+                (!excludeRezervacijaId.HasValue || x.RezervacijaId != excludeRezervacijaId.Value))
+            .GroupBy(x => x.OpremaId)
+            .Select(g => new { OpremaId = g.Key, Qty = g.Sum(x => x.Kolicina) })
+            .ToListAsync();
+
+        var reservedMap = reserved.ToDictionary(x => x.OpremaId, x => x.Qty);
+
+        var equipment = await _context.Oprema
+            .AsNoTracking()
+            .Where(o => o.SpaCentarId == DefaultSpaCentarId && o.IsIspravna)
+            .OrderBy(o => o.Naziv)
+            .Select(o => new { o.Id, o.Naziv, o.Kolicina })
+            .ToListAsync();
+
+        var equipmentDtos = equipment
+            .Select(o =>
+            {
+                var res = reservedMap.TryGetValue(o.Id, out var q) ? q : 0;
+                var remaining = Math.Max(0, o.Kolicina - res);
+                return new OpremaAvailabilityDTO
+                {
+                    OpremaId = o.Id,
+                    Naziv = o.Naziv,
+                    Total = o.Kolicina,
+                    Reserved = res,
+                    Remaining = remaining
+                };
+            })
+            .ToList();
+
+        return Ok(new ResourceAvailabilityDTO
+        {
+            Slot = slot,
+            FreeRooms = freeRooms,
+            Equipment = equipmentDtos
+        });
+    }
+
     [HttpPost("oprema")]
     public async Task<ActionResult<OpremaDTO>> CreateOprema([FromBody] OpremaDTO dto)
     {
