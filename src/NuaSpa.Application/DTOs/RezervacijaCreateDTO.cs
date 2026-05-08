@@ -9,6 +9,10 @@ namespace NuaSpa.Application.DTOs
         public int UslugaId { get; set; }
 
         public int ZaposlenikId { get; set; }
+
+        public int? ProstorijaId { get; set; }
+
+        public List<RezervacijaOpremaItemDTO>? Oprema { get; set; }
     }
 }
 

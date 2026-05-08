@@ -33,6 +33,8 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Korisnik)
                 .Include(r => r.Usluga)
                 .Include(r => r.Zaposlenik)
+                .Include(r => r.Prostorija)
+                .Include(r => r.RezervacijaOprema)
                 .AsQueryable();
 
             if (!includeOtkazane)
@@ -75,6 +77,8 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Korisnik)
                 .Include(r => r.Usluga)
                 .Include(r => r.Zaposlenik)
+                .Include(r => r.Prostorija)
+                .Include(r => r.RezervacijaOprema)
                 .Where(r => r.ZaposlenikId == zaposlenikId)
                 .AsQueryable();
 
@@ -103,6 +107,67 @@ namespace NuaSpa.Application.Services
 
         public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto)
         {
+            // Validate selected room (optional) + equipment availability for the slot.
+            Prostorija? prostorija = null;
+            if (dto.ProstorijaId.HasValue)
+            {
+                prostorija = await _context.Prostorije
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.ProstorijaId.Value &&
+                        x.IsAktivna &&
+                        x.SpaCentarId == 1);
+                if (prostorija == null)
+                    throw new InvalidOperationException("Prostorija nije dostupna.");
+
+                var roomTaken = await _context.Rezervacije
+                    .AsNoTracking()
+                    .AnyAsync(r =>
+                        !r.IsOtkazana &&
+                        r.ProstorijaId == dto.ProstorijaId.Value &&
+                        r.DatumRezervacije == dto.DatumRezervacije);
+                if (roomTaken)
+                    throw new InvalidOperationException("Prostorija je već zauzeta za odabrani termin.");
+            }
+
+            var opremaItems = (dto.Oprema ?? new List<RezervacijaOpremaItemDTO>())
+                .Where(x => x.OpremaId > 0 && x.Kolicina > 0)
+                .GroupBy(x => x.OpremaId)
+                .Select(g => new RezervacijaOpremaItemDTO { OpremaId = g.Key, Kolicina = g.Sum(x => x.Kolicina) })
+                .ToList();
+
+            if (opremaItems.Count > 0)
+            {
+                var opremaIds = opremaItems.Select(x => x.OpremaId).ToList();
+                var opremaInDb = await _context.Oprema
+                    .AsNoTracking()
+                    .Where(x => x.SpaCentarId == 1 && x.IsIspravna && opremaIds.Contains(x.Id))
+                    .Select(x => new { x.Id, x.Kolicina })
+                    .ToListAsync();
+
+                if (opremaInDb.Count != opremaIds.Count)
+                    throw new InvalidOperationException("Dio opreme nije dostupan.");
+
+                var reserved = await _context.RezervacijeOprema
+                    .AsNoTracking()
+                    .Where(x =>
+                        !x.Rezervacija.IsOtkazana &&
+                        x.Rezervacija.DatumRezervacije == dto.DatumRezervacije &&
+                        opremaIds.Contains(x.OpremaId))
+                    .GroupBy(x => x.OpremaId)
+                    .Select(g => new { OpremaId = g.Key, Qty = g.Sum(x => x.Kolicina) })
+                    .ToListAsync();
+
+                var reservedMap = reserved.ToDictionary(x => x.OpremaId, x => x.Qty);
+                foreach (var item in opremaItems)
+                {
+                    var total = opremaInDb.First(x => x.Id == item.OpremaId).Kolicina;
+                    var already = reservedMap.TryGetValue(item.OpremaId, out var v) ? v : 0;
+                    if (already + item.Kolicina > total)
+                        throw new InvalidOperationException("Nema dovoljno opreme za odabrani termin.");
+                }
+            }
+
             var entity = new Rezervacija
             {
                 KorisnikId = korisnikId,
@@ -110,11 +175,27 @@ namespace NuaSpa.Application.Services
                 ZaposlenikId = dto.ZaposlenikId,
                 DatumRezervacije = dto.DatumRezervacije,
                 IsPotvrdjena = false,
-                IsPlacena = false
+                IsPlacena = false,
+                ProstorijaId = dto.ProstorijaId
             };
 
             _context.Rezervacije.Add(entity);
             await _context.SaveChangesAsync();
+
+            if (opremaItems.Count > 0)
+            {
+                foreach (var item in opremaItems)
+                {
+                    _context.RezervacijeOprema.Add(new RezervacijaOprema
+                    {
+                        RezervacijaId = entity.Id,
+                        OpremaId = item.OpremaId,
+                        Kolicina = item.Kolicina,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+                await _context.SaveChangesAsync();
+            }
 
             // Dohvati relacije za DTO mapiranje (Korisnik/Usluga/Zaposlenik).
             var created = await _context.Rezervacije
@@ -122,6 +203,8 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Korisnik)
                 .Include(r => r.Usluga)
                 .Include(r => r.Zaposlenik)
+                .Include(r => r.Prostorija)
+                .Include(r => r.RezervacijaOprema)
                 .FirstAsync(r => r.Id == entity.Id);
 
             return _mapper.Map<RezervacijaDTO>(created);
