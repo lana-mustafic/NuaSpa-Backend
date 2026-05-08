@@ -18,6 +18,13 @@ namespace NuaSpa.Domain.Entities
         [Required]
         public bool IsPlacena { get; set; }
 
+        public bool IsOtkazana { get; set; }
+
+        [MaxLength(400)]
+        public string? RazlogOtkaza { get; set; }
+
+        public DateTime? OtkazanaAt { get; set; }
+
         [Required]
         [ForeignKey("Korisnik")]
         public int KorisnikId { get; set; }

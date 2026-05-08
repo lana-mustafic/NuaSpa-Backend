@@ -9,5 +9,6 @@ namespace NuaSpa.Application.SearchObjects
         public int? KorisnikId { get; set; }
         public DateTime? Datum { get; set; }
         public bool? IsPotvrdjena { get; set; }
+        public bool? IncludeOtkazane { get; set; }
     }
 }

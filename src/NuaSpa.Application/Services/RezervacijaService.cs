@@ -22,7 +22,11 @@ namespace NuaSpa.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<IEnumerable<RezervacijaDTO>> GetAsync(int? korisnikId, DateTime? datum, bool? isPotvrdjena)
+        public async Task<IEnumerable<RezervacijaDTO>> GetAsync(
+            int? korisnikId,
+            DateTime? datum,
+            bool? isPotvrdjena,
+            bool includeOtkazane = false)
         {
             var query = _context.Rezervacije
                 .AsNoTracking()
@@ -30,6 +34,11 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Usluga)
                 .Include(r => r.Zaposlenik)
                 .AsQueryable();
+
+            if (!includeOtkazane)
+            {
+                query = query.Where(r => !r.IsOtkazana);
+            }
 
             if (korisnikId is int id)
             {
@@ -55,7 +64,11 @@ namespace NuaSpa.Application.Services
             return _mapper.Map<IEnumerable<RezervacijaDTO>>(list);
         }
 
-        public async Task<IEnumerable<RezervacijaDTO>> GetForZaposlenikAsync(int zaposlenikId, DateTime? datum, bool? isPotvrdjena)
+        public async Task<IEnumerable<RezervacijaDTO>> GetForZaposlenikAsync(
+            int zaposlenikId,
+            DateTime? datum,
+            bool? isPotvrdjena,
+            bool includeOtkazane = false)
         {
             var query = _context.Rezervacije
                 .AsNoTracking()
@@ -64,6 +77,11 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Zaposlenik)
                 .Where(r => r.ZaposlenikId == zaposlenikId)
                 .AsQueryable();
+
+            if (!includeOtkazane)
+            {
+                query = query.Where(r => !r.IsOtkazana);
+            }
 
             if (datum.HasValue)
             {
@@ -138,7 +156,10 @@ namespace NuaSpa.Application.Services
 
             var taken = await _context.Rezervacije
                 .AsNoTracking()
-                .Where(r => r.ZaposlenikId == zaposlenikId && r.DatumRezervacije.Date == day)
+                .Where(r =>
+                    r.ZaposlenikId == zaposlenikId &&
+                    !r.IsOtkazana &&
+                    r.DatumRezervacije.Date == day)
                 .Select(r => r.DatumRezervacije)
                 .ToListAsync();
 
@@ -154,6 +175,43 @@ namespace NuaSpa.Application.Services
             }
 
             return slots;
+        }
+
+        public async Task<bool> CancelAsync(
+            int rezervacijaId,
+            int? requireKorisnikId,
+            int? requireZaposlenikId,
+            string? razlogOtkaza)
+        {
+            var entity = await _context.Rezervacije.FirstOrDefaultAsync(r => r.Id == rezervacijaId);
+            if (entity == null) return false;
+
+            if (requireKorisnikId.HasValue && entity.KorisnikId != requireKorisnikId.Value)
+            {
+                return false;
+            }
+
+            if (requireZaposlenikId.HasValue && entity.ZaposlenikId != requireZaposlenikId.Value)
+            {
+                return false;
+            }
+
+            if (entity.IsPlacena)
+            {
+                // MVP: ne dozvoljavamo otkazivanje plaćene rezervacije.
+                return false;
+            }
+
+            if (entity.IsOtkazana) return true;
+
+            entity.IsOtkazana = true;
+            entity.OtkazanaAt = DateTime.UtcNow;
+            entity.RazlogOtkaza = string.IsNullOrWhiteSpace(razlogOtkaza)
+                ? null
+                : razlogOtkaza.Trim();
+            entity.IsPotvrdjena = false;
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

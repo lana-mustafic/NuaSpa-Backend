@@ -10,6 +10,9 @@ namespace NuaSpa.Application.DTOs
         public DateTime DatumRezervacije { get; set; }
         public bool IsPotvrdjena { get; set; }
         public bool IsPlacena { get; set; }
+        public bool IsOtkazana { get; set; }
+        public string? RazlogOtkaza { get; set; }
+        public DateTime? OtkazanaAt { get; set; }
         public string? KorisnikIme { get; set; }
         public string? UslugaNaziv { get; set; }
         public string? ZaposlenikIme { get; set; }
