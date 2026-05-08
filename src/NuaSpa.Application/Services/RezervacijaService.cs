@@ -457,6 +457,7 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Korisnik)
                 .Include(r => r.Usluga)
                 .Include(r => r.Zaposlenik)
+                .Include(r => r.Prostorija)
                 .Where(r => r.DatumRezervacije >= start && r.DatumRezervacije < endExclusive)
                 .AsQueryable();
 
@@ -481,6 +482,8 @@ namespace NuaSpa.Application.Services
                     IsOtkazana = r.IsOtkazana,
                     ZaposlenikId = r.ZaposlenikId,
                     ZaposlenikIme = r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime,
+                    ProstorijaId = r.ProstorijaId,
+                    ProstorijaNaziv = r.Prostorija != null ? r.Prostorija.Naziv : null,
                     KorisnikIme = r.Korisnik.Ime + " " + r.Korisnik.Prezime,
                     UslugaNaziv = r.Usluga.Naziv,
                 })

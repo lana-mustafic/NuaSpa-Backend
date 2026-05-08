@@ -11,6 +11,9 @@ public class RezervacijaCalendarItemDTO
     public int ZaposlenikId { get; set; }
     public string? ZaposlenikIme { get; set; }
 
+    public int? ProstorijaId { get; set; }
+    public string? ProstorijaNaziv { get; set; }
+
     public string? KorisnikIme { get; set; }
     public string? UslugaNaziv { get; set; }
 }
