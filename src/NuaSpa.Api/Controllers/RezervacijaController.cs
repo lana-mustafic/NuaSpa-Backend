@@ -100,6 +100,22 @@ namespace NuaSpa.Api.Controllers
             return Ok();
         }
 
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<RezervacijaDTO>> Edit(int id, [FromBody] RezervacijaEditDTO dto)
+        {
+            try
+            {
+                var updated = await _rezervacijaService.EditAsync(id, dto);
+                if (updated == null) return NotFound("Rezervacija nije pronađena.");
+                return Ok(updated);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPatch("{id}/cancel")]
         [Authorize(Roles = "Admin,Klijent,Zaposlenik")]
         public async Task<ActionResult> Cancel(int id, [FromBody] RezervacijaCancelDTO dto)
