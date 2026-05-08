@@ -26,9 +26,16 @@ namespace NuaSpa.Api.Controllers
         [Authorize(Roles = "Klijent,Admin")]
         public async Task<ActionResult<RezervacijaDTO>> Create([FromBody] RezervacijaCreateDTO dto)
         {
-            var korisnikId = User.GetNuaSpaUserId();
-            var created = await _rezervacijaService.CreateAsync(korisnikId, dto);
-            return Ok(created);
+            try
+            {
+                var korisnikId = User.GetNuaSpaUserId();
+                var created = await _rezervacijaService.CreateAsync(korisnikId, dto);
+                return Ok(created);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpGet]

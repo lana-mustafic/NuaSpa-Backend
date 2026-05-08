@@ -16,6 +16,7 @@ namespace NuaSpa.Domain
         public DbSet<Zaposlenik> Zaposlenici { get; set; } = null!;
         public DbSet<Usluga> Usluge { get; set; } = null!;
         public DbSet<Rezervacija> Rezervacije { get; set; } = null!;
+        public DbSet<RezervacijaOprema> RezervacijeOprema { get; set; } = null!;
         public DbSet<Recenzija> Recenzije { get; set; } = null!;
         public DbSet<Favorit> Favoriti { get; set; } = null!;
         public DbSet<Proizvod> Proizvodi { get; set; } = null!;
@@ -108,6 +109,10 @@ namespace NuaSpa.Domain
 
             modelBuilder.Entity<Favorit>()
                 .HasIndex(x => new { x.KorisnikId, x.UslugaId })
+                .IsUnique();
+
+            modelBuilder.Entity<RezervacijaOprema>()
+                .HasIndex(x => new { x.RezervacijaId, x.OpremaId })
                 .IsUnique();
 
             // Seed a single default spa center (id=1) + default working hours.

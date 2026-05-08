@@ -45,7 +45,15 @@ namespace NuaSpa.Application
             CreateMap<Rezervacija, RezervacijaDTO>()
                 .ForMember(dest => dest.KorisnikIme, opt => opt.MapFrom(src => src.Korisnik.Ime + " " + src.Korisnik.Prezime))
                 .ForMember(dest => dest.UslugaNaziv, opt => opt.MapFrom(src => src.Usluga.Naziv))
-                .ForMember(dest => dest.ZaposlenikIme, opt => opt.MapFrom(src => src.Zaposlenik.Ime));
+                .ForMember(dest => dest.ZaposlenikIme, opt => opt.MapFrom(src => src.Zaposlenik.Ime))
+                .ForMember(dest => dest.ProstorijaNaziv, opt => opt.MapFrom(src => src.Prostorija != null ? src.Prostorija.Naziv : null))
+                .ForMember(dest => dest.Oprema, opt => opt.MapFrom(src =>
+                    src.RezervacijaOprema.Select(x => new RezervacijaOpremaItemDTO
+                    {
+                        OpremaId = x.OpremaId,
+                        Kolicina = x.Kolicina
+                    }).ToList()
+                ));
 
             // Mapiranje Skladišta (Izvlačenje naziva proizvoda)
             CreateMap<Skladiste, SkladisteDTO>()

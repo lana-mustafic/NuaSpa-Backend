@@ -13,6 +13,9 @@ namespace NuaSpa.Application.DTOs
         public bool IsOtkazana { get; set; }
         public string? RazlogOtkaza { get; set; }
         public DateTime? OtkazanaAt { get; set; }
+        public int? ProstorijaId { get; set; }
+        public string? ProstorijaNaziv { get; set; }
+        public List<RezervacijaOpremaItemDTO> Oprema { get; set; } = new();
         public string? KorisnikIme { get; set; }
         public string? UslugaNaziv { get; set; }
         public string? ZaposlenikIme { get; set; }

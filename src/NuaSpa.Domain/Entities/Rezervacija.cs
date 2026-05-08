@@ -39,5 +39,12 @@ namespace NuaSpa.Domain.Entities
         [ForeignKey("Zaposlenik")]
         public int ZaposlenikId { get; set; }
         public Zaposlenik Zaposlenik { get; set; } = null!;
+
+        [ForeignKey("Prostorija")]
+        public int? ProstorijaId { get; set; }
+        public Prostorija? Prostorija { get; set; }
+
+        public ICollection<RezervacijaOprema> RezervacijaOprema { get; set; } =
+            new List<RezervacijaOprema>();
     }
 }
