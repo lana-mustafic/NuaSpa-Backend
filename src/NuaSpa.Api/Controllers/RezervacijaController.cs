@@ -134,6 +134,29 @@ namespace NuaSpa.Api.Controllers
             var slots = await _rezervacijaService.GetAvailableSlotsAsync(zaposlenikId, datum);
             return Ok(slots);
         }
+
+        [HttpGet("calendar")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<List<RezervacijaCalendarItemDTO>>> GetCalendar(
+            [FromQuery] DateTime from,
+            [FromQuery] DateTime to,
+            [FromQuery] int? zaposlenikId = null,
+            [FromQuery] bool includeOtkazane = false)
+        {
+            if (to < from) return BadRequest("Neispravan period (to < from).");
+            // Guardrail: max 31 days per request to keep payload bounded.
+            if ((to.Date - from.Date).TotalDays > 31)
+            {
+                return BadRequest("Period je prevelik (max 31 dana).");
+            }
+
+            var items = await _rezervacijaService.GetCalendarAsync(
+                from,
+                to,
+                zaposlenikId,
+                includeOtkazane);
+            return Ok(items);
+        }
     }
 }
 

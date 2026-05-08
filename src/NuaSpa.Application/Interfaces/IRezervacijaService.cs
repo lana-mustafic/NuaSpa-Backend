@@ -32,6 +32,12 @@ namespace NuaSpa.Application.Interfaces
             int? requireKorisnikId,
             int? requireZaposlenikId,
             string? razlogOtkaza);
+
+        Task<List<RezervacijaCalendarItemDTO>> GetCalendarAsync(
+            DateTime from,
+            DateTime to,
+            int? zaposlenikId,
+            bool includeOtkazane = false);
     }
 }
 
