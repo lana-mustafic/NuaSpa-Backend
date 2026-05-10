@@ -484,8 +484,14 @@ namespace NuaSpa.Application.Services
                     ZaposlenikIme = r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime,
                     ProstorijaId = r.ProstorijaId,
                     ProstorijaNaziv = r.Prostorija != null ? r.Prostorija.Naziv : null,
+                    KorisnikId = r.KorisnikId,
                     KorisnikIme = r.Korisnik.Ime + " " + r.Korisnik.Prezime,
+                    KorisnikTelefon = r.Korisnik.PhoneNumber,
+                    KorisnikEmail = r.Korisnik.Email,
                     UslugaNaziv = r.Usluga.Naziv,
+                    UslugaTrajanjeMinuta = r.Usluga.TrajanjeMinuta,
+                    UslugaCijena = r.Usluga.Cijena,
+                    RazlogOtkaza = r.RazlogOtkaza,
                 })
                 .ToListAsync();
 

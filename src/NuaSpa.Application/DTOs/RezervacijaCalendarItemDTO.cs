@@ -14,7 +14,17 @@ public class RezervacijaCalendarItemDTO
     public int? ProstorijaId { get; set; }
     public string? ProstorijaNaziv { get; set; }
 
+    public int KorisnikId { get; set; }
     public string? KorisnikIme { get; set; }
+    public string? KorisnikTelefon { get; set; }
+    public string? KorisnikEmail { get; set; }
+
     public string? UslugaNaziv { get; set; }
+    /// <summary>Trajanje tretmana u minutama (iz usluge).</summary>
+    public int UslugaTrajanjeMinuta { get; set; }
+    /// <summary>Redovna cijena usluge (ne mora odgovarati stvarnoj naplati).</summary>
+    public decimal UslugaCijena { get; set; }
+
+    public string? RazlogOtkaza { get; set; }
 }
 
