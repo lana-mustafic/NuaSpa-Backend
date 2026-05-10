@@ -40,6 +40,16 @@ namespace NuaSpa.Application.Interfaces
             DateTime to,
             int? zaposlenikId,
             bool includeOtkazane = false);
+
+        /// <summary>
+        /// Povijest termina istog klijenta. Terapeut samo ako postoji zajednička rezervacija s tim klijentom.
+        /// </summary>
+        Task<List<RezervacijaPovijestItemDto>> GetPovijestZaKlijentaAsync(
+            bool isAdmin,
+            int zaposlenikIdIfTherapist,
+            int korisnikKlijentId,
+            int? excludeRezervacijaId,
+            int take);
     }
 }
 

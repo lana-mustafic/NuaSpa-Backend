@@ -64,7 +64,7 @@ namespace NuaSpa.Application.Services
                 .OrderByDescending(r => r.DatumRezervacije)
                 .ToListAsync();
 
-            return _mapper.Map<IEnumerable<RezervacijaDTO>>(list);
+            return await MapAndEnrichAsync(list);
         }
 
         public async Task<IEnumerable<RezervacijaDTO>> GetForZaposlenikAsync(
@@ -103,7 +103,7 @@ namespace NuaSpa.Application.Services
                 .OrderByDescending(r => r.DatumRezervacije)
                 .ToListAsync();
 
-            return _mapper.Map<IEnumerable<RezervacijaDTO>>(list);
+            return await MapAndEnrichAsync(list);
         }
 
         public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto)
@@ -216,7 +216,7 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.RezervacijaOprema)
                 .FirstAsync(r => r.Id == entity.Id);
 
-            return _mapper.Map<RezervacijaDTO>(created);
+            return await MapSingleAndEnrichAsync(created);
         }
 
         public async Task<RezervacijaDTO?> EditAsync(int rezervacijaId, RezervacijaEditDTO dto)
@@ -327,7 +327,7 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Prostorija)
                 .Include(r => r.RezervacijaOprema)
                 .FirstAsync(r => r.Id == entity.Id);
-            return _mapper.Map<RezervacijaDTO>(updated);
+            return await MapSingleAndEnrichAsync(updated);
         }
 
         public async Task<bool> UpdatePotvrdjenaAsync(int rezervacijaId, bool isPotvrdjena)
@@ -496,6 +496,86 @@ namespace NuaSpa.Application.Services
                 .ToListAsync();
 
             return list;
+        }
+
+        public async Task<List<RezervacijaPovijestItemDto>> GetPovijestZaKlijentaAsync(
+            bool isAdmin,
+            int zaposlenikIdIfTherapist,
+            int korisnikKlijentId,
+            int? excludeRezervacijaId,
+            int take)
+        {
+            var takeSafe = take <= 0 ? 20 : Math.Min(take, 100);
+
+            if (!isAdmin)
+            {
+                var linked = await _context.Rezervacije.AsNoTracking().AnyAsync(r =>
+                    r.KorisnikId == korisnikKlijentId &&
+                    r.ZaposlenikId == zaposlenikIdIfTherapist);
+                if (!linked)
+                    return new List<RezervacijaPovijestItemDto>();
+            }
+
+            var query = _context.Rezervacije
+                .AsNoTracking()
+                .Include(r => r.Usluga)
+                .Where(r => r.KorisnikId == korisnikKlijentId);
+
+            if (!isAdmin)
+                query = query.Where(r => r.ZaposlenikId == zaposlenikIdIfTherapist);
+
+            if (excludeRezervacijaId.HasValue)
+                query = query.Where(r => r.Id != excludeRezervacijaId.Value);
+
+            return await query
+                .OrderByDescending(r => r.DatumRezervacije)
+                .Take(takeSafe)
+                .Select(r => new RezervacijaPovijestItemDto
+                {
+                    Id = r.Id,
+                    DatumRezervacije = r.DatumRezervacije,
+                    UslugaNaziv = r.Usluga.Naziv,
+                    IsPotvrdjena = r.IsPotvrdjena,
+                    IsPlacena = r.IsPlacena,
+                    IsOtkazana = r.IsOtkazana,
+                })
+                .ToListAsync();
+        }
+
+        private async Task<List<RezervacijaDTO>> MapAndEnrichAsync(List<Rezervacija> list)
+        {
+            var dtos = _mapper.Map<List<RezervacijaDTO>>(list);
+            await ApplyPremiumFlagsAsync(dtos).ConfigureAwait(false);
+            return dtos;
+        }
+
+        private async Task<RezervacijaDTO> MapSingleAndEnrichAsync(Rezervacija entity)
+        {
+            var dto = _mapper.Map<RezervacijaDTO>(entity);
+            await ApplyPremiumFlagsAsync(new List<RezervacijaDTO> { dto }).ConfigureAwait(false);
+            return dto;
+        }
+
+        /// <summary>
+        /// VIP heuristika: min. 3 završena plaćena termina (neotkazana) po korisniku.
+        /// </summary>
+        private async Task ApplyPremiumFlagsAsync(List<RezervacijaDTO> dtos)
+        {
+            if (dtos.Count == 0)
+                return;
+
+            var ids = dtos.Select(d => d.KorisnikId).Distinct().ToList();
+            var premiumIds = await _context.Rezervacije
+                .AsNoTracking()
+                .Where(r => ids.Contains(r.KorisnikId) && r.IsPlacena && !r.IsOtkazana)
+                .GroupBy(r => r.KorisnikId)
+                .Where(g => g.Count() >= 3)
+                .Select(g => g.Key)
+                .ToListAsync();
+
+            var set = premiumIds.ToHashSet();
+            foreach (var d in dtos)
+                d.PremiumKlijent = set.Contains(d.KorisnikId);
         }
     }
 }

@@ -35,6 +35,12 @@ namespace NuaSpa.Domain.Entities
         [ForeignKey("ZaposlenikId")]
         public virtual Zaposlenik? Zaposlenik { get; set; }
 
+        /// <summary>
+        /// Interna napomena vidljiva terapeutu/adminu (alergije, kontraindikacije, preferencije ulja…).
+        /// </summary>
+        [MaxLength(1200)]
+        public string? NapomenaZaTerapeuta { get; set; }
+
         // Napomena: UlogaId je uklonjen jer Identity koristi tabelu AspNetUserRoles 
         // za povezivanje korisnika i uloga.
     }
