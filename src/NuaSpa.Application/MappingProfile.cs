@@ -24,7 +24,6 @@ namespace NuaSpa.Application
             CreateMap<Zaposlenik, ZaposlenikDTO>().ReverseMap();
             CreateMap<Skladiste, SkladisteDTO>().ReverseMap();
             CreateMap<Recenzija, RecenzijaDTO>().ReverseMap();
-            CreateMap<Rezervacija, RezervacijaDTO>().ReverseMap();
             CreateMap<Korisnik, KorisnikDTO>().ReverseMap();
             CreateMap<KategorijaUslugaDTO, KategorijaUsluga>().ReverseMap();
             CreateMap<SpaCentar, SpaCentarDTO>().ReverseMap();
@@ -43,17 +42,26 @@ namespace NuaSpa.Application
 
             // Mapiranje Rezervacije (Spajanje imena i prezimena)
             CreateMap<Rezervacija, RezervacijaDTO>()
+                .ForMember(dest => dest.KorisnikId, opt => opt.MapFrom(src => src.KorisnikId))
+                .ForMember(dest => dest.KorisnikTelefon, opt => opt.MapFrom(src => src.Korisnik.PhoneNumber))
+                .ForMember(dest => dest.NapomenaZaTerapeuta,
+                    opt => opt.MapFrom(src => src.Korisnik.NapomenaZaTerapeuta))
+                .ForMember(dest => dest.UslugaTrajanjeMinuta,
+                    opt => opt.MapFrom(src => src.Usluga.TrajanjeMinuta))
+                .ForMember(dest => dest.UslugaCijena, opt => opt.MapFrom(src => src.Usluga.Cijena))
                 .ForMember(dest => dest.KorisnikIme, opt => opt.MapFrom(src => src.Korisnik.Ime + " " + src.Korisnik.Prezime))
                 .ForMember(dest => dest.UslugaNaziv, opt => opt.MapFrom(src => src.Usluga.Naziv))
                 .ForMember(dest => dest.ZaposlenikIme, opt => opt.MapFrom(src => src.Zaposlenik.Ime))
-                .ForMember(dest => dest.ProstorijaNaziv, opt => opt.MapFrom(src => src.Prostorija != null ? src.Prostorija.Naziv : null))
+                .ForMember(dest => dest.ProstorijaNaziv,
+                    opt => opt.MapFrom(src => src.Prostorija != null ? src.Prostorija.Naziv : null))
                 .ForMember(dest => dest.Oprema, opt => opt.MapFrom(src =>
                     src.RezervacijaOprema.Select(x => new RezervacijaOpremaItemDTO
                     {
                         OpremaId = x.OpremaId,
                         Kolicina = x.Kolicina
                     }).ToList()
-                ));
+                ))
+                .ForMember(dest => dest.PremiumKlijent, opt => opt.Ignore());
 
             // Mapiranje Skladišta (Izvlačenje naziva proizvoda)
             CreateMap<Skladiste, SkladisteDTO>()

@@ -126,6 +126,56 @@ public class ReportingService : IReportingService
         };
     }
 
+    public async Task<DesktopHomeOverviewDto> GetDesktopHomeOverviewAsync(
+        DateTime day,
+        bool isAdmin,
+        bool isZaposlenik,
+        bool isKlijent,
+        int currentUserId,
+        int zaposlenikIdIfTherapist)
+    {
+        var dayStart = day.Date;
+        var next = dayStart.AddDays(1);
+        var registracijeOd = DateTime.Today.AddDays(-7);
+
+        var baseQuery = _context.Rezervacije
+            .AsNoTracking()
+            .Where(r => !r.IsOtkazana && r.DatumRezervacije >= dayStart && r.DatumRezervacije < next);
+
+        int? noviKlijenti = null;
+        decimal prihod = 0m;
+
+        if (isAdmin)
+        {
+            noviKlijenti = await _context.Users
+                .AsNoTracking()
+                .CountAsync(u => u.DatumRegistracije >= registracijeOd);
+
+            prihod = await baseQuery.Select(r => r.Usluga.Cijena).SumAsync();
+        }
+        else if (isZaposlenik)
+        {
+            prihod = await baseQuery
+                .Where(r => r.ZaposlenikId == zaposlenikIdIfTherapist)
+                .Select(r => r.Usluga.Cijena)
+                .SumAsync();
+        }
+        else if (isKlijent)
+        {
+            prihod = await baseQuery
+                .Where(r => r.KorisnikId == currentUserId)
+                .Select(r => r.Usluga.Cijena)
+                .SumAsync();
+        }
+
+        return new DesktopHomeOverviewDto
+        {
+            NoviKlijentiZadnjih7Dana = noviKlijenti,
+            ProcijenjeniPrihodZaDan = prihod,
+            Valuta = "KM",
+        };
+    }
+
     public async Task<List<RevenuePointDTO>> GetRevenueSeriesAsync(DateTime from, DateTime to)
     {
         var start = from.Date;

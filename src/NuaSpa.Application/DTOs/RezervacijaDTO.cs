@@ -16,8 +16,25 @@ namespace NuaSpa.Application.DTOs
         public int? ProstorijaId { get; set; }
         public string? ProstorijaNaziv { get; set; }
         public List<RezervacijaOpremaItemDTO> Oprema { get; set; } = new();
+
+        /// <summary>ID klijenta (korisnika) — za povijest i CRM.</summary>
+        public int KorisnikId { get; set; }
+
         public string? KorisnikIme { get; set; }
+        public string? KorisnikTelefon { get; set; }
+
+        /// <summary>Tekst s kartice klijenta (medicinsko / tehnička napomena za tretman).</summary>
+        public string? NapomenaZaTerapeuta { get; set; }
+
         public string? UslugaNaziv { get; set; }
+        public int UslugaTrajanjeMinuta { get; set; }
+        public decimal UslugaCijena { get; set; }
+
         public string? ZaposlenikIme { get; set; }
+
+        /// <summary>
+        /// Heuristika VIP segmenta (&gt;= 3 uspješno plaćena termina bez otkaza).
+        /// </summary>
+        public bool PremiumKlijent { get; set; }
     }
 }

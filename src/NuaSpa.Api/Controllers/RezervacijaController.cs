@@ -180,6 +180,35 @@ namespace NuaSpa.Api.Controllers
                 includeOtkazane);
             return Ok(items);
         }
+
+        /// <summary>
+        /// Štiklirana povijest termina jednog klijenta. Terapeut samo za zajedničke rezervacije; admin sve.
+        /// </summary>
+        [HttpGet("povijest-za-klijenta")]
+        [Authorize(Roles = "Admin,Zaposlenik")]
+        [ProducesResponseType(typeof(List<RezervacijaPovijestItemDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<List<RezervacijaPovijestItemDto>>> GetPovijestZaKlijenta(
+            [FromQuery] int korisnikId,
+            [FromQuery] int? excludeRezervacijaId = null,
+            [FromQuery] int take = 20)
+        {
+            if (korisnikId <= 0)
+                return BadRequest("Neispravan korisnikId.");
+
+            var isAdmin = User.IsInRole("Admin");
+            var zaposId = 0;
+            if (User.IsInRole("Zaposlenik"))
+                zaposId = User.GetNuaSpaZaposlenikId();
+
+            var list = await _rezervacijaService.GetPovijestZaKlijentaAsync(
+                isAdmin,
+                zaposId,
+                korisnikId,
+                excludeRezervacijaId,
+                take);
+
+            return Ok(list);
+        }
     }
 }
 
