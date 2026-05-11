@@ -19,6 +19,50 @@ namespace NuaSpa.Api.Controllers
             _context = context;
         }
 
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<ZaposlenikDTO>> Update(int id, [FromBody] ZaposlenikDTO dto)
+        {
+            if (id != dto.Id && dto.Id != 0) return BadRequest("ID u ruti i tijelu zahtjeva se ne poklapaju.");
+
+            var entity = await _context.Zaposlenici.FindAsync(id);
+            if (entity == null) return NotFound();
+
+            entity.Ime = dto.Ime.Trim();
+            entity.Prezime = dto.Prezime.Trim();
+            entity.Specijalizacija = dto.Specijalizacija.Trim();
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new ZaposlenikDTO
+            {
+                Id = entity.Id,
+                Ime = entity.Ime,
+                Prezime = entity.Prezime,
+                Specijalizacija = entity.Specijalizacija,
+                Telefon = dto.Telefon
+            });
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var entity = await _context.Zaposlenici.FindAsync(id);
+            if (entity == null) return NotFound();
+
+            var hasReservations = await _context.Rezervacije.AnyAsync(r => r.ZaposlenikId == id);
+            if (hasReservations)
+            {
+                return Conflict(new { message = "Terapeut ima rezervacije i ne može biti obrisan." });
+            }
+
+            _context.Zaposlenici.Remove(entity);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
         [HttpGet("{id}/kpi")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<TherapistKpiDTO>> GetKpis(
