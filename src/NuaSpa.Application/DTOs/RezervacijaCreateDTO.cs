@@ -4,6 +4,8 @@ namespace NuaSpa.Application.DTOs
 {
     public class RezervacijaCreateDTO
     {
+        public int? KorisnikId { get; set; }
+
         public DateTime DatumRezervacije { get; set; }
 
         public int UslugaId { get; set; }

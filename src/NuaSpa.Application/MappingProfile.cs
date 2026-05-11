@@ -44,6 +44,7 @@ namespace NuaSpa.Application
             CreateMap<Rezervacija, RezervacijaDTO>()
                 .ForMember(dest => dest.KorisnikId, opt => opt.MapFrom(src => src.KorisnikId))
                 .ForMember(dest => dest.KorisnikTelefon, opt => opt.MapFrom(src => src.Korisnik.PhoneNumber))
+                .ForMember(dest => dest.KorisnikEmail, opt => opt.MapFrom(src => src.Korisnik.Email))
                 .ForMember(dest => dest.NapomenaZaTerapeuta,
                     opt => opt.MapFrom(src => src.Korisnik.NapomenaZaTerapeuta))
                 .ForMember(dest => dest.UslugaTrajanjeMinuta,
@@ -51,7 +52,7 @@ namespace NuaSpa.Application
                 .ForMember(dest => dest.UslugaCijena, opt => opt.MapFrom(src => src.Usluga.Cijena))
                 .ForMember(dest => dest.KorisnikIme, opt => opt.MapFrom(src => src.Korisnik.Ime + " " + src.Korisnik.Prezime))
                 .ForMember(dest => dest.UslugaNaziv, opt => opt.MapFrom(src => src.Usluga.Naziv))
-                .ForMember(dest => dest.ZaposlenikIme, opt => opt.MapFrom(src => src.Zaposlenik.Ime))
+                .ForMember(dest => dest.ZaposlenikIme, opt => opt.MapFrom(src => src.Zaposlenik.Ime + " " + src.Zaposlenik.Prezime))
                 .ForMember(dest => dest.ProstorijaNaziv,
                     opt => opt.MapFrom(src => src.Prostorija != null ? src.Prostorija.Naziv : null))
                 .ForMember(dest => dest.Oprema, opt => opt.MapFrom(src =>

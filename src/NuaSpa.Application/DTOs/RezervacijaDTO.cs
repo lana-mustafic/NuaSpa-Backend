@@ -22,6 +22,7 @@ namespace NuaSpa.Application.DTOs
 
         public string? KorisnikIme { get; set; }
         public string? KorisnikTelefon { get; set; }
+        public string? KorisnikEmail { get; set; }
 
         /// <summary>Tekst s kartice klijenta (medicinsko / tehnička napomena za tretman).</summary>
         public string? NapomenaZaTerapeuta { get; set; }

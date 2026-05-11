@@ -28,7 +28,9 @@ namespace NuaSpa.Api.Controllers
         {
             try
             {
-                var korisnikId = User.GetNuaSpaUserId();
+                var korisnikId = User.IsInRole("Admin") && dto.KorisnikId.HasValue
+                    ? dto.KorisnikId.Value
+                    : User.GetNuaSpaUserId();
                 var created = await _rezervacijaService.CreateAsync(korisnikId, dto);
                 return Ok(created);
             }
