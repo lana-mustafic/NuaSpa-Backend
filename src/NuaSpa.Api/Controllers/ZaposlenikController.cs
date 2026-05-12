@@ -31,6 +31,9 @@ namespace NuaSpa.Api.Controllers
             entity.Ime = dto.Ime.Trim();
             entity.Prezime = dto.Prezime.Trim();
             entity.Specijalizacija = dto.Specijalizacija.Trim();
+            entity.Telefon = string.IsNullOrWhiteSpace(dto.Telefon)
+                ? null
+                : dto.Telefon.Trim();
 
             await _context.SaveChangesAsync();
 
@@ -40,7 +43,7 @@ namespace NuaSpa.Api.Controllers
                 Ime = entity.Ime,
                 Prezime = entity.Prezime,
                 Specijalizacija = entity.Specijalizacija,
-                Telefon = dto.Telefon
+                Telefon = entity.Telefon
             });
         }
 

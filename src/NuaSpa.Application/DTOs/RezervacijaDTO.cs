@@ -28,9 +28,11 @@ namespace NuaSpa.Application.DTOs
         public string? NapomenaZaTerapeuta { get; set; }
 
         public string? UslugaNaziv { get; set; }
+        public int UslugaId { get; set; }
         public int UslugaTrajanjeMinuta { get; set; }
         public decimal UslugaCijena { get; set; }
 
+        public int ZaposlenikId { get; set; }
         public string? ZaposlenikIme { get; set; }
 
         /// <summary>
