@@ -40,7 +40,10 @@ namespace NuaSpa.Application.Interfaces
             DateTime from,
             DateTime to,
             int? zaposlenikId,
-            bool includeOtkazane = false);
+            bool includeOtkazane = false,
+            int? uslugaId = null,
+            int? prostorijaId = null,
+            string? q = null);
 
         /// <summary>
         /// Povijest termina istog klijenta. Terapeut samo ako postoji zajednička rezervacija s tim klijentom.

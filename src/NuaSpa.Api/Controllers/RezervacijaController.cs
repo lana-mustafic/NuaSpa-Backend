@@ -164,11 +164,14 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("calendar")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Zaposlenik")]
         public async Task<ActionResult<List<RezervacijaCalendarItemDTO>>> GetCalendar(
             [FromQuery] DateTime from,
             [FromQuery] DateTime to,
             [FromQuery] int? zaposlenikId = null,
+            [FromQuery] int? uslugaId = null,
+            [FromQuery] int? prostorijaId = null,
+            [FromQuery] string? q = null,
             [FromQuery] bool includeOtkazane = false)
         {
             if (to < from) return BadRequest("Neispravan period (to < from).");
@@ -178,11 +181,27 @@ namespace NuaSpa.Api.Controllers
                 return BadRequest("Period je prevelik (max 31 dana).");
             }
 
+            var isAdmin = User.IsInRole("Admin");
+            int? zFilter = zaposlenikId;
+            if (!isAdmin)
+            {
+                var myZ = User.GetNuaSpaZaposlenikId();
+                if (zFilter.HasValue && zFilter.Value != myZ)
+                {
+                    return Forbid();
+                }
+
+                zFilter = myZ;
+            }
+
             var items = await _rezervacijaService.GetCalendarAsync(
                 from,
                 to,
-                zaposlenikId,
-                includeOtkazane);
+                zFilter,
+                includeOtkazane,
+                uslugaId,
+                prostorijaId,
+                q);
             return Ok(items);
         }
 

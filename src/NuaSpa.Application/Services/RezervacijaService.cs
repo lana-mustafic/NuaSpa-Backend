@@ -453,7 +453,10 @@ namespace NuaSpa.Application.Services
             DateTime from,
             DateTime to,
             int? zaposlenikId,
-            bool includeOtkazane = false)
+            bool includeOtkazane = false,
+            int? uslugaId = null,
+            int? prostorijaId = null,
+            string? q = null)
         {
             var start = from.Date;
             var endExclusive = to.Date.AddDays(1);
@@ -477,6 +480,43 @@ namespace NuaSpa.Application.Services
                 query = query.Where(r => r.ZaposlenikId == zaposlenikId.Value);
             }
 
+            if (uslugaId.HasValue)
+            {
+                query = query.Where(r => r.UslugaId == uslugaId.Value);
+            }
+
+            if (prostorijaId.HasValue)
+            {
+                if (prostorijaId.Value == 0)
+                {
+                    query = query.Where(r => r.ProstorijaId == null);
+                }
+                else
+                {
+                    query = query.Where(r => r.ProstorijaId == prostorijaId.Value);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var t = q.Trim();
+                if (t.Length > 200)
+                {
+                    t = t[..200];
+                }
+
+                query = query.Where(r =>
+                    r.Id.ToString().Contains(t) ||
+                    r.KorisnikId.ToString().Contains(t) ||
+                    (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Contains(t) ||
+                    (r.Korisnik.Email != null && r.Korisnik.Email.Contains(t)) ||
+                    (r.Korisnik.PhoneNumber != null && r.Korisnik.PhoneNumber.Contains(t)) ||
+                    (r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime).Contains(t) ||
+                    r.Usluga.Naziv.Contains(t) ||
+                    (r.Prostorija != null && r.Prostorija.Naziv.Contains(t)) ||
+                    (r.RazlogOtkaza != null && r.RazlogOtkaza.Contains(t)));
+            }
+
             var list = await query
                 .OrderBy(r => r.DatumRezervacije)
                 .Select(r => new RezervacijaCalendarItemDTO
@@ -494,6 +534,7 @@ namespace NuaSpa.Application.Services
                     KorisnikIme = r.Korisnik.Ime + " " + r.Korisnik.Prezime,
                     KorisnikTelefon = r.Korisnik.PhoneNumber,
                     KorisnikEmail = r.Korisnik.Email,
+                    UslugaId = r.UslugaId,
                     UslugaNaziv = r.Usluga.Naziv,
                     UslugaTrajanjeMinuta = r.Usluga.TrajanjeMinuta,
                     UslugaCijena = r.Usluga.Cijena,
