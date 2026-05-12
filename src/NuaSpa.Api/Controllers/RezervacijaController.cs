@@ -75,11 +75,14 @@ namespace NuaSpa.Api.Controllers
                 korisnikId = search?.KorisnikId;
             }
 
+            int? zaposlenikFilter = isAdmin ? search?.ZaposlenikId : null;
+
             var result = await _rezervacijaService.GetAsync(
                 korisnikId,
                 search?.Datum,
                 search?.IsPotvrdjena,
-                search?.IncludeOtkazane ?? false
+                search?.IncludeOtkazane ?? false,
+                zaposlenikFilter
             );
 
             return Ok(result);

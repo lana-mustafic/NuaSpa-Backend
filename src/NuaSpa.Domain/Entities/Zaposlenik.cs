@@ -20,6 +20,9 @@ namespace NuaSpa.Domain.Entities
         [MaxLength(100)]
         public string Specijalizacija { get; set; } = null!;
 
+        [MaxLength(30)]
+        public string? Telefon { get; set; }
+
         [Required]
         public DateTime DatumZaposlenja { get; set; }
     }

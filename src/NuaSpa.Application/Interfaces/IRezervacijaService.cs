@@ -11,7 +11,8 @@ namespace NuaSpa.Application.Interfaces
             int? korisnikId,
             DateTime? datum,
             bool? isPotvrdjena,
-            bool includeOtkazane = false);
+            bool includeOtkazane = false,
+            int? zaposlenikId = null);
 
         Task<IEnumerable<RezervacijaDTO>> GetForZaposlenikAsync(
             int zaposlenikId,
