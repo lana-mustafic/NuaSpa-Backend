@@ -19,6 +19,7 @@ public class RezervacijaCalendarItemDTO
     public string? KorisnikTelefon { get; set; }
     public string? KorisnikEmail { get; set; }
 
+    public int UslugaId { get; set; }
     public string? UslugaNaziv { get; set; }
     /// <summary>Trajanje tretmana u minutama (iz usluge).</summary>
     public int UslugaTrajanjeMinuta { get; set; }
