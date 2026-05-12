@@ -13,10 +13,12 @@ namespace NuaSpa.Api.Controllers
     public class ZaposlenikController : BaseController<ZaposlenikDTO, object>
     {
         private readonly NuaSpaContext _context;
+        private readonly IZaposlenikService _zaposlenikService;
 
         public ZaposlenikController(IZaposlenikService service, NuaSpaContext context) : base(service)
         {
             _context = context;
+            _zaposlenikService = service;
         }
 
         [HttpPut("{id}")]
@@ -43,8 +45,36 @@ namespace NuaSpa.Api.Controllers
                 Ime = entity.Ime,
                 Prezime = entity.Prezime,
                 Specijalizacija = entity.Specijalizacija,
-                Telefon = entity.Telefon
+                Telefon = entity.Telefon,
+                DatumZaposlenja = entity.DatumZaposlenja,
             });
+        }
+
+        [HttpGet("{id}/admin-profile")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<TherapistAdminProfileDto>> GetAdminProfile(
+            int id,
+            [FromQuery] int maxReviews = 20)
+        {
+            var dto = await _zaposlenikService.GetAdminProfileAsync(id, maxReviews);
+            if (dto == null) return NotFound();
+            return Ok(dto);
+        }
+
+        [HttpPatch("{id}/interna-napomena")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateInternaNapomena(
+            int id,
+            [FromBody] TherapistNotepadUpdateDto body)
+        {
+            var ok = await _zaposlenikService.UpdateInternaNapomenaAsync(id, body?.Napomena);
+            if (!ok)
+            {
+                return BadRequest(
+                    "Terapeut nema povezan korisnički nalog — interna napomena se ne može spremiti.");
+            }
+
+            return NoContent();
         }
 
         [HttpDelete("{id}")]

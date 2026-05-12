@@ -27,7 +27,8 @@ namespace NuaSpa.Application.Services
             int? korisnikId,
             DateTime? datum,
             bool? isPotvrdjena,
-            bool includeOtkazane = false)
+            bool includeOtkazane = false,
+            int? zaposlenikId = null)
         {
             var query = _context.Rezervacije
                 .AsNoTracking()
@@ -46,6 +47,11 @@ namespace NuaSpa.Application.Services
             if (korisnikId is int id)
             {
                 query = query.Where(r => r.KorisnikId == id);
+            }
+
+            if (zaposlenikId is int zid)
+            {
+                query = query.Where(r => r.ZaposlenikId == zid);
             }
 
             if (datum.HasValue)
