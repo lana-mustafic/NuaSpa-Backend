@@ -13,5 +13,16 @@ public class AdminClientRowDTO
     public int UkupnoPosjeta { get; set; }
     public decimal UkupnoPotroseno { get; set; }
     public bool IsVip { get; set; }
+
+    /// <summary>Preferirani terapeut (Korisnik.ZaposlenikId).</summary>
+    public int? PreferiraniZaposlenikId { get; set; }
+
+    /// <summary>Terapeut prikazan u tablici: preferirani ako postoji, inače zadnji s neotkazane posjete.</summary>
+    public int? TerapeutZaposlenikId { get; set; }
+
+    public string? TerapeutIme { get; set; }
+    public string? TerapeutPrezime { get; set; }
+
+    public bool IsVipKlijent { get; set; }
 }
 
