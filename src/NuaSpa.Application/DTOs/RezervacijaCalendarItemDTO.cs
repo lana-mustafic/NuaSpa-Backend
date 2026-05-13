@@ -26,6 +26,11 @@ public class RezervacijaCalendarItemDTO
     /// <summary>Redovna cijena usluge (ne mora odgovarati stvarnoj naplati).</summary>
     public decimal UslugaCijena { get; set; }
 
+    /// <summary>
+    /// Premium / VIP signal za admin kalendar (heuristika: cijena ili naziv usluge).
+    /// </summary>
+    public bool IsVip { get; set; }
+
     public string? RazlogOtkaza { get; set; }
 }
 

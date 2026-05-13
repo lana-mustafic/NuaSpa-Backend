@@ -505,17 +505,21 @@ namespace NuaSpa.Application.Services
                     t = t[..200];
                 }
 
+                var tl = t.ToLowerInvariant();
                 query = query.Where(r =>
                     r.Id.ToString().Contains(t) ||
                     r.KorisnikId.ToString().Contains(t) ||
-                    (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Contains(t) ||
-                    (r.Korisnik.Email != null && r.Korisnik.Email.Contains(t)) ||
-                    (r.Korisnik.PhoneNumber != null && r.Korisnik.PhoneNumber.Contains(t)) ||
-                    (r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime).Contains(t) ||
-                    r.Usluga.Naziv.Contains(t) ||
-                    (r.Prostorija != null && r.Prostorija.Naziv.Contains(t)) ||
-                    (r.RazlogOtkaza != null && r.RazlogOtkaza.Contains(t)));
+                    (r.Korisnik.Ime + " " + r.Korisnik.Prezime).ToLower().Contains(tl) ||
+                    (r.Korisnik.Email != null && r.Korisnik.Email.ToLower().Contains(tl)) ||
+                    (r.Korisnik.PhoneNumber != null && r.Korisnik.PhoneNumber.ToLower().Contains(tl)) ||
+                    (r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime).ToLower().Contains(tl) ||
+                    (r.Zaposlenik.Telefon != null && r.Zaposlenik.Telefon.ToLower().Contains(tl)) ||
+                    r.Usluga.Naziv.ToLower().Contains(tl) ||
+                    (r.Prostorija != null && r.Prostorija.Naziv.ToLower().Contains(tl)) ||
+                    (r.RazlogOtkaza != null && r.RazlogOtkaza.ToLower().Contains(tl)));
             }
+
+            const decimal vipPriceThreshold = 150m;
 
             var list = await query
                 .OrderBy(r => r.DatumRezervacije)
@@ -538,6 +542,9 @@ namespace NuaSpa.Application.Services
                     UslugaNaziv = r.Usluga.Naziv,
                     UslugaTrajanjeMinuta = r.Usluga.TrajanjeMinuta,
                     UslugaCijena = r.Usluga.Cijena,
+                    IsVip = r.Usluga.Cijena >= vipPriceThreshold
+                        || r.Usluga.Naziv.ToLower().Contains("vip")
+                        || r.Usluga.Naziv.ToLower().Contains("premium"),
                     RazlogOtkaza = r.RazlogOtkaza,
                 })
                 .ToListAsync();
