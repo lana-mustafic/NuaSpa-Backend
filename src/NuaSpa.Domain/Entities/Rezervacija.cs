@@ -20,6 +20,11 @@ namespace NuaSpa.Domain.Entities
 
         public bool IsOtkazana { get; set; }
 
+        /// <summary>
+        /// VIP tretman (admin) — poseban prikaz u kalendaru i sl.
+        /// </summary>
+        public bool IsVip { get; set; }
+
         [MaxLength(400)]
         public string? RazlogOtkaza { get; set; }
 

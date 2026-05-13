@@ -27,7 +27,7 @@ public class RezervacijaCalendarItemDTO
     public decimal UslugaCijena { get; set; }
 
     /// <summary>
-    /// Premium / VIP signal za admin kalendar (heuristika: cijena ili naziv usluge).
+    /// VIP tretman (admin) — spremljeno na rezervaciji; kalendar prikazuje zlatni naglasak.
     /// </summary>
     public bool IsVip { get; set; }
 

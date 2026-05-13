@@ -112,7 +112,7 @@ namespace NuaSpa.Application.Services
             return await MapAndEnrichAsync(list);
         }
 
-        public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto)
+        public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto, bool isAdminBooking = false)
         {
             // Validate working hours (SpaCentarId = 1)
             var hours = await GetWorkingHoursAsync(dto.DatumRezervacije);
@@ -191,7 +191,8 @@ namespace NuaSpa.Application.Services
                 DatumRezervacije = dto.DatumRezervacije,
                 IsPotvrdjena = false,
                 IsPlacena = false,
-                ProstorijaId = dto.ProstorijaId
+                ProstorijaId = dto.ProstorijaId,
+                IsVip = isAdminBooking && dto.IsVip
             };
 
             _context.Rezervacije.Add(entity);
@@ -306,6 +307,7 @@ namespace NuaSpa.Application.Services
             entity.ZaposlenikId = dto.ZaposlenikId;
             entity.UslugaId = dto.UslugaId;
             entity.ProstorijaId = dto.ProstorijaId;
+            entity.IsVip = dto.IsVip;
 
             // Replace equipment links
             if (entity.RezervacijaOprema.Count > 0)
@@ -353,6 +355,17 @@ namespace NuaSpa.Application.Services
             if (entity.ZaposlenikId != zaposlenikId) return false;
 
             entity.IsPotvrdjena = isPotvrdjena;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> SetIsVipAsync(int rezervacijaId, bool isVip)
+        {
+            var entity = await _context.Rezervacije.FirstOrDefaultAsync(r => r.Id == rezervacijaId);
+            if (entity == null) return false;
+            if (entity.IsOtkazana) return false;
+
+            entity.IsVip = isVip;
             await _context.SaveChangesAsync();
             return true;
         }
@@ -519,8 +532,6 @@ namespace NuaSpa.Application.Services
                     (r.RazlogOtkaza != null && r.RazlogOtkaza.ToLower().Contains(tl)));
             }
 
-            const decimal vipPriceThreshold = 150m;
-
             var list = await query
                 .OrderBy(r => r.DatumRezervacije)
                 .Select(r => new RezervacijaCalendarItemDTO
@@ -542,9 +553,7 @@ namespace NuaSpa.Application.Services
                     UslugaNaziv = r.Usluga.Naziv,
                     UslugaTrajanjeMinuta = r.Usluga.TrajanjeMinuta,
                     UslugaCijena = r.Usluga.Cijena,
-                    IsVip = r.Usluga.Cijena >= vipPriceThreshold
-                        || r.Usluga.Naziv.ToLower().Contains("vip")
-                        || r.Usluga.Naziv.ToLower().Contains("premium"),
+                    IsVip = r.IsVip,
                     RazlogOtkaza = r.RazlogOtkaza,
                 })
                 .ToListAsync();
