@@ -36,6 +36,11 @@ namespace NuaSpa.Domain.Entities
         public virtual Zaposlenik? Zaposlenik { get; set; }
 
         /// <summary>
+        /// Ručni VIP status klijenta (admin). Kombinira se s heuristikom posjeta/potrošnje u API odgovoru.
+        /// </summary>
+        public bool IsVipKlijent { get; set; }
+
+        /// <summary>
         /// Interna napomena vidljiva terapeutu/adminu (alergije, kontraindikacije, preferencije ulja…).
         /// </summary>
         [MaxLength(1200)]
