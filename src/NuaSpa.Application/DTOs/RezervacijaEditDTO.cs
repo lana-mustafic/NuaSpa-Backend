@@ -9,6 +9,10 @@ public class RezervacijaEditDTO
     public int ZaposlenikId { get; set; }
     public int UslugaId { get; set; }
     public int? ProstorijaId { get; set; }
+
+    /// <summary>VIP tretman (admin).</summary>
+    public bool IsVip { get; set; }
+
     public List<RezervacijaOpremaItemDTO>? Oprema { get; set; }
 }
 

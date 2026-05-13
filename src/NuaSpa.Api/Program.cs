@@ -13,6 +13,7 @@ using NuaSpa.Domain.Entities;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.IdentityModel.Tokens.Jwt;
 using Stripe;
@@ -22,7 +23,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // --- 1. KONTROLERI I JSON KONFIGURACIJA ---
 builder.Services.AddControllers()
-    .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
+    .AddJsonOptions(x =>
+    {
+        x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        x.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    });
 
 // --- 2. SWAGGER / OPENAPI ---
 builder.Services.AddEndpointsApiExplorer();

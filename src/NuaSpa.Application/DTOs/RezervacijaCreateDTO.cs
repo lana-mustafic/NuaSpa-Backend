@@ -14,6 +14,9 @@ namespace NuaSpa.Application.DTOs
 
         public int? ProstorijaId { get; set; }
 
+        /// <summary>VIP tretman (admin); default false.</summary>
+        public bool IsVip { get; set; }
+
         public List<RezervacijaOpremaItemDTO>? Oprema { get; set; }
     }
 }

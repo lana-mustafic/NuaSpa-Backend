@@ -31,7 +31,8 @@ namespace NuaSpa.Api.Controllers
                 var korisnikId = User.IsInRole("Admin") && dto.KorisnikId.HasValue
                     ? dto.KorisnikId.Value
                     : User.GetNuaSpaUserId();
-                var created = await _rezervacijaService.CreateAsync(korisnikId, dto);
+                var isAdminBooking = User.IsInRole("Admin");
+                var created = await _rezervacijaService.CreateAsync(korisnikId, dto, isAdminBooking);
                 return Ok(created);
             }
             catch (InvalidOperationException ex)
@@ -119,6 +120,16 @@ namespace NuaSpa.Api.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+
+        [HttpPatch("{id:int}/vip")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> SetVip(int id, [FromBody] RezervacijaVipDto dto)
+        {
+            if (dto == null) return BadRequest();
+            var ok = await _rezervacijaService.SetIsVipAsync(id, dto.IsVip);
+            if (!ok) return NotFound("Rezervacija nije pronađena ili je otkazana.");
+            return Ok();
         }
 
         [HttpPatch("{id}/cancel")]

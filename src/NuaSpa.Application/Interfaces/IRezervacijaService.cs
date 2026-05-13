@@ -20,7 +20,10 @@ namespace NuaSpa.Application.Interfaces
             bool? isPotvrdjena,
             bool includeOtkazane = false);
 
-        Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto);
+        Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto, bool isAdminBooking = false);
+
+        /// <summary>Postavlja VIP oznaku na rezervaciji (samo admin).</summary>
+        Task<bool> SetIsVipAsync(int rezervacijaId, bool isVip);
 
         Task<RezervacijaDTO?> EditAsync(int rezervacijaId, RezervacijaEditDTO dto);
 

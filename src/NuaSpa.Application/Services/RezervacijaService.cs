@@ -112,7 +112,7 @@ namespace NuaSpa.Application.Services
             return await MapAndEnrichAsync(list);
         }
 
-        public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto)
+        public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto, bool isAdminBooking = false)
         {
             // Validate working hours (SpaCentarId = 1)
             var hours = await GetWorkingHoursAsync(dto.DatumRezervacije);
@@ -191,7 +191,8 @@ namespace NuaSpa.Application.Services
                 DatumRezervacije = dto.DatumRezervacije,
                 IsPotvrdjena = false,
                 IsPlacena = false,
-                ProstorijaId = dto.ProstorijaId
+                ProstorijaId = dto.ProstorijaId,
+                IsVip = isAdminBooking && dto.IsVip
             };
 
             _context.Rezervacije.Add(entity);
@@ -306,6 +307,7 @@ namespace NuaSpa.Application.Services
             entity.ZaposlenikId = dto.ZaposlenikId;
             entity.UslugaId = dto.UslugaId;
             entity.ProstorijaId = dto.ProstorijaId;
+            entity.IsVip = dto.IsVip;
 
             // Replace equipment links
             if (entity.RezervacijaOprema.Count > 0)
@@ -353,6 +355,17 @@ namespace NuaSpa.Application.Services
             if (entity.ZaposlenikId != zaposlenikId) return false;
 
             entity.IsPotvrdjena = isPotvrdjena;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> SetIsVipAsync(int rezervacijaId, bool isVip)
+        {
+            var entity = await _context.Rezervacije.FirstOrDefaultAsync(r => r.Id == rezervacijaId);
+            if (entity == null) return false;
+            if (entity.IsOtkazana) return false;
+
+            entity.IsVip = isVip;
             await _context.SaveChangesAsync();
             return true;
         }
@@ -505,16 +518,18 @@ namespace NuaSpa.Application.Services
                     t = t[..200];
                 }
 
+                var tl = t.ToLowerInvariant();
                 query = query.Where(r =>
                     r.Id.ToString().Contains(t) ||
                     r.KorisnikId.ToString().Contains(t) ||
-                    (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Contains(t) ||
-                    (r.Korisnik.Email != null && r.Korisnik.Email.Contains(t)) ||
-                    (r.Korisnik.PhoneNumber != null && r.Korisnik.PhoneNumber.Contains(t)) ||
-                    (r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime).Contains(t) ||
-                    r.Usluga.Naziv.Contains(t) ||
-                    (r.Prostorija != null && r.Prostorija.Naziv.Contains(t)) ||
-                    (r.RazlogOtkaza != null && r.RazlogOtkaza.Contains(t)));
+                    (r.Korisnik.Ime + " " + r.Korisnik.Prezime).ToLower().Contains(tl) ||
+                    (r.Korisnik.Email != null && r.Korisnik.Email.ToLower().Contains(tl)) ||
+                    (r.Korisnik.PhoneNumber != null && r.Korisnik.PhoneNumber.ToLower().Contains(tl)) ||
+                    (r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime).ToLower().Contains(tl) ||
+                    (r.Zaposlenik.Telefon != null && r.Zaposlenik.Telefon.ToLower().Contains(tl)) ||
+                    r.Usluga.Naziv.ToLower().Contains(tl) ||
+                    (r.Prostorija != null && r.Prostorija.Naziv.ToLower().Contains(tl)) ||
+                    (r.RazlogOtkaza != null && r.RazlogOtkaza.ToLower().Contains(tl)));
             }
 
             var list = await query
@@ -538,6 +553,7 @@ namespace NuaSpa.Application.Services
                     UslugaNaziv = r.Usluga.Naziv,
                     UslugaTrajanjeMinuta = r.Usluga.TrajanjeMinuta,
                     UslugaCijena = r.Usluga.Cijena,
+                    IsVip = r.IsVip,
                     RazlogOtkaza = r.RazlogOtkaza,
                 })
                 .ToListAsync();

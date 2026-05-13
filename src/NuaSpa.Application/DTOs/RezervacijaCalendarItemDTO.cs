@@ -26,6 +26,11 @@ public class RezervacijaCalendarItemDTO
     /// <summary>Redovna cijena usluge (ne mora odgovarati stvarnoj naplati).</summary>
     public decimal UslugaCijena { get; set; }
 
+    /// <summary>
+    /// VIP tretman (admin) — spremljeno na rezervaciji; kalendar prikazuje zlatni naglasak.
+    /// </summary>
+    public bool IsVip { get; set; }
+
     public string? RazlogOtkaza { get; set; }
 }
 
