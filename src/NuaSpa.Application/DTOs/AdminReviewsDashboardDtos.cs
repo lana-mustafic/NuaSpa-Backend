@@ -15,6 +15,9 @@ public class AdminReviewRowDto
     public string? TerapeutIme { get; set; }
     /// <summary>Recenzije iz aplikacije (nema zasebnog polja u bazi).</summary>
     public string Izvor { get; set; } = "NuaSpa";
+
+    /// <summary>Javni odgovor salona (admin), ako postoji.</summary>
+    public string? AdminOdgovor { get; set; }
 }
 
 public class AdminTopUslugaOcjenaDto
@@ -49,8 +52,10 @@ public class AdminReviewsDashboardDto
 
     public double? PostotakPozitivnihPrethodno { get; set; }
 
-    /// <summary>Null dok ne postoji model odgovora u bazi.</summary>
+    /// <summary>Postotak recenzija s nepraznim admin odgovorom.</summary>
     public double? PostotakOdgovora { get; set; }
+
+    public double? PostotakOdgovoraPrethodno { get; set; }
 
     /// <summary>Ključ: broj zvjezdica (1–5), vrijednost: broj recenzija.</summary>
     public Dictionary<int, int> DistribucijaOcjena { get; set; } = new();

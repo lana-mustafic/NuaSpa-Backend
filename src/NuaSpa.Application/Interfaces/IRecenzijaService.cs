@@ -33,6 +33,11 @@ namespace NuaSpa.Application.Interfaces
             int? uslugaId,
             int? zaposlenikId,
             CancellationToken cancellationToken = default);
+
+        Task<bool> SetAdminOdgovorAsync(
+            int recenzijaId,
+            string? tekst,
+            CancellationToken cancellationToken = default);
     }
 }
 

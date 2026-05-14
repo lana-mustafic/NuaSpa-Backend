@@ -89,6 +89,17 @@ namespace NuaSpa.Api.Controllers
             return File(bytes, "text/csv; charset=utf-8", "recenzije.csv");
         }
 
+        [HttpPatch("{id}/admin-odgovor")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> PatchAdminOdgovor(
+            int id,
+            [FromBody] RecenzijaAdminOdgovorPatchDto? body,
+            CancellationToken cancellationToken)
+        {
+            var ok = await _service.SetAdminOdgovorAsync(id, body?.Tekst, cancellationToken);
+            return ok ? NoContent() : NotFound();
+        }
+
         [HttpPost]
         [Authorize(Roles = "Klijent,Admin")]
         public async Task<ActionResult<RecenzijaDTO>> Create([FromBody] RecenzijaCreateDTO dto)

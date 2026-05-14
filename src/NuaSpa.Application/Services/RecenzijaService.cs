@@ -118,6 +118,24 @@ namespace NuaSpa.Application.Services
                 prevPostPos = Math.Round(100.0 * prevPosCount / prevTotal, 1);
             }
 
+            double? postOdg = null;
+            double? postOdgPrev = null;
+            if (total > 0)
+            {
+                var odg = await filteredCurrent.CountAsync(
+                    r => r.AdminOdgovor != null && r.AdminOdgovor != string.Empty,
+                    cancellationToken);
+                postOdg = Math.Round(100.0 * odg / total, 1);
+            }
+
+            if (prevTotal > 0)
+            {
+                var odgP = await filteredPrev.CountAsync(
+                    r => r.AdminOdgovor != null && r.AdminOdgovor != string.Empty,
+                    cancellationToken);
+                postOdgPrev = Math.Round(100.0 * odgP / prevTotal, 1);
+            }
+
             var distList = await filteredCurrent
                 .GroupBy(r => r.Ocjena)
                 .Select(g => new { Star = g.Key, Cnt = g.Count() })
@@ -180,7 +198,8 @@ namespace NuaSpa.Application.Services
                         .OrderByDescending(r => r.DatumRezervacije)
                         .Select(r => r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime)
                         .FirstOrDefault(),
-                    Izvor = "NuaSpa"
+                    Izvor = "NuaSpa",
+                    AdminOdgovor = rev.AdminOdgovor
                 })
                 .ToListAsync(cancellationToken);
 
@@ -195,7 +214,8 @@ namespace NuaSpa.Application.Services
                 UkupnoPrethodno = prevTotal,
                 PostotakPozitivnih = postPos,
                 PostotakPozitivnihPrethodno = prevPostPos,
-                PostotakOdgovora = null,
+                PostotakOdgovora = postOdg,
+                PostotakOdgovoraPrethodno = postOdgPrev,
                 DistribucijaOcjena = dist,
                 TopUsluge = top,
                 IstaknutaRecenzija = quote
@@ -234,12 +254,14 @@ namespace NuaSpa.Application.Services
                         .OrderByDescending(r => r.DatumRezervacije)
                         .Select(r => r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime)
                         .FirstOrDefault(),
-                    Izvor = "NuaSpa"
+                    Izvor = "NuaSpa",
+                    AdminOdgovor = rev.AdminOdgovor
                 })
                 .ToListAsync(cancellationToken);
 
             var sb = new StringBuilder();
-            sb.AppendLine("Id,CreatedAt,Ocjena,Korisnik,BrojPosjeta,Usluga,Terapeut,Izvor,Komentar");
+            sb.AppendLine(
+                "Id,CreatedAt,Ocjena,Korisnik,BrojPosjeta,Usluga,Terapeut,Izvor,Komentar,AdminOdgovor");
             foreach (var r in rows)
             {
                 sb.Append(r.Id).Append(',');
@@ -250,7 +272,8 @@ namespace NuaSpa.Application.Services
                 sb.Append(CsvEscape(r.UslugaNaziv)).Append(',');
                 sb.Append(CsvEscape(r.TerapeutIme ?? "")).Append(',');
                 sb.Append(CsvEscape(r.Izvor)).Append(',');
-                sb.Append(CsvEscape(r.Komentar)).AppendLine();
+                sb.Append(CsvEscape(r.Komentar)).Append(',');
+                sb.Append(CsvEscape(r.AdminOdgovor ?? "")).AppendLine();
             }
 
             return Encoding.UTF8.GetBytes(sb.ToString());
@@ -298,11 +321,33 @@ namespace NuaSpa.Application.Services
                 var pattern = search.Trim();
                 q = q.Where(r =>
                     r.Komentar.Contains(pattern)
+                    || (r.AdminOdgovor != null && r.AdminOdgovor.Contains(pattern))
                     || (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Contains(pattern)
                     || r.Usluga.Naziv.Contains(pattern));
             }
 
             return q;
+        }
+
+        public async Task<bool> SetAdminOdgovorAsync(
+            int recenzijaId,
+            string? tekst,
+            CancellationToken cancellationToken = default)
+        {
+            var entity = await _context.Recenzije
+                .FirstOrDefaultAsync(r => r.Id == recenzijaId && !r.IsDeleted, cancellationToken);
+            if (entity == null) return false;
+
+            if (string.IsNullOrWhiteSpace(tekst))
+                entity.AdminOdgovor = null;
+            else
+            {
+                var t = tekst.Trim();
+                entity.AdminOdgovor = t.Length > 2000 ? t[..2000] : t;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
         }
     }
 }
