@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
@@ -11,15 +12,58 @@ namespace NuaSpa.Api.Controllers;
 public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
 {
     private readonly IRabbitMQProducer _rabbitMQProducer;
-    // Promijenjeno: sada koristimo IUslugaService
     private readonly IUslugaService _uslugaService;
+    private readonly IWebHostEnvironment _env;
 
     public UslugaController(
         IUslugaService service,
-        IRabbitMQProducer rabbitMQProducer) : base(service)
+        IRabbitMQProducer rabbitMQProducer,
+        IWebHostEnvironment env) : base(service)
     {
         _uslugaService = service;
         _rabbitMQProducer = rabbitMQProducer;
+        _env = env;
+    }
+
+    /// <summary>Admin: učitava sliku usluge u wwwroot i vraća javni URL.</summary>
+    [HttpPost("upload-image")]
+    [Authorize(Roles = "Admin")]
+    [RequestSizeLimit(8_000_000)]
+    public async Task<ActionResult<object>> UploadImage(
+        IFormFile? file,
+        CancellationToken cancellationToken = default)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Nije odabrana datoteka." });
+        }
+
+        if (file.Length > 8_000_000)
+        {
+            return BadRequest(new { message = "Datoteka je prevelika (maks. 8 MB)." });
+        }
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        string[] allowed = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+        if (string.IsNullOrEmpty(ext) || !allowed.Contains(ext))
+        {
+            return BadRequest(new { message = "Dopušteni formati: JPG, PNG, WEBP, GIF." });
+        }
+
+        var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+        var dir = Path.Combine(webRoot, "uploads", "usluge");
+        Directory.CreateDirectory(dir);
+
+        var safeName = $"{Guid.NewGuid():N}{ext}";
+        var physical = Path.Combine(dir, safeName);
+
+        await using (var stream = System.IO.File.Create(physical))
+        {
+            await file.CopyToAsync(stream, cancellationToken);
+        }
+
+        var url = $"{Request.Scheme}://{Request.Host}/uploads/usluge/{safeName}";
+        return Ok(new { url });
     }
 
     [HttpPost]

@@ -159,6 +159,19 @@ namespace NuaSpa.Api.Controllers
             return Ok();
         }
 
+        [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var (ok, message) = await _rezervacijaService.DeleteAdminAsync(id);
+            if (!ok)
+            {
+                return Conflict(new { message });
+            }
+
+            return NoContent();
+        }
+
         [HttpGet("dostupni-termini")]
         [Authorize(Roles = "Klijent,Admin,Zaposlenik")]
         public async Task<ActionResult<List<DateTime>>> GetDostupniTermini([FromQuery] int zaposlenikId, [FromQuery] DateTime datum)

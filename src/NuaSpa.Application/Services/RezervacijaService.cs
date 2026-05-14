@@ -462,6 +462,51 @@ namespace NuaSpa.Application.Services
             return true;
         }
 
+        public async Task<(bool Ok, string? Message)> DeleteAdminAsync(int rezervacijaId)
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var entity = await _context.Rezervacije
+                    .Include(r => r.RezervacijaOprema)
+                    .FirstOrDefaultAsync(r => r.Id == rezervacijaId);
+
+                if (entity == null)
+                {
+                    return (false, "Rezervacija ne postoji.");
+                }
+
+                if (entity.IsPlacena)
+                {
+                    return (false, "Plaćena rezervacija se ne može obrisati.");
+                }
+
+                var placanja = await _context.Placanja
+                    .Where(p => p.RezervacijaId == rezervacijaId)
+                    .ToListAsync();
+
+                foreach (var p in placanja)
+                {
+                    p.RezervacijaId = null;
+                }
+
+                if (entity.RezervacijaOprema.Count > 0)
+                {
+                    _context.RezervacijeOprema.RemoveRange(entity.RezervacijaOprema);
+                }
+
+                _context.Rezervacije.Remove(entity);
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                return (false, $"Brisanje nije uspjelo: {ex.Message}");
+            }
+        }
+
         public async Task<List<RezervacijaCalendarItemDTO>> GetCalendarAsync(
             DateTime from,
             DateTime to,
