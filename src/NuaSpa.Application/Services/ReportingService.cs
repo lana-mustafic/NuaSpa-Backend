@@ -304,4 +304,129 @@ public class ReportingService : IReportingService
             };
         }).ToList();
     }
+
+    public async Task<List<ActivityFeedItemDto>> GetActivityFeedAsync(
+        DateTime day,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var start = day.Date;
+        var end = start.AddDays(1);
+        take = Math.Clamp(take, 1, 50);
+        var list = new List<ActivityFeedItemDto>();
+
+        var rezervacije = await _context.Rezervacije.AsNoTracking()
+            .Where(r => !r.IsDeleted && r.DatumRezervacije >= start && r.DatumRezervacije < end)
+            .Include(r => r.Usluga)
+            .Include(r => r.Korisnik)
+            .OrderByDescending(r => r.DatumRezervacije)
+            .Take(30)
+            .ToListAsync(cancellationToken);
+
+        foreach (var r in rezervacije)
+        {
+            var svc = r.Usluga?.Naziv ?? "—";
+            var guest = r.Korisnik != null
+                ? $"{r.Korisnik.Ime} {r.Korisnik.Prezime}".Trim()
+                : "—";
+            string naslov;
+            if (r.IsOtkazana)
+                naslov = $"Cancelled · {svc}";
+            else if (r.IsPotvrdjena)
+                naslov = $"Confirmed · {svc}";
+            else
+                naslov = $"Pending · {svc}";
+
+            var at = r.IsOtkazana && r.OtkazanaAt.HasValue
+                ? r.OtkazanaAt!.Value
+                : r.DatumRezervacije;
+
+            list.Add(new ActivityFeedItemDto
+            {
+                Tip = "booking",
+                Naslov = naslov,
+                Podnaslov = string.IsNullOrWhiteSpace(guest) ? null : guest,
+                DatumVrijeme = at,
+            });
+        }
+
+        var placanja = await QueryPrihodnaPlacanja(start, end)
+            .Include(p => p.Rezervacija!)
+            .ThenInclude(x => x.Usluga)
+            .OrderByDescending(p => p.DatumPlacanja)
+            .Take(25)
+            .ToListAsync(cancellationToken);
+
+        foreach (var p in placanja)
+        {
+            var svc = p.Rezervacija?.Usluga?.Naziv;
+            list.Add(new ActivityFeedItemDto
+            {
+                Tip = "payment",
+                Naslov = $"Payment · {p.Iznos:0.##} KM",
+                Podnaslov = string.IsNullOrWhiteSpace(svc) ? "—" : svc,
+                DatumVrijeme = p.DatumPlacanja,
+            });
+        }
+
+        var recenzije = await _context.Recenzije.AsNoTracking()
+            .Where(x => !x.IsDeleted && x.CreatedAt >= start && x.CreatedAt < end)
+            .Include(x => x.Usluga)
+            .Include(x => x.Korisnik)
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(20)
+            .ToListAsync(cancellationToken);
+
+        foreach (var x in recenzije)
+        {
+            var guest = x.Korisnik != null
+                ? $"{x.Korisnik.Ime} {x.Korisnik.Prezime}".Trim()
+                : "—";
+            list.Add(new ActivityFeedItemDto
+            {
+                Tip = "review",
+                Naslov = $"Review · {x.Ocjena}★ · {x.Usluga?.Naziv ?? "—"}",
+                Podnaslov = string.IsNullOrWhiteSpace(guest) ? null : guest,
+                DatumVrijeme = x.CreatedAt,
+            });
+        }
+
+        var klijentRole = await _context.Roles.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.NormalizedName == "KLIJENT", cancellationToken);
+        if (klijentRole != null)
+        {
+            var clientIds = await _context.UserRoles.AsNoTracking()
+                .Where(ur => ur.RoleId == klijentRole.Id)
+                .Select(ur => ur.UserId)
+                .ToListAsync(cancellationToken);
+            var idSet = clientIds.Count == 0 ? null : clientIds.ToHashSet();
+            if (idSet != null)
+            {
+                var newUsers = await _context.Users.AsNoTracking()
+                    .Where(u =>
+                        u.DatumRegistracije >= start
+                        && u.DatumRegistracije < end
+                        && idSet.Contains(u.Id))
+                    .OrderByDescending(u => u.DatumRegistracije)
+                    .Take(15)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var u in newUsers)
+                {
+                    list.Add(new ActivityFeedItemDto
+                    {
+                        Tip = "client",
+                        Naslov = $"New client · {u.Ime} {u.Prezime}".Trim(),
+                        Podnaslov = u.Email,
+                        DatumVrijeme = u.DatumRegistracije,
+                    });
+                }
+            }
+        }
+
+        return list
+            .OrderByDescending(x => x.DatumVrijeme)
+            .Take(take)
+            .ToList();
+    }
 }

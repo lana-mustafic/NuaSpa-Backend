@@ -20,5 +20,11 @@ namespace NuaSpa.Application.Interfaces
         Task<List<RevenuePointDTO>> GetRevenueSeriesAsync(DateTime from, DateTime to);
         Task<List<ServicePopularityDTO>> GetServicePopularityAsync(DateTime from, DateTime to, int take);
         Task<List<TopSpenderDTO>> GetTopSpendersAsync(DateTime from, DateTime to, int take);
+
+        /// <summary>Merged timeline for admin dashboard (bookings, payments, reviews, new clients).</summary>
+        Task<List<ActivityFeedItemDto>> GetActivityFeedAsync(
+            DateTime day,
+            int take,
+            CancellationToken cancellationToken = default);
     }
 }

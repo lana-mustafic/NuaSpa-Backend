@@ -92,5 +92,17 @@ namespace NuaSpa.Api.Controllers
             var data = await _reportingService.GetTopSpendersAsync(from, to, take);
             return Ok(data);
         }
+
+        [HttpGet("activity-feed")]
+        [ProducesResponseType(typeof(List<ActivityFeedItemDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<List<ActivityFeedItemDto>>> GetActivityFeed(
+            [FromQuery] DateTime? day = null,
+            [FromQuery] int take = 16,
+            CancellationToken cancellationToken = default)
+        {
+            var d = (day ?? DateTime.UtcNow).Date;
+            var data = await _reportingService.GetActivityFeedAsync(d, take, cancellationToken);
+            return Ok(data);
+        }
     }
 }
