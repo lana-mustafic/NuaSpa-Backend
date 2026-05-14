@@ -50,12 +50,6 @@ namespace NuaSpa.Application.Services
             var methodNorm = (methodCategory ?? "all").Trim().ToLowerInvariant();
             var searchNorm = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
 
-            var kpiCurTask = ComputeKpiAsync(from, toExclusive, cancellationToken);
-            var kpiPrevTask = ComputeKpiAsync(prevFrom, prevToExclusive, cancellationToken);
-            var metodeTask = MethodSharesAsync(from, toExclusive, cancellationToken);
-            var trendTask = RevenueTrendAsync(from, toExclusive, cancellationToken);
-            var aktivnostTask = RecentActivityAsync(from, toExclusive, cancellationToken);
-
             var baseQ = FilteredPlacanjaQuery(from, toExclusive, searchNorm, statusNorm, methodNorm, uslugaId);
 
             var ukupno = await baseQ.CountAsync(cancellationToken);
@@ -71,21 +65,20 @@ namespace NuaSpa.Application.Services
             {
                 PlacanjeId = p.Id,
                 TransakcijskiId = FormatPayId(p.Id, p.DatumPlacanja),
-                KlijentPunoIme = p.Rezervacija == null
-                    ? "—"
-                    : $"{p.Rezervacija.Korisnik.Ime} {p.Rezervacija.Korisnik.Prezime}".Trim(),
-                UslugaTekst = p.Rezervacija == null
-                    ? "—"
-                    : FormatUsluga(p.Rezervacija.Usluga.Naziv, p.Rezervacija.Usluga.TrajanjeMinuta),
+                KlijentPunoIme = FormatKlijent(p.Rezervacija),
+                UslugaTekst = FormatUslugaTekst(p.Rezervacija),
                 DatumVrijeme = p.DatumPlacanja,
                 Iznos = p.Iznos,
                 MetodaLabel = FormatMethodLabel(p.MetodaPlacanja, p.TransakcijskiBroj),
                 Status = MapStatus(p.Rezervacija?.IsPlacena, p.Rezervacija?.IsOtkazana),
             }).ToList();
 
-            await Task.WhenAll(kpiCurTask, kpiPrevTask, metodeTask, trendTask, aktivnostTask);
-            var kpiCur = await kpiCurTask;
-            var kpiPrev = await kpiPrevTask;
+            // Jedan DbContext ne smije izvršavati više upita paralelno (Task.WhenAll bi bacalo 500).
+            var kpiCur = await ComputeKpiAsync(from, toExclusive, cancellationToken);
+            var kpiPrev = await ComputeKpiAsync(prevFrom, prevToExclusive, cancellationToken);
+            var metode = await MethodSharesAsync(from, toExclusive, cancellationToken);
+            var trend = await RevenueTrendAsync(from, toExclusive, cancellationToken);
+            var aktivnost = await RecentActivityAsync(from, toExclusive, cancellationToken);
 
             return new AdminFinanceDashboardDto
             {
@@ -94,9 +87,9 @@ namespace NuaSpa.Application.Services
                 Ukupno = ukupno,
                 Stranica = page,
                 VelicinaStranice = pageSize,
-                MetodePostotak = await metodeTask,
-                PrihodDnevno = await trendTask,
-                NedavnaAktivnost = await aktivnostTask,
+                MetodePostotak = metode,
+                PrihodDnevno = trend,
+                NedavnaAktivnost = aktivnost,
             };
         }
 
@@ -126,12 +119,8 @@ namespace NuaSpa.Application.Services
             foreach (var r in all)
             {
                 var id = FormatPayId(r.Id, r.DatumPlacanja);
-                var client = r.Rezervacija == null
-                    ? ""
-                    : $"{r.Rezervacija.Korisnik.Ime} {r.Rezervacija.Korisnik.Prezime}".Trim();
-                var svc = r.Rezervacija == null
-                    ? "—"
-                    : FormatUsluga(r.Rezervacija.Usluga.Naziv, r.Rezervacija.Usluga.TrajanjeMinuta);
+                var client = FormatKlijent(r.Rezervacija);
+                var svc = FormatUslugaTekst(r.Rezervacija);
                 var dt = r.DatumPlacanja.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
                 var amt = r.Iznos.ToString("0.##", CultureInfo.InvariantCulture);
                 var meth = FormatMethodLabel(r.MetodaPlacanja, r.TransakcijskiBroj);
@@ -172,8 +161,10 @@ namespace NuaSpa.Application.Services
             {
                 var t = searchNorm.ToLowerInvariant();
                 q = q.Where(p =>
-                    p.TransakcijskiBroj.ToLower().Contains(t) ||
+                    (p.TransakcijskiBroj ?? "").ToLower().Contains(t) ||
                     (p.Rezervacija != null &&
+                     p.Rezervacija.Korisnik != null &&
+                     p.Rezervacija.Usluga != null &&
                      (p.Rezervacija.Korisnik.Ime.ToLower().Contains(t) ||
                       p.Rezervacija.Korisnik.Prezime.ToLower().Contains(t) ||
                       p.Rezervacija.Usluga.Naziv.ToLower().Contains(t))));
@@ -193,21 +184,21 @@ namespace NuaSpa.Application.Services
             if (methodNorm == "card")
             {
                 q = q.Where(p =>
-                    p.MetodaPlacanja.ToLower().Contains("stripe") ||
-                    p.MetodaPlacanja.ToLower().Contains("visa") ||
-                    p.MetodaPlacanja.ToLower().Contains("master") ||
-                    p.MetodaPlacanja.ToLower().Contains("card"));
+                    (p.MetodaPlacanja ?? "").ToLower().Contains("stripe") ||
+                    (p.MetodaPlacanja ?? "").ToLower().Contains("visa") ||
+                    (p.MetodaPlacanja ?? "").ToLower().Contains("master") ||
+                    (p.MetodaPlacanja ?? "").ToLower().Contains("card"));
             }
             else if (methodNorm == "cash")
             {
-                q = q.Where(p => p.MetodaPlacanja.ToLower().Contains("gotovin"));
+                q = q.Where(p => (p.MetodaPlacanja ?? "").ToLower().Contains("gotovin"));
             }
             else if (methodNorm == "digital")
             {
                 q = q.Where(p =>
-                    p.MetodaPlacanja.ToLower().Contains("apple") ||
-                    p.MetodaPlacanja.ToLower().Contains("google") ||
-                    p.MetodaPlacanja.ToLower().Contains("paypal"));
+                    (p.MetodaPlacanja ?? "").ToLower().Contains("apple") ||
+                    (p.MetodaPlacanja ?? "").ToLower().Contains("google") ||
+                    (p.MetodaPlacanja ?? "").ToLower().Contains("paypal"));
             }
 
             return q
@@ -380,9 +371,9 @@ namespace NuaSpa.Application.Services
             };
         }
 
-        private static string BucketMethod(string metoda)
+        private static string BucketMethod(string? metoda)
         {
-            var m = metoda.ToLowerInvariant();
+            var m = (metoda ?? "").ToLowerInvariant();
             if (m.Contains("stripe") || m.Contains("visa") || m.Contains("master") || m.Contains("card"))
                 return "card";
             if (m.Contains("gotovin"))
@@ -443,9 +434,7 @@ namespace NuaSpa.Application.Services
             foreach (var p in items)
             {
                 var st = MapStatus(p.Rezervacija?.IsPlacena, p.Rezervacija?.IsOtkazana);
-                var klijent = p.Rezervacija == null
-                    ? "—"
-                    : $"{p.Rezervacija.Korisnik.Ime} {p.Rezervacija.Korisnik.Prezime}".Trim();
+                var klijent = FormatKlijent(p.Rezervacija);
 
                 string tip;
                 string opis;
@@ -476,6 +465,18 @@ namespace NuaSpa.Application.Services
             }
 
             return list;
+        }
+
+        private static string FormatKlijent(Rezervacija? r)
+        {
+            if (r?.Korisnik == null) return "—";
+            return $"{r.Korisnik.Ime} {r.Korisnik.Prezime}".Trim();
+        }
+
+        private static string FormatUslugaTekst(Rezervacija? r)
+        {
+            if (r?.Usluga == null) return "—";
+            return FormatUsluga(r.Usluga.Naziv, r.Usluga.TrajanjeMinuta);
         }
 
         private static string MapStatus(bool? placena, bool? otkazana)
