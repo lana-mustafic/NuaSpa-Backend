@@ -39,6 +39,9 @@ namespace NuaSpa.Application.Interfaces
             int? requireZaposlenikId,
             string? razlogOtkaza);
 
+        /// <summary>Trajno uklanja rezervaciju (admin). Ne smije biti plaćena.</summary>
+        Task<(bool Ok, string? Message)> DeleteAdminAsync(int rezervacijaId);
+
         Task<List<RezervacijaCalendarItemDTO>> GetCalendarAsync(
             DateTime from,
             DateTime to,
