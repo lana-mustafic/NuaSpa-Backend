@@ -1,11 +1,11 @@
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace NuaSpa.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddZaposlenikKategorijaUsluga : Migration
+    public partial class AddZaposlenikKategorijaAndProfile : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -24,6 +24,27 @@ namespace NuaSpa.Infrastructure.Migrations
                 name: "KategorijaUslugaId",
                 table: "Zaposlenici",
                 type: "int",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "Jezici",
+                table: "Zaposlenici",
+                type: "nvarchar(200)",
+                maxLength: 200,
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "Lokacija",
+                table: "Zaposlenici",
+                type: "nvarchar(120)",
+                maxLength: 120,
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "Obrazovanje",
+                table: "Zaposlenici",
+                type: "nvarchar(1000)",
+                maxLength: 1000,
                 nullable: true);
 
             migrationBuilder.CreateIndex(
@@ -53,6 +74,18 @@ namespace NuaSpa.Infrastructure.Migrations
 
             migrationBuilder.DropColumn(
                 name: "KategorijaUslugaId",
+                table: "Zaposlenici");
+
+            migrationBuilder.DropColumn(
+                name: "Jezici",
+                table: "Zaposlenici");
+
+            migrationBuilder.DropColumn(
+                name: "Lokacija",
+                table: "Zaposlenici");
+
+            migrationBuilder.DropColumn(
+                name: "Obrazovanje",
                 table: "Zaposlenici");
 
             migrationBuilder.AlterColumn<string>(

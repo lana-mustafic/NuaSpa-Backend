@@ -176,16 +176,58 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<NuaSpaContext>();
-        if (context.Database.GetPendingMigrations().Any())
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        var pending = context.Database.GetPendingMigrations().ToList();
+        if (pending.Count > 0)
         {
-            context.Database.Migrate();
+            logger.LogInformation(
+                "Primjenjujem {Count} migracija: {Migrations}",
+                pending.Count,
+                string.Join(", ", pending));
         }
+
+        context.Database.Migrate();
+        EnsureZaposlenikProfileColumns(context);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
         logger.LogError(ex, "Došlo je do greške prilikom migracije baze podataka.");
+        throw;
     }
+}
+
+static void EnsureZaposlenikProfileColumns(NuaSpaContext context)
+{
+    context.Database.ExecuteSqlRaw(
+        """
+        IF COL_LENGTH('dbo.Zaposlenici', 'KategorijaUslugaId') IS NULL
+        BEGIN
+            ALTER TABLE [Zaposlenici] ALTER COLUMN [Specijalizacija] nvarchar(500) NOT NULL;
+            ALTER TABLE [Zaposlenici] ADD [KategorijaUslugaId] int NULL;
+            ALTER TABLE [Zaposlenici] ADD [Jezici] nvarchar(200) NULL;
+            ALTER TABLE [Zaposlenici] ADD [Lokacija] nvarchar(120) NULL;
+            ALTER TABLE [Zaposlenici] ADD [Obrazovanje] nvarchar(1000) NULL;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.indexes
+                WHERE name = 'IX_Zaposlenici_KategorijaUslugaId'
+                  AND object_id = OBJECT_ID('dbo.Zaposlenici'))
+            BEGIN
+                CREATE INDEX [IX_Zaposlenici_KategorijaUslugaId]
+                    ON [Zaposlenici]([KategorijaUslugaId]);
+            END;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.foreign_keys
+                WHERE name = 'FK_Zaposlenici_KategorijeUsluga_KategorijaUslugaId')
+            BEGIN
+                ALTER TABLE [Zaposlenici] ADD CONSTRAINT [FK_Zaposlenici_KategorijeUsluga_KategorijaUslugaId]
+                    FOREIGN KEY ([KategorijaUslugaId]) REFERENCES [KategorijeUsluga]([Id])
+                    ON DELETE SET NULL;
+            END;
+        END
+        """);
 }
 
 // --- DEV SEED LOGIN KORISNIKA (dummy hash iz migracija ne radi za login) ---
@@ -298,7 +340,13 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<NuaSpaContext>(); // Zamijeni 'NuaSpaContext' imenom tvog Context-a ako je drugačije
     if (!context.KategorijeUsluga.Any())
     {
-        context.KategorijeUsluga.Add(new NuaSpa.Domain.Entities.KategorijaUsluga { Naziv = "Automatska", IsDeleted = false, CreatedAt = DateTime.Now });
+        context.KategorijeUsluga.Add(new KategorijaUsluga
+        {
+            Naziv = "General",
+            Opis = "Default category",
+            IsDeleted = false,
+            CreatedAt = DateTime.UtcNow,
+        });
         context.SaveChanges();
     }
 }

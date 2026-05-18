@@ -55,8 +55,13 @@ namespace NuaSpa.Application.Services
 
         public override async Task<ZaposlenikDTO> Insert(ZaposlenikDTO dto)
         {
-            var entity = _mapper.Map<Zaposlenik>(dto);
-            entity.DatumZaposlenja = DateTime.UtcNow;
+            var entity = new Zaposlenik
+            {
+                Ime = dto.Ime.Trim(),
+                Prezime = dto.Prezime.Trim(),
+                Specijalizacija = dto.Specijalizacija.Trim(),
+                DatumZaposlenja = DateTime.UtcNow,
+            };
             ApplyDtoFields(entity, dto);
 
             _context.Zaposlenici.Add(entity);

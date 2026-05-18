@@ -21,7 +21,13 @@ namespace NuaSpa.Application
                 .ForMember(dest => dest.KategorijaUsluga, opt => opt.Ignore());
             CreateMap<Proizvod, ProizvodDTO>().ReverseMap();
             CreateMap<Popust, PopustDTO>().ReverseMap();
-            CreateMap<Zaposlenik, ZaposlenikDTO>().ReverseMap();
+            CreateMap<Zaposlenik, ZaposlenikDTO>()
+                .ForMember(dest => dest.KategorijaUslugaNaziv,
+                    opt => opt.MapFrom(src =>
+                        src.KategorijaUsluga != null ? src.KategorijaUsluga.Naziv : null));
+            CreateMap<ZaposlenikDTO, Zaposlenik>()
+                .ForMember(dest => dest.KategorijaUsluga, opt => opt.Ignore())
+                .ForMember(dest => dest.DatumZaposlenja, opt => opt.Ignore());
             CreateMap<Skladiste, SkladisteDTO>().ReverseMap();
             CreateMap<Recenzija, RecenzijaDTO>().ReverseMap();
             CreateMap<Korisnik, KorisnikDTO>().ReverseMap();

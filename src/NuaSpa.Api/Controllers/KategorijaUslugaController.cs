@@ -19,6 +19,12 @@ namespace NuaSpa.Api.Controllers
         [Authorize(Roles = "Admin")]
         public override async Task<KategorijaUslugaDTO> Insert([FromBody] KategorijaUslugaDTO dto)
         {
+            if (string.IsNullOrWhiteSpace(dto?.Naziv))
+            {
+                throw new BadHttpRequestException("Naziv kategorije je obavezan.");
+            }
+
+            dto.Naziv = dto.Naziv.Trim();
             return await base.Insert(dto);
         }
 
