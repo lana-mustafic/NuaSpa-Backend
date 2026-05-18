@@ -17,11 +17,16 @@ namespace NuaSpa.Domain.Entities
         public string Prezime { get; set; } = null!;
 
         [Required]
-        [MaxLength(100)]
+        [MaxLength(500)]
         public string Specijalizacija { get; set; } = null!;
 
         [MaxLength(30)]
         public string? Telefon { get; set; }
+
+        /// <summary>Primarna kategorija usluga za koju je terapeut predviđen.</summary>
+        public int? KategorijaUslugaId { get; set; }
+
+        public virtual KategorijaUsluga? KategorijaUsluga { get; set; }
 
         [Required]
         public DateTime DatumZaposlenja { get; set; }

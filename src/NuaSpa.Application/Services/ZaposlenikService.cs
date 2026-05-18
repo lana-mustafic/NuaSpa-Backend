@@ -20,6 +20,9 @@ namespace NuaSpa.Application.Services
         {
             var entity = _mapper.Map<Zaposlenik>(dto);
             entity.DatumZaposlenja = DateTime.UtcNow;
+            entity.KategorijaUslugaId = dto.KategorijaUslugaId is > 0
+                ? dto.KategorijaUslugaId
+                : null;
 
             _context.Zaposlenici.Add(entity);
             await _context.SaveChangesAsync();

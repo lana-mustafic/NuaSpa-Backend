@@ -21,6 +21,23 @@ namespace NuaSpa.Api.Controllers
             _zaposlenikService = service;
         }
 
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public override async Task<ZaposlenikDTO> Insert([FromBody] ZaposlenikDTO dto)
+        {
+            if (dto.KategorijaUslugaId is > 0)
+            {
+                var katOk = await _context.KategorijeUsluga.AsNoTracking()
+                    .AnyAsync(k => k.Id == dto.KategorijaUslugaId);
+                if (!katOk)
+                {
+                    throw new BadHttpRequestException("KategorijaUslugaId ne postoji.");
+                }
+            }
+
+            return await _zaposlenikService.Insert(dto);
+        }
+
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ZaposlenikDTO>> Update(int id, [FromBody] ZaposlenikDTO dto)
@@ -30,12 +47,22 @@ namespace NuaSpa.Api.Controllers
             var entity = await _context.Zaposlenici.FindAsync(id);
             if (entity == null) return NotFound();
 
+            if (dto.KategorijaUslugaId is > 0)
+            {
+                var katOk = await _context.KategorijeUsluga.AsNoTracking()
+                    .AnyAsync(k => k.Id == dto.KategorijaUslugaId);
+                if (!katOk) return BadRequest("KategorijaUslugaId ne postoji.");
+            }
+
             entity.Ime = dto.Ime.Trim();
             entity.Prezime = dto.Prezime.Trim();
             entity.Specijalizacija = dto.Specijalizacija.Trim();
             entity.Telefon = string.IsNullOrWhiteSpace(dto.Telefon)
                 ? null
                 : dto.Telefon.Trim();
+            entity.KategorijaUslugaId = dto.KategorijaUslugaId is > 0
+                ? dto.KategorijaUslugaId
+                : null;
 
             await _context.SaveChangesAsync();
 
@@ -46,6 +73,7 @@ namespace NuaSpa.Api.Controllers
                 Prezime = entity.Prezime,
                 Specijalizacija = entity.Specijalizacija,
                 Telefon = entity.Telefon,
+                KategorijaUslugaId = entity.KategorijaUslugaId,
                 DatumZaposlenja = entity.DatumZaposlenja,
             });
         }

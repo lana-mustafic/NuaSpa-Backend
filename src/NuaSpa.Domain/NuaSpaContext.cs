@@ -107,6 +107,12 @@ namespace NuaSpa.Domain
                 .HasForeignKey(k => k.GradId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Zaposlenik>()
+                .HasOne(z => z.KategorijaUsluga)
+                .WithMany()
+                .HasForeignKey(z => z.KategorijaUslugaId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             modelBuilder.Entity<Favorit>()
                 .HasIndex(x => new { x.KorisnikId, x.UslugaId })
                 .IsUnique();

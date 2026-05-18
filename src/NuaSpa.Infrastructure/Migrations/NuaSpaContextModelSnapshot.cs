@@ -1134,14 +1134,19 @@ namespace NuaSpa.Infrastructure.Migrations
 
                     b.Property<string>("Specijalizacija")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Telefon")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<int?>("KategorijaUslugaId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("KategorijaUslugaId");
 
                     b.ToTable("Zaposlenici");
                 });
@@ -1394,6 +1399,16 @@ namespace NuaSpa.Infrastructure.Migrations
                         .HasForeignKey("KategorijaUslugaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("KategorijaUsluga");
+                });
+
+            modelBuilder.Entity("NuaSpa.Domain.Entities.Zaposlenik", b =>
+                {
+                    b.HasOne("NuaSpa.Domain.Entities.KategorijaUsluga", "KategorijaUsluga")
+                        .WithMany()
+                        .HasForeignKey("KategorijaUslugaId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("KategorijaUsluga");
                 });
