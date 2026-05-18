@@ -11,4 +11,12 @@ public class TherapistAdminProfileDto
     public string? InternaNapomena { get; set; }
     public IReadOnlyList<TherapistReviewRowDto> NedavneRecenzije { get; set; } =
         new List<TherapistReviewRowDto>();
+
+    public string? LokacijaPrikaz { get; set; }
+    public string Uloga { get; set; } = "Therapist";
+    public TherapistKpiDTO? Kpi { get; set; }
+    public IReadOnlyList<TherapistWeeklyScheduleDayDto> SedmicniRaspored { get; set; } =
+        new List<TherapistWeeklyScheduleDayDto>();
+    public IReadOnlyList<TherapistTopServiceDto> TopUsluge { get; set; } =
+        new List<TherapistTopServiceDto>();
 }

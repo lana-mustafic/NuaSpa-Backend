@@ -28,6 +28,15 @@ namespace NuaSpa.Domain.Entities
 
         public virtual KategorijaUsluga? KategorijaUsluga { get; set; }
 
+        [MaxLength(200)]
+        public string? Jezici { get; set; }
+
+        [MaxLength(1000)]
+        public string? Obrazovanje { get; set; }
+
+        [MaxLength(120)]
+        public string? Lokacija { get; set; }
+
         [Required]
         public DateTime DatumZaposlenja { get; set; }
     }

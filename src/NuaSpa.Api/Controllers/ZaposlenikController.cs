@@ -35,6 +35,14 @@ namespace NuaSpa.Api.Controllers
                 }
             }
 
+            var specError = await _zaposlenikService.ValidateSpecijalizacijaAsync(
+                dto.KategorijaUslugaId,
+                dto.Specijalizacija);
+            if (specError != null)
+            {
+                throw new BadHttpRequestException(specError);
+            }
+
             return await _zaposlenikService.Insert(dto);
         }
 
@@ -42,10 +50,10 @@ namespace NuaSpa.Api.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ZaposlenikDTO>> Update(int id, [FromBody] ZaposlenikDTO dto)
         {
-            if (id != dto.Id && dto.Id != 0) return BadRequest("ID u ruti i tijelu zahtjeva se ne poklapaju.");
-
-            var entity = await _context.Zaposlenici.FindAsync(id);
-            if (entity == null) return NotFound();
+            if (id != dto.Id && dto.Id != 0)
+            {
+                return BadRequest("ID u ruti i tijelu zahtjeva se ne poklapaju.");
+            }
 
             if (dto.KategorijaUslugaId is > 0)
             {
@@ -54,37 +62,29 @@ namespace NuaSpa.Api.Controllers
                 if (!katOk) return BadRequest("KategorijaUslugaId ne postoji.");
             }
 
-            entity.Ime = dto.Ime.Trim();
-            entity.Prezime = dto.Prezime.Trim();
-            entity.Specijalizacija = dto.Specijalizacija.Trim();
-            entity.Telefon = string.IsNullOrWhiteSpace(dto.Telefon)
-                ? null
-                : dto.Telefon.Trim();
-            entity.KategorijaUslugaId = dto.KategorijaUslugaId is > 0
-                ? dto.KategorijaUslugaId
-                : null;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new ZaposlenikDTO
+            var specError = await _zaposlenikService.ValidateSpecijalizacijaAsync(
+                dto.KategorijaUslugaId,
+                dto.Specijalizacija);
+            if (specError != null)
             {
-                Id = entity.Id,
-                Ime = entity.Ime,
-                Prezime = entity.Prezime,
-                Specijalizacija = entity.Specijalizacija,
-                Telefon = entity.Telefon,
-                KategorijaUslugaId = entity.KategorijaUslugaId,
-                DatumZaposlenja = entity.DatumZaposlenja,
-            });
+                return BadRequest(specError);
+            }
+
+            var updated = await _zaposlenikService.UpdateAsync(id, dto);
+            if (updated == null) return NotFound();
+
+            return Ok(updated);
         }
 
         [HttpGet("{id}/admin-profile")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<TherapistAdminProfileDto>> GetAdminProfile(
             int id,
-            [FromQuery] int maxReviews = 20)
+            [FromQuery] int maxReviews = 20,
+            [FromQuery] DateTime? from = null,
+            [FromQuery] DateTime? to = null)
         {
-            var dto = await _zaposlenikService.GetAdminProfileAsync(id, maxReviews);
+            var dto = await _zaposlenikService.GetAdminProfileAsync(id, maxReviews, from, to);
             if (dto == null) return NotFound();
             return Ok(dto);
         }
@@ -118,8 +118,6 @@ namespace NuaSpa.Api.Controllers
                 return Conflict(new { message = "Terapeut ima rezervacije i ne može biti obrisan." });
             }
 
-            // Unlink therapist from user accounts and client preferred-therapist refs
-            // (FK_AspNetUsers_Zaposlenici_ZaposlenikId blocks delete otherwise).
             await _context.Users
                 .Where(k => k.ZaposlenikId == id)
                 .ExecuteUpdateAsync(s => s.SetProperty(k => k.ZaposlenikId, (int?)null));
@@ -154,55 +152,10 @@ namespace NuaSpa.Api.Controllers
                 return BadRequest("Period je prevelik (max 366 dana).");
             }
 
-            var start = from.Date;
-            var endExclusive = to.Date.AddDays(1);
+            var dto = await _zaposlenikService.GetKpiAsync(id, from, to);
+            if (dto == null) return NotFound();
 
-            var rezQuery = _context.Rezervacije
-                .AsNoTracking()
-                .Where(r => r.ZaposlenikId == id && r.DatumRezervacije >= start && r.DatumRezervacije < endExclusive);
-
-            var ukupno = await rezQuery.CountAsync();
-            var potvrdjene = await rezQuery.Where(r => r.IsPotvrdjena && !r.IsOtkazana).CountAsync();
-            var otkazane = await rezQuery.Where(r => r.IsOtkazana).CountAsync();
-            var placene = await rezQuery.Where(r => r.IsPlacena && !r.IsOtkazana).CountAsync();
-
-            var prihod = await rezQuery
-                .Where(r => r.IsPlacena && !r.IsOtkazana)
-                .Join(
-                    _context.Usluge.AsNoTracking(),
-                    r => r.UslugaId,
-                    u => u.Id,
-                    (r, u) => u.Cijena
-                )
-                .SumAsync(x => (decimal?)x) ?? 0m;
-
-            // Heuristika ocjene: recenzije za usluge koje je ovaj terapeut obavio kod tog korisnika.
-            // (Recenzija nije direktno vezana na terapeuta u modelu.)
-            var ratings = await (
-                from r in _context.Recenzije.AsNoTracking()
-                join rez in _context.Rezervacije.AsNoTracking()
-                    on new { r.UslugaId, r.KorisnikId } equals new { rez.UslugaId, rez.KorisnikId }
-                where rez.ZaposlenikId == id
-                      && rez.DatumRezervacije >= start
-                      && rez.DatumRezervacije < endExclusive
-                select (double?)r.Ocjena
-            ).ToListAsync();
-
-            var avg = ratings.Count == 0 ? 0.0 : Math.Round(ratings.Average() ?? 0.0, 2);
-
-            return Ok(new TherapistKpiDTO
-            {
-                ZaposlenikId = id,
-                From = start,
-                To = to.Date,
-                UkupnoRezervacija = ukupno,
-                PotvrdjeneRezervacije = potvrdjene,
-                OtkazaneRezervacije = otkazane,
-                PlaceneRezervacije = placene,
-                Prihod = prihod,
-                ProsjecnaOcjena = avg,
-            });
+            return Ok(dto);
         }
     }
 }
-
