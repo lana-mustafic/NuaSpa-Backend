@@ -23,6 +23,9 @@ namespace NuaSpa.Domain.Entities
         [MaxLength(30)]
         public string? Telefon { get; set; }
 
+        [MaxLength(120)]
+        public string? Email { get; set; }
+
         /// <summary>Primarna kategorija usluga za koju je terapeut predviđen.</summary>
         public int? KategorijaUslugaId { get; set; }
 

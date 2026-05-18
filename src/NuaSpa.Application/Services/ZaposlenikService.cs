@@ -261,6 +261,7 @@ namespace NuaSpa.Application.Services
             entity.Telefon = string.IsNullOrWhiteSpace(dto.Telefon)
                 ? null
                 : dto.Telefon.Trim();
+            entity.Email = NormalizeOptional(dto.Email, 120);
         }
 
         private static string? NormalizeOptional(string? value, int maxLen)
@@ -279,6 +280,7 @@ namespace NuaSpa.Application.Services
                 Prezime = z.Prezime,
                 Specijalizacija = z.Specijalizacija,
                 Telefon = z.Telefon,
+                Email = z.Email,
                 KategorijaUslugaId = z.KategorijaUslugaId,
                 KategorijaUslugaNaziv = z.KategorijaUsluga?.Naziv,
                 Jezici = z.Jezici,

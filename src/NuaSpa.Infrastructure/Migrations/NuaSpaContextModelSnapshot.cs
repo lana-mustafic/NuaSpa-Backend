@@ -1119,6 +1119,10 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.Property<DateTime>("DatumZaposlenja")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
                     b.Property<string>("Ime")
                         .IsRequired()
                         .HasMaxLength(50)

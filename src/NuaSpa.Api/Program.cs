@@ -227,6 +227,11 @@ static void EnsureZaposlenikProfileColumns(NuaSpaContext context)
                     ON DELETE SET NULL;
             END;
         END
+
+        IF COL_LENGTH('dbo.Zaposlenici', 'Email') IS NULL
+        BEGIN
+            ALTER TABLE [Zaposlenici] ADD [Email] nvarchar(120) NULL;
+        END
         """);
 }
 
