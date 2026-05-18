@@ -90,8 +90,25 @@ namespace NuaSpa.Api.Controllers
                 return Conflict(new { message = "Terapeut ima rezervacije i ne može biti obrisan." });
             }
 
+            // Unlink therapist from user accounts and client preferred-therapist refs
+            // (FK_AspNetUsers_Zaposlenici_ZaposlenikId blocks delete otherwise).
+            await _context.Users
+                .Where(k => k.ZaposlenikId == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(k => k.ZaposlenikId, (int?)null));
+
             _context.Zaposlenici.Remove(entity);
-            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return Conflict(new
+                {
+                    message = "Terapeut se ne može obrisati zbog povezanih podataka u bazi.",
+                });
+            }
 
             return NoContent();
         }
