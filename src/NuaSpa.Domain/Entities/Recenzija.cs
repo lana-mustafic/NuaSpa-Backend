@@ -27,6 +27,10 @@ namespace NuaSpa.Domain.Entities
         public int KorisnikId { get; set; }
         public Korisnik Korisnik { get; set; } = null!;
 
+        [ForeignKey("Zaposlenik")]
+        public int? ZaposlenikId { get; set; }
+        public Zaposlenik? Zaposlenik { get; set; }
+
         /// <summary>Javni odgovor salona na recenziju (admin).</summary>
         [MaxLength(2000)]
         public string? AdminOdgovor { get; set; }

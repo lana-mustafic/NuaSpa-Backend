@@ -232,6 +232,20 @@ static void EnsureZaposlenikProfileColumns(NuaSpaContext context)
         BEGIN
             ALTER TABLE [Zaposlenici] ADD [Email] nvarchar(120) NULL;
         END
+
+        IF COL_LENGTH('dbo.Recenzije', 'ZaposlenikId') IS NULL
+        BEGIN
+            ALTER TABLE [Recenzije] ADD [ZaposlenikId] int NULL;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.foreign_keys
+                WHERE name = 'FK_Recenzije_Zaposlenici_ZaposlenikId')
+            BEGIN
+                ALTER TABLE [Recenzije] ADD CONSTRAINT [FK_Recenzije_Zaposlenici_ZaposlenikId]
+                    FOREIGN KEY ([ZaposlenikId]) REFERENCES [Zaposlenici]([Id])
+                    ON DELETE NO ACTION;
+            END;
+        END
         """);
 }
 

@@ -40,12 +40,15 @@ namespace NuaSpa.Application.Services
 
         public async Task<RecenzijaDTO> CreateAsync(int korisnikId, RecenzijaCreateDTO dto)
         {
+            await ValidateCreateAsync(dto);
+
             var entity = new Recenzija
             {
                 KorisnikId = korisnikId,
                 UslugaId = dto.UslugaId,
+                ZaposlenikId = dto.ZaposlenikId,
                 Ocjena = dto.Ocjena,
-                Komentar = dto.Komentar,
+                Komentar = dto.Komentar.Trim(),
                 CreatedAt = DateTime.Now,
                 IsDeleted = false
             };
@@ -60,6 +63,57 @@ namespace NuaSpa.Application.Services
                 .FirstAsync(r => r.Id == entity.Id);
 
             return _mapper.Map<RecenzijaDTO>(created);
+        }
+
+        private async Task ValidateCreateAsync(RecenzijaCreateDTO dto)
+        {
+            if (dto.ZaposlenikId <= 0)
+            {
+                throw new InvalidOperationException("Terapeut je obavezan.");
+            }
+
+            if (dto.UslugaId <= 0)
+            {
+                throw new InvalidOperationException("Usluga je obavezna.");
+            }
+
+            if (dto.Ocjena is < 1 or > 5)
+            {
+                throw new InvalidOperationException("Ocjena mora biti između 1 i 5.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Komentar))
+            {
+                throw new InvalidOperationException("Komentar je obavezan.");
+            }
+
+            var zaposlenik = await _context.Zaposlenici
+                .AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == dto.ZaposlenikId);
+            if (zaposlenik == null)
+            {
+                throw new InvalidOperationException("Terapeut ne postoji.");
+            }
+
+            if (zaposlenik.KategorijaUslugaId is not > 0)
+            {
+                throw new InvalidOperationException(
+                    "Terapeut nema dodijeljenu kategoriju usluga.");
+            }
+
+            var usluga = await _context.Usluge
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == dto.UslugaId && !u.IsDeleted);
+            if (usluga == null)
+            {
+                throw new InvalidOperationException("Usluga ne postoji.");
+            }
+
+            if (usluga.KategorijaUslugaId != zaposlenik.KategorijaUslugaId)
+            {
+                throw new InvalidOperationException(
+                    "Odabrana usluga ne pripada kategoriji terapeuta.");
+            }
         }
 
         public async Task<AdminReviewsDashboardDto> GetAdminDashboardAsync(
@@ -190,14 +244,19 @@ namespace NuaSpa.Application.Services
                     BrojPosjeta = _context.Rezervacije.Count(r =>
                         r.KorisnikId == rev.KorisnikId && !r.IsOtkazana && r.IsPotvrdjena),
                     UslugaNaziv = rev.Usluga.Naziv,
-                    TerapeutIme = _context.Rezervacije
-                        .Where(r => r.KorisnikId == rev.KorisnikId
-                            && r.UslugaId == rev.UslugaId
-                            && !r.IsOtkazana
-                            && r.DatumRezervacije <= rev.CreatedAt)
-                        .OrderByDescending(r => r.DatumRezervacije)
-                        .Select(r => r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime)
-                        .FirstOrDefault(),
+                    TerapeutIme = rev.ZaposlenikId != null
+                        ? _context.Zaposlenici
+                            .Where(z => z.Id == rev.ZaposlenikId)
+                            .Select(z => z.Ime + " " + z.Prezime)
+                            .FirstOrDefault()
+                        : _context.Rezervacije
+                            .Where(r => r.KorisnikId == rev.KorisnikId
+                                && r.UslugaId == rev.UslugaId
+                                && !r.IsOtkazana
+                                && r.DatumRezervacije <= rev.CreatedAt)
+                            .OrderByDescending(r => r.DatumRezervacije)
+                            .Select(r => r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime)
+                            .FirstOrDefault(),
                     Izvor = "NuaSpa",
                     AdminOdgovor = rev.AdminOdgovor
                 })
@@ -246,14 +305,19 @@ namespace NuaSpa.Application.Services
                     BrojPosjeta = _context.Rezervacije.Count(r =>
                         r.KorisnikId == rev.KorisnikId && !r.IsOtkazana && r.IsPotvrdjena),
                     UslugaNaziv = rev.Usluga.Naziv,
-                    TerapeutIme = _context.Rezervacije
-                        .Where(r => r.KorisnikId == rev.KorisnikId
-                            && r.UslugaId == rev.UslugaId
-                            && !r.IsOtkazana
-                            && r.DatumRezervacije <= rev.CreatedAt)
-                        .OrderByDescending(r => r.DatumRezervacije)
-                        .Select(r => r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime)
-                        .FirstOrDefault(),
+                    TerapeutIme = rev.ZaposlenikId != null
+                        ? _context.Zaposlenici
+                            .Where(z => z.Id == rev.ZaposlenikId)
+                            .Select(z => z.Ime + " " + z.Prezime)
+                            .FirstOrDefault()
+                        : _context.Rezervacije
+                            .Where(r => r.KorisnikId == rev.KorisnikId
+                                && r.UslugaId == rev.UslugaId
+                                && !r.IsOtkazana
+                                && r.DatumRezervacije <= rev.CreatedAt)
+                            .OrderByDescending(r => r.DatumRezervacije)
+                            .Select(r => r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime)
+                            .FirstOrDefault(),
                     Izvor = "NuaSpa",
                     AdminOdgovor = rev.AdminOdgovor
                 })

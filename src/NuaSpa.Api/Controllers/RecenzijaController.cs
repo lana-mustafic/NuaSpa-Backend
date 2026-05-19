@@ -105,8 +105,15 @@ namespace NuaSpa.Api.Controllers
         public async Task<ActionResult<RecenzijaDTO>> Create([FromBody] RecenzijaCreateDTO dto)
         {
             var korisnikId = User.GetNuaSpaUserId();
-            var created = await _service.CreateAsync(korisnikId, dto);
-            return Ok(created);
+            try
+            {
+                var created = await _service.CreateAsync(korisnikId, dto);
+                return Ok(created);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }
