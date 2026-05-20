@@ -24,5 +24,8 @@ public class AdminClientRowDTO
     public string? TerapeutPrezime { get; set; }
 
     public bool IsVipKlijent { get; set; }
+
+    /// <summary>Account active (Korisnik.Status).</summary>
+    public bool Status { get; set; } = true;
 }
 

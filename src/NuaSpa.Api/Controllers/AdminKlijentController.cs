@@ -102,6 +102,7 @@ public class AdminKlijentController : ControllerBase
                 k.DatumRegistracije,
                 PreferiraniZaposlenikId = k.ZaposlenikId,
                 k.IsVipKlijent,
+                k.Status,
             })
             .Take(safeTake)
             .ToListAsync(ct);
@@ -167,6 +168,7 @@ public class AdminKlijentController : ControllerBase
                 TerapeutIme = tIme,
                 TerapeutPrezime = tPrez,
                 IsVipKlijent = r.IsVipKlijent,
+                Status = r.Status,
             };
         }).ToList();
 
@@ -310,7 +312,44 @@ public class AdminKlijentController : ControllerBase
         if (user == null) return NotFound();
 
         if (!await _userManager.IsInRoleAsync(user, "Klijent"))
-            return BadRequest("Korisnik nije klijent.");
+            return BadRequest("User is not a client.");
+
+        if (dto.Status == false)
+        {
+            var hasUpcoming = await _context.Rezervacije.AsNoTracking()
+                .AnyAsync(
+                    r => r.KorisnikId == id && !r.IsOtkazana && r.DatumRezervacije > DateTime.UtcNow,
+                    ct);
+            if (hasUpcoming)
+                return Conflict("Client has upcoming appointments. Cancel or reschedule them first.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Ime))
+            user.Ime = dto.Ime.Trim();
+
+        if (!string.IsNullOrWhiteSpace(dto.Prezime))
+            user.Prezime = dto.Prezime.Trim();
+
+        if (dto.Email != null)
+        {
+            var email = dto.Email.Trim();
+            if (string.IsNullOrEmpty(email))
+                return BadRequest("Email cannot be empty.");
+
+            var existingMail = await _userManager.FindByEmailAsync(email);
+            if (existingMail != null && existingMail.Id != user.Id)
+                return Conflict("Email is already registered.");
+
+            var setMail = await _userManager.SetEmailAsync(user, email);
+            if (!setMail.Succeeded)
+                return BadRequest(setMail.Errors.Select(e => e.Description).ToList());
+        }
+
+        if (dto.Telefon != null)
+            user.PhoneNumber = string.IsNullOrWhiteSpace(dto.Telefon) ? null : dto.Telefon.Trim();
+
+        if (dto.Status.HasValue)
+            user.Status = dto.Status.Value;
 
         if (dto.IsVipKlijent.HasValue) user.IsVipKlijent = dto.IsVipKlijent.Value;
 
@@ -321,7 +360,7 @@ public class AdminKlijentController : ControllerBase
             {
                 var zOk = await _context.Zaposlenici.AsNoTracking()
                     .AnyAsync(z => z.Id == dto.ZaposlenikId.Value, ct);
-                if (!zOk) return BadRequest("ZaposlenikId ne postoji.");
+                if (!zOk) return BadRequest("Therapist id does not exist.");
                 user.ZaposlenikId = dto.ZaposlenikId.Value;
             }
         }
@@ -354,6 +393,7 @@ public class AdminKlijentController : ControllerBase
                 k.DatumRegistracije,
                 PreferiraniZaposlenikId = k.ZaposlenikId,
                 k.IsVipKlijent,
+                k.Status,
             })
             .ToListAsync(ct);
 
@@ -415,6 +455,7 @@ public class AdminKlijentController : ControllerBase
                 TerapeutIme = tIme,
                 TerapeutPrezime = tPrez,
                 IsVipKlijent = r.IsVipKlijent,
+                Status = r.Status,
             };
         }).ToList();
 
