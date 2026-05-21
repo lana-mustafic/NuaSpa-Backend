@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
 using NuaSpa.Domain.Common;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Domain.Entities
 {
@@ -42,5 +43,8 @@ namespace NuaSpa.Domain.Entities
 
         [Required]
         public DateTime DatumZaposlenja { get; set; }
+
+        /// <summary>Active therapists can be booked; Inactive/OnLeave are hidden from booking.</summary>
+        public ZaposlenikStatus Status { get; set; } = ZaposlenikStatus.Active;
     }
 }

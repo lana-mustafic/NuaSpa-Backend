@@ -8,6 +8,7 @@ using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.Services
 {
@@ -183,6 +184,11 @@ namespace NuaSpa.Application.Services
                 }
             }
 
+            await ValidateTherapistAndSlotAsync(
+                dto.ZaposlenikId,
+                dto.UslugaId,
+                dto.DatumRezervacije);
+
             var entity = new Rezervacija
             {
                 KorisnikId = korisnikId,
@@ -240,6 +246,12 @@ namespace NuaSpa.Application.Services
             if (hours.IsClosed) throw new InvalidOperationException("Spa centar je zatvoren za odabrani dan.");
             if (!IsWithinWorkingHours(dto.DatumRezervacije, hours.OpenMin, hours.CloseMin))
                 throw new InvalidOperationException("Termin je van radnog vremena spa centra.");
+
+            await ValidateTherapistAndSlotAsync(
+                dto.ZaposlenikId,
+                dto.UslugaId,
+                dto.DatumRezervacije,
+                rezervacijaId);
 
             // Validate room (exclude current reservation)
             if (dto.ProstorijaId.HasValue)
@@ -370,8 +382,24 @@ namespace NuaSpa.Application.Services
             return true;
         }
 
-        public async Task<List<DateTime>> GetAvailableSlotsAsync(int zaposlenikId, DateTime date, int slotMinutes = 60)
+        public async Task<List<DateTime>> GetAvailableSlotsAsync(
+            int zaposlenikId,
+            DateTime date,
+            int? uslugaId = null,
+            int slotMinutes = 60)
         {
+            var therapist = await _context.Zaposlenici.AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (therapist == null || therapist.Status != ZaposlenikStatus.Active)
+            {
+                return new List<DateTime>();
+            }
+
+            if (uslugaId is > 0)
+            {
+                slotMinutes = await GetServiceDurationMinutesAsync(uslugaId.Value);
+            }
+
             var day = date.Date;
             var hours = await GetWorkingHoursAsync(day);
             if (hours.IsClosed) return new List<DateTime>();
@@ -381,25 +409,84 @@ namespace NuaSpa.Application.Services
 
             var taken = await _context.Rezervacije
                 .AsNoTracking()
+                .Include(r => r.Usluga)
                 .Where(r =>
                     r.ZaposlenikId == zaposlenikId &&
                     !r.IsOtkazana &&
                     r.DatumRezervacije.Date == day)
-                .Select(r => r.DatumRezervacije)
+                .Select(r => new { r.DatumRezervacije, r.Usluga.TrajanjeMinuta })
                 .ToListAsync();
 
-            var takenSet = taken.ToHashSet();
-
             var slots = new List<DateTime>();
-            for (var t = start; t < end; t = t.AddMinutes(slotMinutes))
+            for (var t = start; t.AddMinutes(slotMinutes) <= end; t = t.AddMinutes(slotMinutes))
             {
-                if (!takenSet.Contains(t))
+                var slotEnd = t.AddMinutes(slotMinutes);
+                var overlaps = taken.Any(b =>
+                {
+                    var duration = b.TrajanjeMinuta > 0 ? b.TrajanjeMinuta : 60;
+                    var bEnd = b.DatumRezervacije.AddMinutes(duration);
+                    return b.DatumRezervacije < slotEnd && bEnd > t;
+                });
+                if (!overlaps)
                 {
                     slots.Add(t);
                 }
             }
 
             return slots;
+        }
+
+        private async Task<int> GetServiceDurationMinutesAsync(int uslugaId)
+        {
+            var minutes = await _context.Usluge.AsNoTracking()
+                .Where(u => u.Id == uslugaId)
+                .Select(u => u.TrajanjeMinuta)
+                .FirstOrDefaultAsync();
+            return minutes > 0 ? minutes : 60;
+        }
+
+        private async Task ValidateTherapistAndSlotAsync(
+            int zaposlenikId,
+            int uslugaId,
+            DateTime start,
+            int? excludeRezervacijaId = null)
+        {
+            var therapist = await _context.Zaposlenici.AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (therapist == null)
+            {
+                throw new InvalidOperationException("Terapeut nije pronađen.");
+            }
+
+            if (therapist.Status != ZaposlenikStatus.Active)
+            {
+                throw new InvalidOperationException("Terapeut nije dostupan za rezervacije.");
+            }
+
+            var duration = await GetServiceDurationMinutesAsync(uslugaId);
+            var end = start.AddMinutes(duration);
+
+            var conflicts = await _context.Rezervacije
+                .AsNoTracking()
+                .Include(r => r.Usluga)
+                .Where(r =>
+                    r.ZaposlenikId == zaposlenikId
+                    && !r.IsOtkazana
+                    && (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value)
+                    && r.DatumRezervacije < end)
+                .Select(r => new { r.DatumRezervacije, r.Usluga.TrajanjeMinuta })
+                .ToListAsync();
+
+            foreach (var c in conflicts)
+            {
+                var cDuration = c.TrajanjeMinuta > 0 ? c.TrajanjeMinuta : 60;
+                var cEnd = c.DatumRezervacije.AddMinutes(cDuration);
+                if (c.DatumRezervacije < end && cEnd > start)
+                {
+                    throw new InvalidOperationException(
+                        "Terapeut je već zauzet u odabranom terminu.");
+                }
+            }
         }
 
         private async Task<(bool IsClosed, int OpenMin, int CloseMin)> GetWorkingHoursAsync(DateTime date)

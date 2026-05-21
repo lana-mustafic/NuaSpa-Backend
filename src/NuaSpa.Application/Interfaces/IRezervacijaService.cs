@@ -31,7 +31,11 @@ namespace NuaSpa.Application.Interfaces
 
         Task<bool> UpdatePotvrdjenaForZaposlenikAsync(int rezervacijaId, int zaposlenikId, bool isPotvrdjena);
 
-        Task<List<DateTime>> GetAvailableSlotsAsync(int zaposlenikId, DateTime date, int slotMinutes = 60);
+        Task<List<DateTime>> GetAvailableSlotsAsync(
+            int zaposlenikId,
+            DateTime date,
+            int? uslugaId = null,
+            int slotMinutes = 60);
 
         Task<bool> CancelAsync(
             int rezervacijaId,

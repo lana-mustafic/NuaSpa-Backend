@@ -174,7 +174,10 @@ namespace NuaSpa.Api.Controllers
 
         [HttpGet("dostupni-termini")]
         [Authorize(Roles = "Klijent,Admin,Zaposlenik")]
-        public async Task<ActionResult<List<DateTime>>> GetDostupniTermini([FromQuery] int zaposlenikId, [FromQuery] DateTime datum)
+        public async Task<ActionResult<List<DateTime>>> GetDostupniTermini(
+            [FromQuery] int zaposlenikId,
+            [FromQuery] DateTime datum,
+            [FromQuery] int? uslugaId = null)
         {
             // Teraput smije tražiti samo svoje termine.
             if (User.IsInRole("Zaposlenik"))
@@ -183,7 +186,10 @@ namespace NuaSpa.Api.Controllers
                 if (myId != zaposlenikId) return Forbid();
             }
 
-            var slots = await _rezervacijaService.GetAvailableSlotsAsync(zaposlenikId, datum);
+            var slots = await _rezervacijaService.GetAvailableSlotsAsync(
+                zaposlenikId,
+                datum,
+                uslugaId);
             return Ok(slots);
         }
 

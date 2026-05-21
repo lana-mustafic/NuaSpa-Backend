@@ -233,6 +233,12 @@ static void EnsureZaposlenikProfileColumns(NuaSpaContext context)
             ALTER TABLE [Zaposlenici] ADD [Email] nvarchar(120) NULL;
         END
 
+        IF COL_LENGTH('dbo.Zaposlenici', 'Status') IS NULL
+        BEGIN
+            ALTER TABLE [Zaposlenici] ADD [Status] int NOT NULL
+                CONSTRAINT [DF_Zaposlenici_Status] DEFAULT 0;
+        END
+
         IF COL_LENGTH('dbo.Recenzije', 'ZaposlenikId') IS NULL
         BEGIN
             ALTER TABLE [Recenzije] ADD [ZaposlenikId] int NULL;

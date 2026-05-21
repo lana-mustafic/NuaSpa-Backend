@@ -8,6 +8,7 @@ using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.Services
 {
@@ -262,6 +263,7 @@ namespace NuaSpa.Application.Services
                 ? null
                 : dto.Telefon.Trim();
             entity.Email = NormalizeOptional(dto.Email, 120);
+            entity.Status = dto.Status;
         }
 
         private static string? NormalizeOptional(string? value, int maxLen)
@@ -287,8 +289,138 @@ namespace NuaSpa.Application.Services
                 Obrazovanje = z.Obrazovanje,
                 Lokacija = z.Lokacija,
                 DatumZaposlenja = z.DatumZaposlenja,
+                Status = z.Status,
             };
             return dto;
+        }
+
+        public async Task<IEnumerable<ZaposlenikDTO>> GetForServiceAsync(int uslugaId, bool bookableOnly = true)
+        {
+            var usluga = await _context.Usluge
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == uslugaId && !u.IsDeleted);
+            if (usluga == null) return Array.Empty<ZaposlenikDTO>();
+
+            var serviceName = usluga.Naziv.Trim();
+            var query = _context.Zaposlenici
+                .AsNoTracking()
+                .Include(z => z.KategorijaUsluga)
+                .Where(z =>
+                    z.KategorijaUslugaId == usluga.KategorijaUslugaId
+                    && z.Specijalizacija.Contains(serviceName));
+
+            if (bookableOnly)
+            {
+                query = query.Where(z => z.Status == ZaposlenikStatus.Active);
+            }
+
+            var list = await query
+                .OrderBy(z => z.Prezime)
+                .ThenBy(z => z.Ime)
+                .ToListAsync();
+
+            return list
+                .Where(z => ParseSpecNames(z.Specijalizacija)
+                    .Any(n => string.Equals(n, serviceName, StringComparison.OrdinalIgnoreCase)))
+                .Select(MapToDto)
+                .ToList();
+        }
+
+        public async Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId)
+        {
+            return await GetById(zaposlenikId);
+        }
+
+        public async Task<ZaposlenikDTO?> UpdateMeAsync(int zaposlenikId, TherapistSelfProfileUpdateDto dto)
+        {
+            var entity = await _context.Zaposlenici
+                .Include(z => z.KategorijaUsluga)
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (entity == null) return null;
+
+            entity.Telefon = string.IsNullOrWhiteSpace(dto.Telefon)
+                ? null
+                : dto.Telefon.Trim();
+            entity.Jezici = NormalizeOptional(dto.Jezici, 200);
+
+            await _context.SaveChangesAsync();
+            return MapToDto(entity);
+        }
+
+        public async Task<IReadOnlyList<TherapistReviewRowDto>> GetMyReviewsAsync(
+            int zaposlenikId,
+            int maxReviews = 30)
+        {
+            var take = Math.Clamp(maxReviews, 1, 50);
+            return await _context.Recenzije
+                .AsNoTracking()
+                .Include(r => r.Usluga)
+                .Include(r => r.Korisnik)
+                .Where(rev => _context.Rezervacije.Any(rez =>
+                    rez.ZaposlenikId == zaposlenikId
+                    && !rez.IsOtkazana
+                    && rez.KorisnikId == rev.KorisnikId
+                    && rez.UslugaId == rev.UslugaId))
+                .OrderByDescending(rev => rev.CreatedAt)
+                .Take(take)
+                .Select(rev => new TherapistReviewRowDto
+                {
+                    CreatedAt = rev.CreatedAt,
+                    Ocjena = rev.Ocjena,
+                    Komentar = rev.Komentar,
+                    UslugaNaziv = rev.Usluga.Naziv,
+                    KorisnikIme = rev.Korisnik.Ime + " " +
+                        (string.IsNullOrEmpty(rev.Korisnik.Prezime)
+                            ? ""
+                            : rev.Korisnik.Prezime.Substring(0, 1) + "."),
+                })
+                .ToListAsync();
+        }
+
+        public async Task<TherapistDashboardDto?> GetDashboardAsync(int zaposlenikId, DateTime? day = null)
+        {
+            var exists = await _context.Zaposlenici.AsNoTracking()
+                .AnyAsync(z => z.Id == zaposlenikId);
+            if (!exists) return null;
+
+            var d = (day ?? DateTime.UtcNow).Date;
+            var monthStart = new DateTime(d.Year, d.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var monthEnd = monthStart.AddMonths(1);
+
+            var baseQuery = _context.Rezervacije.AsNoTracking()
+                .Where(r => r.ZaposlenikId == zaposlenikId && !r.IsOtkazana);
+
+            var todayCount = await baseQuery.CountAsync(r => r.DatumRezervacije.Date == d);
+            var upcomingCount = await baseQuery.CountAsync(r => r.DatumRezervacije.Date > d);
+            var completedMonth = await baseQuery.CountAsync(r =>
+                r.DatumRezervacije >= monthStart
+                && r.DatumRezervacije < monthEnd
+                && r.IsPotvrdjena);
+
+            var revenueMonth = await baseQuery
+                .Where(r =>
+                    r.DatumRezervacije >= monthStart
+                    && r.DatumRezervacije < monthEnd
+                    && r.IsPlacena)
+                .Include(r => r.Usluga)
+                .SumAsync(r => (decimal?)r.Usluga.Cijena ?? 0m);
+
+            var reviews = await _context.Recenzije.AsNoTracking()
+                .Where(r => r.ZaposlenikId == zaposlenikId)
+                .Select(r => r.Ocjena)
+                .ToListAsync();
+
+            return new TherapistDashboardDto
+            {
+                TodayAppointments = todayCount,
+                UpcomingAppointments = upcomingCount,
+                CompletedThisMonth = completedMonth,
+                ProsjecnaOcjena = reviews.Count == 0
+                    ? 0
+                    : Math.Round(reviews.Average(x => (double)x), 2),
+                ReviewCount = reviews.Count,
+                RevenueThisMonth = revenueMonth,
+            };
         }
 
         private async Task<string> ResolveLokacijaPrikazAsync(Zaposlenik z)

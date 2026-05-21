@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
@@ -137,6 +138,56 @@ namespace NuaSpa.Api.Controllers
             }
 
             return NoContent();
+        }
+
+        [HttpGet("for-service/{uslugaId:int}")]
+        [Authorize(Roles = "Admin,Klijent")]
+        public async Task<ActionResult<IEnumerable<ZaposlenikDTO>>> GetForService(
+            int uslugaId,
+            [FromQuery] bool bookableOnly = true)
+        {
+            var list = await _zaposlenikService.GetForServiceAsync(uslugaId, bookableOnly);
+            return Ok(list);
+        }
+
+        [HttpGet("me")]
+        [Authorize(Roles = "Zaposlenik")]
+        public async Task<ActionResult<ZaposlenikDTO>> GetMe()
+        {
+            var id = User.GetNuaSpaZaposlenikId();
+            var dto = await _zaposlenikService.GetMeAsync(id);
+            if (dto == null || dto.Id == 0) return NotFound();
+            return Ok(dto);
+        }
+
+        [HttpPatch("me")]
+        [Authorize(Roles = "Zaposlenik")]
+        public async Task<ActionResult<ZaposlenikDTO>> UpdateMe([FromBody] TherapistSelfProfileUpdateDto body)
+        {
+            var id = User.GetNuaSpaZaposlenikId();
+            var updated = await _zaposlenikService.UpdateMeAsync(id, body);
+            if (updated == null) return NotFound();
+            return Ok(updated);
+        }
+
+        [HttpGet("me/dashboard")]
+        [Authorize(Roles = "Zaposlenik")]
+        public async Task<ActionResult<TherapistDashboardDto>> GetMyDashboard([FromQuery] DateTime? day = null)
+        {
+            var id = User.GetNuaSpaZaposlenikId();
+            var dto = await _zaposlenikService.GetDashboardAsync(id, day);
+            if (dto == null) return NotFound();
+            return Ok(dto);
+        }
+
+        [HttpGet("me/reviews")]
+        [Authorize(Roles = "Zaposlenik")]
+        public async Task<ActionResult<IReadOnlyList<TherapistReviewRowDto>>> GetMyReviews(
+            [FromQuery] int maxReviews = 30)
+        {
+            var id = User.GetNuaSpaZaposlenikId();
+            var list = await _zaposlenikService.GetMyReviewsAsync(id, maxReviews);
+            return Ok(list);
         }
 
         [HttpGet("{id}/kpi")]

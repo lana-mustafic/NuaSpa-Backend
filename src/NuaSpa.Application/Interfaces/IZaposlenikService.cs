@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using NuaSpa.Application.DTOs;
 
@@ -19,6 +20,18 @@ namespace NuaSpa.Application.Interfaces
         Task<string?> ValidateSpecijalizacijaAsync(int? kategorijaUslugaId, string specijalizacija);
 
         Task<bool> UpdateInternaNapomenaAsync(int zaposlenikId, string? napomena);
+
+        Task<IEnumerable<ZaposlenikDTO>> GetForServiceAsync(int uslugaId, bool bookableOnly = true);
+
+        Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId);
+
+        Task<ZaposlenikDTO?> UpdateMeAsync(int zaposlenikId, TherapistSelfProfileUpdateDto dto);
+
+        Task<TherapistDashboardDto?> GetDashboardAsync(int zaposlenikId, DateTime? day = null);
+
+        Task<IReadOnlyList<TherapistReviewRowDto>> GetMyReviewsAsync(
+            int zaposlenikId,
+            int maxReviews = 30);
     }
 }
 
