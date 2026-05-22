@@ -10,6 +10,7 @@ using NuaSpa.Application.Common;
 using NuaSpa.Application.Interfaces.Messaging;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
@@ -188,6 +189,7 @@ using (var scope = app.Services.CreateScope())
 
         context.Database.Migrate();
         EnsureZaposlenikProfileColumns(context);
+        EnsureStaffInvitationsTable(context);
     }
     catch (Exception ex)
     {
@@ -251,6 +253,38 @@ static void EnsureZaposlenikProfileColumns(NuaSpaContext context)
                     FOREIGN KEY ([ZaposlenikId]) REFERENCES [Zaposlenici]([Id])
                     ON DELETE NO ACTION;
             END;
+        END
+        """);
+}
+
+static void EnsureStaffInvitationsTable(NuaSpaContext context)
+{
+    context.Database.ExecuteSqlRaw(
+        """
+        IF OBJECT_ID(N'dbo.StaffInvitations', N'U') IS NULL
+        BEGIN
+            CREATE TABLE [StaffInvitations] (
+                [Id] int NOT NULL IDENTITY,
+                [ZaposlenikId] int NOT NULL,
+                [KorisnikId] int NOT NULL,
+                [Email] nvarchar(256) NOT NULL,
+                [TokenHash] nvarchar(64) NOT NULL,
+                [CreatedAt] datetime2 NOT NULL,
+                [ExpiresAt] datetime2 NOT NULL,
+                [AcceptedAt] datetime2 NULL,
+                [CreatedByKorisnikId] int NULL,
+                CONSTRAINT [PK_StaffInvitations] PRIMARY KEY ([Id]),
+                CONSTRAINT [FK_StaffInvitations_Zaposlenici_ZaposlenikId]
+                    FOREIGN KEY ([ZaposlenikId]) REFERENCES [Zaposlenici]([Id]) ON DELETE CASCADE,
+                CONSTRAINT [FK_StaffInvitations_AspNetUsers_KorisnikId]
+                    FOREIGN KEY ([KorisnikId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE
+            );
+
+            CREATE INDEX [IX_StaffInvitations_TokenHash]
+                ON [StaffInvitations]([TokenHash]);
+
+            CREATE INDEX [IX_StaffInvitations_ZaposlenikId_AcceptedAt]
+                ON [StaffInvitations]([ZaposlenikId], [AcceptedAt]);
         END
         """);
 }
@@ -341,6 +375,41 @@ if (app.Environment.IsDevelopment())
             gradId: 3,
             password: "Lana123!",
             roleName: "Klijent");
+
+        var context = services.GetRequiredService<NuaSpaContext>();
+        var demoTherapist = await context.Zaposlenici
+            .OrderBy(z => z.Id)
+            .FirstOrDefaultAsync();
+        if (demoTherapist == null)
+        {
+            demoTherapist = new Zaposlenik
+            {
+                Ime = "Thera",
+                Prezime = "Pist",
+                Specijalizacija = "Swedish Massage",
+                DatumZaposlenja = DateTime.UtcNow,
+                Status = ZaposlenikStatus.Active,
+                CreatedAt = DateTime.UtcNow,
+            };
+            context.Zaposlenici.Add(demoTherapist);
+            await context.SaveChangesAsync();
+        }
+
+        await EnsureUserAsync(
+            username: "therapist",
+            email: "therapist@nuaspa.ba",
+            ime: "Thera",
+            prezime: "Pist",
+            gradId: 1,
+            password: "Therapist123!",
+            roleName: "Zaposlenik");
+
+        var therapistUser = await userManager.FindByNameAsync("therapist");
+        if (therapistUser != null && therapistUser.ZaposlenikId != demoTherapist.Id)
+        {
+            therapistUser.ZaposlenikId = demoTherapist.Id;
+            await userManager.UpdateAsync(therapistUser);
+        }
     }
     catch (Exception ex)
     {
