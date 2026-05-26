@@ -38,6 +38,7 @@ namespace NuaSpa.Api.Controllers
             return Ok(dto);
         }
 
+        /// <summary>Stripe webhook — anoniman, ali zaštićen provjerom potpisa (ConstructEvent).</summary>
         [HttpPost("webhook")]
         [AllowAnonymous]
         public async Task<IActionResult> Webhook(CancellationToken ct = default)

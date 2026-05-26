@@ -18,17 +18,20 @@ public class AuthService : IAuthService
 {
     private readonly UserManager<Korisnik> _userManager;
     private readonly ITokenService _tokenService;
+    private readonly ITokenRevocationService _tokenRevocationService;
     private readonly ITherapistAccountService _therapistAccountService;
     private readonly NuaSpaContext _context;
 
     public AuthService(
         UserManager<Korisnik> userManager,
         ITokenService tokenService,
+        ITokenRevocationService tokenRevocationService,
         ITherapistAccountService therapistAccountService,
         NuaSpaContext context)
     {
         _userManager = userManager;
         _tokenService = tokenService;
+        _tokenRevocationService = tokenRevocationService;
         _therapistAccountService = therapistAccountService;
         _context = context;
     }
@@ -76,14 +79,19 @@ public class AuthService : IAuthService
         }
 
         var roles = await _userManager.GetRolesAsync(user);
-        var token = _tokenService.CreateToken(user, roles);
+        var issued = _tokenService.CreateToken(user, roles);
 
         return new AuthResponse
         {
-            Token = token,
+            Token = issued.Token,
             Username = user.UserName!,
-            Expiration = DateTime.Now.AddMinutes(60),
+            Expiration = issued.ExpiresAtUtc.ToLocalTime(),
         };
+    }
+
+    public async Task LogoutAsync(string jti, DateTime expiresAtUtc, CancellationToken ct)
+    {
+        await _tokenRevocationService.RevokeAsync(jti, expiresAtUtc, ct);
     }
 
     public async Task<string> AcceptInviteAsync(

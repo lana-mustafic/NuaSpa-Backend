@@ -32,6 +32,7 @@ namespace NuaSpa.Domain
         public DbSet<RadnoVrijeme> RadnaVremena { get; set; } = null!;
         public DbSet<Prostorija> Prostorije { get; set; } = null!;
         public DbSet<Oprema> Oprema { get; set; } = null!;
+        public DbSet<RevokedJwt> RevokedJwts { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

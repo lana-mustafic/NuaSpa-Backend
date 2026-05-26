@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
-using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Common;
+using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.SearchObjects;
 using NuaSpa.Application.Interfaces.Messaging;
@@ -47,13 +47,17 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
             return BadRequest(new { message = "Datoteka je prevelika (maks. 8 MB)." });
         }
 
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        string[] allowed = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
-        if (string.IsNullOrEmpty(ext) || !allowed.Contains(ext))
+        await using var readStream = file.OpenReadStream();
+        if (!UploadImageValidator.TryValidate(
+                file.FileName,
+                file.ContentType,
+                readStream,
+                out var validationError))
         {
-            return BadRequest(new { message = "Dopušteni formati: JPG, PNG, WEBP, GIF." });
+            return BadRequest(new { message = validationError });
         }
 
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
         var dir = Path.Combine(webRoot, "uploads", "usluge");
         Directory.CreateDirectory(dir);
@@ -61,12 +65,13 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
         var safeName = $"{Guid.NewGuid():N}{ext}";
         var physical = Path.Combine(dir, safeName);
 
-        await using (var stream = System.IO.File.Create(physical))
+        readStream.Position = 0;
+        await using (var outStream = System.IO.File.Create(physical))
         {
-            await file.CopyToAsync(stream, cancellationToken);
+            await readStream.CopyToAsync(outStream, cancellationToken);
         }
 
-        var url = $"{Request.Scheme}://{Request.Host}/uploads/usluge/{safeName}";
+        var url = $"{Request.Scheme}://{Request.Host}/api/files/usluge/{safeName}";
         return Ok(new { url });
     }
 

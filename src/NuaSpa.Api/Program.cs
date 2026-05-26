@@ -170,6 +170,25 @@ builder.Services.AddAuthentication(options =>
         RoleClaimType = ClaimTypes.Role,
         NameClaimType = JwtRegisteredClaimNames.NameId
     };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var jti = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti);
+            if (string.IsNullOrWhiteSpace(jti))
+            {
+                return;
+            }
+
+            var revocation = context.HttpContext.RequestServices
+                .GetRequiredService<NuaSpa.Application.Interfaces.ITokenRevocationService>();
+            if (await revocation.IsRevokedAsync(jti, context.HttpContext.RequestAborted))
+            {
+                context.Fail("Token je opozvan (odjava).");
+            }
+        }
+    };
 });
 
 // AutoMapper 15+: prvi argument je Action; skenira assembly gdje je MappingProfile.
@@ -409,10 +428,25 @@ var webRootPath = app.Environment.WebRootPath
     ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "usluge"));
 
-app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.Context.Request.Path.StartsWithSegments("/uploads", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!(ctx.Context.User.Identity?.IsAuthenticated ?? false))
+            {
+                ctx.Context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                ctx.Context.Response.ContentLength = 0;
+            }
+        }
+    }
+});
+
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();

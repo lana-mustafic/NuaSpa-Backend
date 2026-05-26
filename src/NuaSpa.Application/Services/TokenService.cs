@@ -1,5 +1,6 @@
 ﻿using Microsoft.IdentityModel.Tokens;
 using NuaSpa.Application.Common;
+using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain.Entities;
 using System.IdentityModel.Tokens.Jwt;
@@ -19,10 +20,14 @@ public class TokenService : ITokenService
         _key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Key));
     }
 
-    public string CreateToken(Korisnik korisnik, IList<string> uloge)
+    public IssuedTokenDto CreateToken(Korisnik korisnik, IList<string> uloge)
     {
+        var jti = Guid.NewGuid().ToString("N");
+        var expires = DateTime.UtcNow.AddMinutes(_settings.DurationInMinutes);
+
         var claims = new List<Claim>
         {
+            new Claim(JwtRegisteredClaimNames.Jti, jti),
             new Claim(JwtRegisteredClaimNames.NameId, korisnik.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.UniqueName, korisnik.UserName!),
             new Claim(JwtRegisteredClaimNames.Email, korisnik.Email!),
@@ -46,7 +51,7 @@ public class TokenService : ITokenService
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.Now.AddMinutes(_settings.DurationInMinutes),
+            Expires = expires,
             SigningCredentials = creds,
             Issuer = _settings.Issuer,
             Audience = _settings.Audience
@@ -55,6 +60,11 @@ public class TokenService : ITokenService
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.CreateToken(tokenDescriptor);
 
-        return tokenHandler.WriteToken(token);
+        return new IssuedTokenDto
+        {
+            Token = tokenHandler.WriteToken(token),
+            Jti = jti,
+            ExpiresAtUtc = expires,
+        };
     }
 }

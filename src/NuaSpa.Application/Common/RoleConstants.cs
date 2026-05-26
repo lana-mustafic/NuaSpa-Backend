@@ -1,13 +1,16 @@
+using NuaSpa.Domain.Common;
+
 namespace NuaSpa.Application.Common;
 
 /// <summary>
 /// Centralizovane role string vrijednosti (koriste se u [Authorize] atributima i provjerama u kodu).
+/// Moraju odgovarati seed ulogama u <see cref="RoleNames"/>.
 /// </summary>
 public static class RoleConstants
 {
-    public const string Admin = "Admin";
-    public const string Klijent = "Klijent";
-    public const string Zaposlenik = "Zaposlenik";
+    public const string Admin = RoleNames.Admin;
+    public const string Klijent = RoleNames.Klijent;
+    public const string Zaposlenik = RoleNames.Zaposlenik;
 
     public const string KlijentAdmin = Klijent + "," + Admin;
     public const string AdminKlijent = Admin + "," + Klijent;

@@ -35,6 +35,13 @@ namespace NuaSpa.Api.Controllers
         [Authorize(Roles = RoleConstants.KlijentAdmin)]
         public async Task<ActionResult<RezervacijaDTO>> Create([FromBody] RezervacijaCreateDTO dto)
         {
+            if (!User.IsInRole(RoleConstants.Admin) &&
+                dto.KorisnikId.HasValue &&
+                dto.KorisnikId.Value != User.GetNuaSpaUserId())
+            {
+                return Forbid();
+            }
+
             var korisnikId = User.IsInRole(RoleConstants.Admin) && dto.KorisnikId.HasValue
                 ? dto.KorisnikId.Value
                 : User.GetNuaSpaUserId();

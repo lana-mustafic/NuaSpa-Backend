@@ -2,6 +2,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 
@@ -9,7 +10,6 @@ namespace NuaSpa.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class AccountController : ControllerBase
 {
     private readonly ITherapistAccountService _therapistAccountService;
@@ -23,13 +23,15 @@ public class AccountController : ControllerBase
         _authService = authService;
     }
 
+    [AllowAnonymous]
     [HttpPost("login")]
-    public async Task<ActionResult<AuthResponse>> Login(LoginRequest loginRequest)
+    public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest loginRequest)
     {
         var res = await _authService.LoginAsync(loginRequest, HttpContext.RequestAborted);
         return Ok(res);
     }
 
+    [AllowAnonymous]
     [HttpGet("validate-invite")]
     public async Task<ActionResult<ValidateInviteTokenDto>> ValidateInvite([FromQuery] string token)
     {
@@ -37,6 +39,7 @@ public class AccountController : ControllerBase
         return Ok(dto);
     }
 
+    [AllowAnonymous]
     [HttpPost("accept-invite")]
     public async Task<IActionResult> AcceptInvite([FromBody] AcceptTherapistInviteDto dto)
     {
@@ -45,16 +48,35 @@ public class AccountController : ControllerBase
     }
 
     [Authorize]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        var jti = User.FindFirstValue(JwtRegisteredClaimNames.Jti);
+        if (string.IsNullOrWhiteSpace(jti))
+        {
+            return BadRequest(new { message = "Token nema JTI claim — prijavite se ponovo." });
+        }
+
+        var expClaim = User.FindFirstValue(JwtRegisteredClaimNames.Exp);
+        DateTime expiresAtUtc;
+        if (long.TryParse(expClaim, out var unixExp))
+        {
+            expiresAtUtc = DateTimeOffset.FromUnixTimeSeconds(unixExp).UtcDateTime;
+        }
+        else
+        {
+            expiresAtUtc = DateTime.UtcNow.AddHours(1);
+        }
+
+        await _authService.LogoutAsync(jti, expiresAtUtc, HttpContext.RequestAborted);
+        return Ok(new { message = "Uspješno ste se odjavili." });
+    }
+
+    [Authorize]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
     {
-        var userIdClaim = User.FindFirstValue(JwtRegisteredClaimNames.NameId)
-            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized();
-        }
-
+        var userId = User.GetNuaSpaUserId();
         await _authService.ChangePasswordAsync(userId, dto, HttpContext.RequestAborted);
         return Ok(new { message = "Lozinka je uspješno promijenjena." });
     }
