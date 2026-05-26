@@ -8,17 +8,17 @@ public sealed class RezervacijaCreateDtoValidator : AbstractValidator<Rezervacij
     public RezervacijaCreateDtoValidator()
     {
         RuleFor(x => x.UslugaId)
-            .GreaterThan(0).WithMessage("UslugaId je obavezan.");
+            .GreaterThan(0).WithMessage("Odaberite uslugu.");
 
         RuleFor(x => x.ZaposlenikId)
-            .GreaterThan(0).WithMessage("ZaposlenikId je obavezan.");
+            .GreaterThan(0).WithMessage("Odaberite terapeuta.");
 
         RuleFor(x => x.DatumRezervacije)
             .Must(d => d != default)
-            .WithMessage("Datum rezervacije je obavezan.");
+            .WithMessage("Datum i vrijeme termina su obavezni.");
 
         RuleFor(x => x.KorisnikId)
             .GreaterThan(0).When(x => x.KorisnikId.HasValue)
-            .WithMessage("KorisnikId mora biti pozitivan broj.");
+            .WithMessage("Odaberite klijenta.");
     }
 }
