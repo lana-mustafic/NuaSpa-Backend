@@ -10,6 +10,8 @@ namespace NuaSpa.Application.Interfaces
     {
         Task<IEnumerable<RecenzijaDTO>> GetByUslugaAsync(int uslugaId);
 
+        Task<RecenzijaDTO?> GetByIdAsync(int id);
+
         Task<RecenzijaDTO> CreateAsync(int korisnikId, RecenzijaCreateDTO dto);
 
         Task<AdminReviewsDashboardDto> GetAdminDashboardAsync(

@@ -41,6 +41,36 @@ namespace NuaSpa.Api.Controllers
             }
         }
 
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<RezervacijaDTO>> GetById(int id)
+        {
+            var dto = await _rezervacijaService.GetByIdAsync(id);
+            if (dto == null)
+            {
+                return NotFound("Rezervacija nije pronađena.");
+            }
+
+            var isAdmin = User.IsInRole("Admin");
+            if (User.IsInRole("Klijent") && !isAdmin)
+            {
+                if (dto.KorisnikId != User.GetNuaSpaUserId())
+                {
+                    return Forbid();
+                }
+            }
+
+            if (User.IsInRole("Zaposlenik") && !isAdmin)
+            {
+                if (!User.TryGetNuaSpaZaposlenikId(out var zaposlenikId) ||
+                    dto.ZaposlenikId != zaposlenikId)
+                {
+                    return Forbid();
+                }
+            }
+
+            return Ok(dto);
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<RezervacijaDTO>>> Get([FromQuery] RezervacijaSearchObject? search = null)
         {
@@ -55,7 +85,11 @@ namespace NuaSpa.Api.Controllers
 
             if (isZaposlenik)
             {
-                var zaposlenikId = User.GetNuaSpaZaposlenikId();
+                if (!User.TryGetNuaSpaZaposlenikId(out var zaposlenikId))
+                {
+                    return Forbid();
+                }
+
                 var zaposResult = await _rezervacijaService.GetForZaposlenikAsync(
                     zaposlenikId,
                     search?.Datum,
@@ -100,7 +134,11 @@ namespace NuaSpa.Api.Controllers
                 return Ok();
             }
 
-            var zaposlenikId = User.GetNuaSpaZaposlenikId();
+            if (!User.TryGetNuaSpaZaposlenikId(out var zaposlenikId))
+            {
+                return Forbid();
+            }
+
             var updated = await _rezervacijaService.UpdatePotvrdjenaForZaposlenikAsync(id, zaposlenikId, dto.IsPotvrdjena);
             if (!updated) return NotFound("Rezervacija nije pronađena (ili nemate pristup).");
             return Ok();
@@ -145,7 +183,12 @@ namespace NuaSpa.Api.Controllers
             }
             if (User.IsInRole("Zaposlenik") && !User.IsInRole("Admin"))
             {
-                requireZaposlenikId = User.GetNuaSpaZaposlenikId();
+                if (!User.TryGetNuaSpaZaposlenikId(out var zid))
+                {
+                    return Forbid();
+                }
+
+                requireZaposlenikId = zid;
             }
 
             var ok = await _rezervacijaService.CancelAsync(
@@ -182,8 +225,10 @@ namespace NuaSpa.Api.Controllers
             // Teraput smije tražiti samo svoje termine.
             if (User.IsInRole("Zaposlenik"))
             {
-                var myId = User.GetNuaSpaZaposlenikId();
-                if (myId != zaposlenikId) return Forbid();
+                if (!User.TryGetNuaSpaZaposlenikId(out var myId) || myId != zaposlenikId)
+                {
+                    return Forbid();
+                }
             }
 
             var slots = await _rezervacijaService.GetAvailableSlotsAsync(
@@ -215,7 +260,11 @@ namespace NuaSpa.Api.Controllers
             int? zFilter = zaposlenikId;
             if (!isAdmin)
             {
-                var myZ = User.GetNuaSpaZaposlenikId();
+                if (!User.TryGetNuaSpaZaposlenikId(out var myZ))
+                {
+                    return Forbid();
+                }
+
                 if (zFilter.HasValue && zFilter.Value != myZ)
                 {
                     return Forbid();
@@ -252,7 +301,12 @@ namespace NuaSpa.Api.Controllers
             var isAdmin = User.IsInRole("Admin");
             var zaposId = 0;
             if (User.IsInRole("Zaposlenik"))
-                zaposId = User.GetNuaSpaZaposlenikId();
+            {
+                if (!User.TryGetNuaSpaZaposlenikId(out zaposId))
+                {
+                    return Forbid();
+                }
+            }
 
             var list = await _rezervacijaService.GetPovijestZaKlijentaAsync(
                 isAdmin,

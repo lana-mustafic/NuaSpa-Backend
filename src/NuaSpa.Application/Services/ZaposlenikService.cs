@@ -5,14 +5,16 @@ using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.DTOs;
+using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.SearchObjects;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.Services
 {
-    public class ZaposlenikService : BaseService<ZaposlenikDTO, Zaposlenik, object>, IZaposlenikService
+    public class ZaposlenikService : BaseService<ZaposlenikDTO, Zaposlenik, ZaposlenikSearchObject>, IZaposlenikService
     {
         private const int DefaultSpaCentarId = 1;
         private const int SeniorTherapistMinAppointments = 20;
@@ -30,11 +32,45 @@ namespace NuaSpa.Application.Services
         {
         }
 
-        public override async Task<IEnumerable<ZaposlenikDTO>> Get(object? search = null)
+        public override async Task<IEnumerable<ZaposlenikDTO>> Get(ZaposlenikSearchObject? search = null)
         {
-            var list = await _context.Zaposlenici
+            var query = _context.Zaposlenici
                 .AsNoTracking()
                 .Include(z => z.KategorijaUsluga)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search?.Ime))
+            {
+                var ime = search.Ime.Trim();
+                query = query.Where(z => z.Ime.Contains(ime));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search?.Prezime))
+            {
+                var prezime = search.Prezime.Trim();
+                query = query.Where(z => z.Prezime.Contains(prezime));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search?.Q))
+            {
+                var q = search.Q.Trim().ToLower();
+                query = query.Where(z =>
+                    z.Ime.ToLower().Contains(q) ||
+                    z.Prezime.ToLower().Contains(q) ||
+                    z.Specijalizacija.ToLower().Contains(q));
+            }
+
+            if (search?.KategorijaUslugaId is int katId)
+            {
+                query = query.Where(z => z.KategorijaUslugaId == katId);
+            }
+
+            if (search?.Status is ZaposlenikStatus status)
+            {
+                query = query.Where(z => z.Status == status);
+            }
+
+            var list = await query
                 .OrderBy(z => z.Prezime)
                 .ThenBy(z => z.Ime)
                 .ToListAsync();
@@ -49,9 +85,12 @@ namespace NuaSpa.Application.Services
                 .Include(z => z.KategorijaUsluga)
                 .FirstOrDefaultAsync(z => z.Id == id);
 
-            return entity == null
-                ? _mapper.Map<ZaposlenikDTO>(null!)
-                : MapToDto(entity);
+            if (entity == null)
+            {
+                throw new NotFoundException($"Zaposlenik id={id} ne postoji.");
+            }
+
+            return MapToDto(entity);
         }
 
         public override async Task<ZaposlenikDTO> Insert(ZaposlenikDTO dto)

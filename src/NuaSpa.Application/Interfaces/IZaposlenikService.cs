@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NuaSpa.Application.DTOs;
+using NuaSpa.Application.SearchObjects;
 
 namespace NuaSpa.Application.Interfaces
 {
-    public interface IZaposlenikService : IBaseService<ZaposlenikDTO, object>
+    public interface IZaposlenikService : IBaseService<ZaposlenikDTO, ZaposlenikSearchObject>
     {
         Task<TherapistAdminProfileDto?> GetAdminProfileAsync(
             int zaposlenikId,

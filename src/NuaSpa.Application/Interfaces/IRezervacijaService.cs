@@ -7,6 +7,8 @@ namespace NuaSpa.Application.Interfaces
 {
     public interface IRezervacijaService
     {
+        Task<RezervacijaDTO?> GetByIdAsync(int rezervacijaId);
+
         Task<IEnumerable<RezervacijaDTO>> GetAsync(
             int? korisnikId,
             DateTime? datum,

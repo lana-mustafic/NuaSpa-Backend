@@ -68,11 +68,11 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public override async Task<UslugaDTO> Insert([FromBody] UslugaDTO dto)
+    public override async Task<ActionResult<UslugaDTO>> Insert([FromBody] UslugaDTO dto)
     {
-        var result = await base.Insert(dto);
-        await _rabbitMQProducer.SendMessage(result, "usluge_queue");
-        return result;
+        var created = await _uslugaService.Insert(dto);
+        await _rabbitMQProducer.SendMessage(created, "usluge_queue");
+        return Ok(created);
     }
 
     [HttpPut("{id:int}")]

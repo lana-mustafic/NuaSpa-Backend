@@ -2,11 +2,12 @@
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.DTOs;
+using NuaSpa.Application.SearchObjects;
 
 namespace NuaSpa.Api.Controllers
 {
     [Authorize]
-    public class KategorijaUslugaController : BaseController<KategorijaUslugaDTO, object>
+    public class KategorijaUslugaController : BaseController<KategorijaUslugaDTO, KategorijaUslugaSearchObject>
     {
         private readonly IKategorijaUslugaService _kategorijaService;
 
@@ -17,7 +18,7 @@ namespace NuaSpa.Api.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
-        public override async Task<KategorijaUslugaDTO> Insert([FromBody] KategorijaUslugaDTO dto)
+        public override async Task<ActionResult<KategorijaUslugaDTO>> Insert([FromBody] KategorijaUslugaDTO dto)
         {
             if (string.IsNullOrWhiteSpace(dto?.Naziv))
             {

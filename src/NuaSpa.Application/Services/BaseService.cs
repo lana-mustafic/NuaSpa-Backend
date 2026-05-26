@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 
@@ -27,6 +28,11 @@ namespace NuaSpa.Application.Services
         public virtual async Task<T> GetById(int id)
         {
             var entity = await _context.Set<TDb>().FindAsync(id);
+            if (entity == null)
+            {
+                throw new NotFoundException($"{typeof(TDb).Name} id={id} ne postoji.");
+            }
+
             return _mapper.Map<T>(entity);
         }
 

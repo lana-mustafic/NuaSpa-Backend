@@ -24,6 +24,25 @@ namespace NuaSpa.Application.Services
             _mapper = mapper;
         }
 
+        public async Task<RezervacijaDTO?> GetByIdAsync(int rezervacijaId)
+        {
+            var entity = await _context.Rezervacije
+                .AsNoTracking()
+                .Include(r => r.Korisnik)
+                .Include(r => r.Usluga)
+                .Include(r => r.Zaposlenik)
+                .Include(r => r.Prostorija)
+                .Include(r => r.RezervacijaOprema)
+                .FirstOrDefaultAsync(r => r.Id == rezervacijaId);
+
+            if (entity == null)
+            {
+                return null;
+            }
+
+            return await MapSingleAndEnrichAsync(entity);
+        }
+
         public async Task<IEnumerable<RezervacijaDTO>> GetAsync(
             int? korisnikId,
             DateTime? datum,

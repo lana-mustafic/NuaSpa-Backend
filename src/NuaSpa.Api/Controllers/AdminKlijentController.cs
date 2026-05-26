@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.DTOs;
+using NuaSpa.Application.SearchObjects;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 
@@ -43,7 +44,7 @@ public class AdminKlijentController : ControllerBase
         var roleId = await GetKlijentRoleIdAsync(ct);
         if (roleId == null) return Ok(new AdminClientStatsDto());
 
-        var baseQuery = KlijentiQuery(roleId.Value, q);
+        var baseQuery = KlijentiQuery(roleId.Value, search: null, q);
 
         var users = await baseQuery.Select(k => new { k.Id, k.IsVipKlijent }).ToListAsync(ct);
         var ids = users.Select(u => u.Id).ToList();
@@ -79,6 +80,7 @@ public class AdminKlijentController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<List<AdminClientRowDTO>>> Get(
+        [FromQuery] KorisnikSearchObject? search = null,
         [FromQuery] string? q = null,
         [FromQuery] int take = 500,
         CancellationToken ct = default)
@@ -88,7 +90,7 @@ public class AdminKlijentController : ControllerBase
 
         var safeTake = take <= 0 ? 500 : Math.Min(take, 1000);
 
-        var query = KlijentiQuery(roleId.Value, q)
+        var query = KlijentiQuery(roleId.Value, search, q)
             .OrderByDescending(k => k.DatumRegistracije);
 
         var rows = await query
@@ -175,12 +177,15 @@ public class AdminKlijentController : ControllerBase
         return Ok(result);
     }
 
-    private IQueryable<Korisnik> KlijentiQuery(int klijentRoleId, string? q)
+    private IQueryable<Korisnik> KlijentiQuery(
+        int klijentRoleId,
+        KorisnikSearchObject? search,
+        string? q)
     {
         var query = _context.Users.AsNoTracking()
             .Where(k => _context.UserRoles.Any(ur => ur.UserId == k.Id && ur.RoleId == klijentRoleId));
 
-        var qq = q?.Trim();
+        var qq = (search?.Q ?? q)?.Trim();
         if (!string.IsNullOrWhiteSpace(qq))
         {
             var t = qq.ToLower();
@@ -189,6 +194,18 @@ public class AdminKlijentController : ControllerBase
                 (k.Email ?? "").ToLower().Contains(t) ||
                 (k.UserName ?? "").ToLower().Contains(t) ||
                 (k.PhoneNumber ?? "").ToLower().Contains(t));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search?.Ime))
+        {
+            var ime = search.Ime.Trim();
+            query = query.Where(k => k.Ime.Contains(ime));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search?.Prezime))
+        {
+            var prezime = search.Prezime.Trim();
+            query = query.Where(k => k.Prezime.Contains(prezime));
         }
 
         return query;
@@ -302,12 +319,29 @@ public class AdminKlijentController : ControllerBase
         return Ok(list[0]);
     }
 
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<AdminClientRowDTO>> GetById(int id, CancellationToken ct = default)
+    {
+        var roleId = await GetKlijentRoleIdAsync(ct);
+        if (roleId == null) return NotFound();
+
+        var isClient = await _context.UserRoles.AsNoTracking()
+            .AnyAsync(ur => ur.UserId == id && ur.RoleId == roleId.Value, ct);
+        if (!isClient) return NotFound();
+
+        var rows = await GetInternalRowsForIdsAsync(new List<int> { id }, ct);
+        if (rows.Count == 0) return NotFound();
+        return Ok(rows[0]);
+    }
+
     [HttpPatch("{id:int}")]
     public async Task<ActionResult<AdminClientRowDTO>> Patch(
         int id,
         [FromBody] AdminKlijentUpdateDto dto,
         CancellationToken ct = default)
     {
+        if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
         var user = await _userManager.FindByIdAsync(id.ToString());
         if (user == null) return NotFound();
 

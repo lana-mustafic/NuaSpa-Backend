@@ -5,7 +5,9 @@ namespace NuaSpa.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BaseController<TModel, TSearch> : ControllerBase where TModel : class where TSearch : class
+public class BaseController<TModel, TSearch> : ControllerBase
+    where TModel : class
+    where TSearch : class
 {
     protected readonly IBaseService<TModel, TSearch> _service;
 
@@ -15,20 +17,23 @@ public class BaseController<TModel, TSearch> : ControllerBase where TModel : cla
     }
 
     [HttpGet]
-    public virtual async Task<IEnumerable<TModel>> Get([FromQuery] TSearch? search = null)
+    public virtual async Task<ActionResult<IEnumerable<TModel>>> Get([FromQuery] TSearch? search = null)
     {
-        return await _service.Get(search);
+        var list = await _service.Get(search);
+        return Ok(list);
     }
 
-    [HttpGet("{id}")]
-    public virtual async Task<TModel> GetById(int id)
+    [HttpGet("{id:int}")]
+    public virtual async Task<ActionResult<TModel>> GetById(int id)
     {
-        return await _service.GetById(id);
+        var item = await _service.GetById(id);
+        return Ok(item);
     }
 
     [HttpPost]
-    public virtual async Task<TModel> Insert([FromBody] TModel dto)
+    public virtual async Task<ActionResult<TModel>> Insert([FromBody] TModel dto)
     {
-        return await _service.Insert(dto);
+        var created = await _service.Insert(dto);
+        return Ok(created);
     }
 }

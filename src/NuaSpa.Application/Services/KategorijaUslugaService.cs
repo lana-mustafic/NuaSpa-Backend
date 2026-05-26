@@ -2,17 +2,39 @@
 using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.SearchObjects;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 
 namespace NuaSpa.Application.Services;
 
 public class KategorijaUslugaService
-    : BaseService<KategorijaUslugaDTO, KategorijaUsluga, object>, IKategorijaUslugaService
+    : BaseService<KategorijaUslugaDTO, KategorijaUsluga, KategorijaUslugaSearchObject>,
+        IKategorijaUslugaService
 {
     public KategorijaUslugaService(NuaSpaContext context, IMapper mapper)
         : base(context, mapper)
     {
+    }
+
+    public override async Task<IEnumerable<KategorijaUslugaDTO>> Get(
+        KategorijaUslugaSearchObject? search = null)
+    {
+        var query = _context.KategorijeUsluga.AsNoTracking().AsQueryable();
+
+        if (search?.IncludeDeleted != true)
+        {
+            query = query.Where(k => !k.IsDeleted);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search?.Naziv))
+        {
+            var naziv = search.Naziv.Trim();
+            query = query.Where(k => k.Naziv.Contains(naziv));
+        }
+
+        var list = await query.OrderBy(k => k.Naziv).ToListAsync();
+        return _mapper.Map<IEnumerable<KategorijaUslugaDTO>>(list);
     }
 
     public async Task<KategorijaUslugaDTO> UpdateAsync(KategorijaUslugaDTO dto)

@@ -25,8 +25,25 @@ namespace NuaSpa.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<RecenzijaDTO>>> Get([FromQuery] int uslugaId)
         {
+            if (uslugaId <= 0)
+            {
+                return BadRequest("Parametar uslugaId je obavezan.");
+            }
+
             var result = await _service.GetByUslugaAsync(uslugaId);
             return Ok(result);
+        }
+
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<RecenzijaDTO>> GetById(int id)
+        {
+            var dto = await _service.GetByIdAsync(id);
+            if (dto == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(dto);
         }
 
         [HttpGet("admin-dashboard")]

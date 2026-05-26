@@ -19,6 +19,7 @@ namespace NuaSpa.Application.Services
             var query = _context.Usluge
                 .AsNoTracking()
                 .Include(u => u.KategorijaUsluga)
+                .Where(u => !u.IsDeleted)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search?.Naziv))

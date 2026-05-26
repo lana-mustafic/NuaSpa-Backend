@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -108,8 +109,13 @@ public class AccountController : ControllerBase
         return Ok(new { message });
     }
     [HttpPost("register-test")]
-    public async Task<IActionResult> Register()
+    public async Task<IActionResult> Register([FromServices] IWebHostEnvironment env)
     {
+        if (!env.IsDevelopment())
+        {
+            return NotFound();
+        }
+
         var user = new Korisnik
         {
             UserName = "lana",

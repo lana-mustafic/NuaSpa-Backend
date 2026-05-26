@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.SearchObjects;
 using NuaSpa.Domain;
 
 namespace NuaSpa.Api.Controllers
@@ -11,7 +12,7 @@ namespace NuaSpa.Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class ZaposlenikController : BaseController<ZaposlenikDTO, object>
+    public class ZaposlenikController : BaseController<ZaposlenikDTO, ZaposlenikSearchObject>
     {
         private readonly NuaSpaContext _context;
         private readonly IZaposlenikService _zaposlenikService;
@@ -37,7 +38,7 @@ namespace NuaSpa.Api.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Admin")]
-        public override async Task<ZaposlenikDTO> Insert([FromBody] ZaposlenikDTO dto)
+        public override async Task<ActionResult<ZaposlenikDTO>> Insert([FromBody] ZaposlenikDTO dto)
         {
             if (dto.KategorijaUslugaId is > 0)
             {
@@ -57,7 +58,8 @@ namespace NuaSpa.Api.Controllers
                 throw new BadHttpRequestException(specError);
             }
 
-            return await _zaposlenikService.Insert(dto);
+            var created = await _zaposlenikService.Insert(dto);
+            return Ok(created);
         }
 
         [HttpPut("{id}")]

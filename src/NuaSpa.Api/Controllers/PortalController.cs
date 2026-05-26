@@ -36,7 +36,12 @@ public class PortalController : ControllerBase
         var userId = User.GetNuaSpaUserId();
         var zaposId = 0;
         if (isZaposlenik)
-            zaposId = User.GetNuaSpaZaposlenikId();
+        {
+            if (!User.TryGetNuaSpaZaposlenikId(out zaposId))
+            {
+                return Forbid();
+            }
+        }
 
         var dto = await _reporting.GetDesktopHomeOverviewAsync(
             d,

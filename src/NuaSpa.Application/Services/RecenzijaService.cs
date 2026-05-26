@@ -31,11 +31,23 @@ namespace NuaSpa.Application.Services
                 .AsNoTracking()
                 .Include(r => r.Korisnik)
                 .Include(r => r.Usluga)
-                .Where(r => r.UslugaId == uslugaId)
+                .Where(r => r.UslugaId == uslugaId && !r.IsDeleted)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
 
             return _mapper.Map<IEnumerable<RecenzijaDTO>>(list);
+        }
+
+        public async Task<RecenzijaDTO?> GetByIdAsync(int id)
+        {
+            var entity = await _context.Recenzije
+                .AsNoTracking()
+                .Include(r => r.Korisnik)
+                .Include(r => r.Usluga)
+                .Include(r => r.Zaposlenik)
+                .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+
+            return entity == null ? null : _mapper.Map<RecenzijaDTO>(entity);
         }
 
         public async Task<RecenzijaDTO> CreateAsync(int korisnikId, RecenzijaCreateDTO dto)
