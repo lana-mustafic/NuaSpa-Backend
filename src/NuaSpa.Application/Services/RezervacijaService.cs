@@ -86,7 +86,6 @@ namespace NuaSpa.Application.Services
 
             if (datum.HasValue)
             {
-                // MVP: filtrira po datumu (bez vremena)
                 var date = datum.Value.Date;
                 query = query.Where(r => r.DatumRezervacije.Date == date);
             }

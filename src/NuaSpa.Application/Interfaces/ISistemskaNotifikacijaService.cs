@@ -7,11 +7,6 @@ using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.Interfaces;
 
-public interface INotificationPushService
-{
-    Task PushUpdatedAsync(int korisnikId, CancellationToken ct = default);
-}
-
 public interface ISistemskaNotifikacijaService
 {
     Task NotifyUsersAsync(
@@ -39,14 +34,4 @@ public interface ISistemskaNotifikacijaService
     Task<bool> MarkReadAsync(int korisnikId, int notifikacijaId, CancellationToken ct = default);
 
     Task MarkAllReadAsync(int korisnikId, CancellationToken ct = default);
-}
-
-public interface IObavijestService
-{
-    Task<IReadOnlyList<ObavijestDto>> GetPublishedAsync(CancellationToken ct = default);
-    Task<IReadOnlyList<ObavijestDto>> GetAllAdminAsync(CancellationToken ct = default);
-    Task<ObavijestDto?> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<ObavijestDto> CreateAsync(ObavijestCreateDto dto, CancellationToken ct = default);
-    Task<ObavijestDto?> UpdateAsync(int id, ObavijestUpdateDto dto, CancellationToken ct = default);
-    Task<bool> DeleteAsync(int id, CancellationToken ct = default);
 }
