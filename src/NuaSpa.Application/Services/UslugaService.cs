@@ -73,28 +73,31 @@ namespace NuaSpa.Application.Services
 
         public async Task<(bool Ok, string? Message)> DeleteAsync(int id)
         {
-            if (await _context.Rezervacije.AsNoTracking().AnyAsync(r => r.UslugaId == id))
-            {
-                return (false, "Usluga ima rezervacije i ne može se obrisati.");
-            }
-
-            if (await _context.Favoriti.AsNoTracking().AnyAsync(f => f.UslugaId == id))
-            {
-                return (false, "Usluga je u favoritima korisnika.");
-            }
-
-            if (await _context.Recenzije.AsNoTracking().AnyAsync(r => r.UslugaId == id))
-            {
-                return (false, "Usluga ima recenzije.");
-            }
-
             var entity = await _context.Usluge.FindAsync(id);
-            if (entity == null)
+            if (entity == null || entity.IsDeleted)
             {
                 return (false, "Usluga ne postoji.");
             }
 
-            _context.Usluge.Remove(entity);
+            if (await _context.Rezervacije.AsNoTracking()
+                    .AnyAsync(r => r.UslugaId == id && !r.IsDeleted))
+            {
+                return (false, "Usluga ima aktivne rezervacije i ne može se obrisati. Prvo arhivirajte ili otkažite rezervacije.");
+            }
+
+            if (await _context.Favoriti.AsNoTracking()
+                    .AnyAsync(f => f.UslugaId == id && !f.IsDeleted))
+            {
+                return (false, "Usluga je u favoritima korisnika i ne može se obrisati.");
+            }
+
+            if (await _context.Recenzije.AsNoTracking()
+                    .AnyAsync(r => r.UslugaId == id && !r.IsDeleted))
+            {
+                return (false, "Usluga ima recenzije i ne može se obrisati.");
+            }
+
+            entity.IsDeleted = true;
             await _context.SaveChangesAsync();
             return (true, null);
         }

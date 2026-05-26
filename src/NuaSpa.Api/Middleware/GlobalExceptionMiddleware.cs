@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.Exceptions;
 
 namespace NuaSpa.Api.Middleware;
@@ -91,8 +93,21 @@ public sealed class GlobalExceptionMiddleware
         await context.Response.WriteAsync(json);
     }
 
-    private static (HttpStatusCode status, string title, string clientDetail) MapException(Exception ex) =>
-        ex switch
+    private static (HttpStatusCode status, string title, string clientDetail) MapException(Exception ex)
+    {
+        if (ex is DbUpdateException dbEx)
+        {
+            var sql = dbEx.InnerException as SqlException;
+            if (sql?.Number is 547 or 2627 or 2601)
+            {
+                return (
+                    HttpStatusCode.Conflict,
+                    "Referencijalni integritet.",
+                    "Zapis se ne može obrisati ili izmijeniti jer ga koriste drugi podaci u bazi.");
+            }
+        }
+
+        return ex switch
         {
             NotFoundException or KeyNotFoundException =>
                 (HttpStatusCode.NotFound, "Resurs nije pronađen.", "Traženi resurs ne postoji."),
@@ -105,4 +120,5 @@ public sealed class GlobalExceptionMiddleware
             _ =>
                 (HttpStatusCode.InternalServerError, "Greška servera.", "Došlo je do neočekivane greške."),
         };
+    }
 }

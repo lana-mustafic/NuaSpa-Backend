@@ -13,6 +13,11 @@ namespace NuaSpa.Application.DTOs
         public string Telefon { get; set; } = null!;
         public string KorisnickoIme { get; set; } = null!;
 
+        /// <summary>FK prema referentnoj tablici Gradovi (ne koristiti string za grad).</summary>
+        public int GradId { get; set; }
+
+        public string? GradNaziv { get; set; }
+
         // Često dodajemo i naziv uloge direktno ovdje
         public string? UlogaNaziv { get; set; }
     }

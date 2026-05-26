@@ -52,18 +52,25 @@ public class KategorijaUslugaService
 
     public async Task<(bool Ok, string? Message)> DeleteAsync(int id)
     {
-        if (await _context.Usluge.AsNoTracking().AnyAsync(u => u.KategorijaUslugaId == id))
-        {
-            return (false, "Kategorija ima pridružene usluge.");
-        }
-
         var entity = await _context.Set<KategorijaUsluga>().FindAsync(id);
-        if (entity == null)
+        if (entity == null || entity.IsDeleted)
         {
             return (false, "Kategorija ne postoji.");
         }
 
-        _context.Remove(entity);
+        if (await _context.Usluge.AsNoTracking()
+                .AnyAsync(u => u.KategorijaUslugaId == id && !u.IsDeleted))
+        {
+            return (false, "Kategorija ima pridružene usluge i ne može se obrisati. Prvo uklonite ili arhivirajte usluge.");
+        }
+
+        if (await _context.Zaposlenici.AsNoTracking()
+                .AnyAsync(z => z.KategorijaUslugaId == id && !z.IsDeleted))
+        {
+            return (false, "Kategoriju koriste zaposlenici i ne može se obrisati.");
+        }
+
+        entity.IsDeleted = true;
         await _context.SaveChangesAsync();
         return (true, null);
     }

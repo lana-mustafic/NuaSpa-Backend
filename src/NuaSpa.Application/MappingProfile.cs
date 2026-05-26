@@ -30,7 +30,6 @@ namespace NuaSpa.Application
                 .ForMember(dest => dest.DatumZaposlenja, opt => opt.Ignore());
             CreateMap<Skladiste, SkladisteDTO>().ReverseMap();
             CreateMap<Recenzija, RecenzijaDTO>().ReverseMap();
-            CreateMap<Korisnik, KorisnikDTO>().ReverseMap();
             CreateMap<KategorijaUslugaDTO, KategorijaUsluga>().ReverseMap();
             CreateMap<SpaCentar, SpaCentarDTO>().ReverseMap();
             CreateMap<Prostorija, ProstorijaDTO>().ReverseMap();
@@ -42,9 +41,13 @@ namespace NuaSpa.Application
             // Mapiranje Korisnika (UserName -> KorisnickoIme)
             CreateMap<Korisnik, KorisnikDTO>()
                 .ForMember(dest => dest.KorisnickoIme, opt => opt.MapFrom(src => src.UserName))
-                .ForMember(dest => dest.UlogaNaziv, opt => opt.Ignore()) // Ignorišemo jer nemaš direktnu relaciju više
+                .ForMember(dest => dest.Telefon, opt => opt.MapFrom(src => src.PhoneNumber ?? string.Empty))
+                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email ?? string.Empty))
+                .ForMember(dest => dest.GradNaziv, opt => opt.MapFrom(src => src.Grad.Naziv))
+                .ForMember(dest => dest.UlogaNaziv, opt => opt.Ignore())
                 .ReverseMap()
-                .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.KorisnickoIme));
+                .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.KorisnickoIme))
+                .ForMember(dest => dest.Grad, opt => opt.Ignore());
 
             // Mapiranje Rezervacije (Spajanje imena i prezimena)
             CreateMap<Rezervacija, RezervacijaDTO>()

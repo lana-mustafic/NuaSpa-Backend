@@ -21,6 +21,7 @@ public sealed class UslugaDtoValidator : AbstractValidator<UslugaDTO>
             .GreaterThan(0).WithMessage("Kategorija usluge je obavezna.");
 
         RuleFor(x => x.Opis)
-            .MaximumLength(4000);
+            .NotEmpty().WithMessage("Opis usluge je obavezan.")
+            .MaximumLength(1000);
     }
 }

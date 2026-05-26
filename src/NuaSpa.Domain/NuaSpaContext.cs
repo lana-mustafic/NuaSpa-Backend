@@ -62,7 +62,8 @@ namespace NuaSpa.Domain
                 new KategorijaUsluga { Id = 3, Naziv = "Body", Opis = "Tretmani tijela", CreatedAt = seedDate }
             );
 
-            // 2. SEED ZA KORISNIKE (SecurityStamp je OBAVEZAN za Identity)
+            // 2. SEED ZA KORISNIKE — PasswordHash u migraciji je placeholder;
+            //    radne lozinke postavlja Development seeder preko UserManager (Identity hash).
             var adminId = 1;
             var lanaId = 2;
 

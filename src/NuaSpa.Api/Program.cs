@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using NuaSpa.Api.Data;
 using NuaSpa.Api.Services.Messaging;
 using NuaSpa.Application;
 using NuaSpa.Application.Common;
@@ -162,6 +163,7 @@ builder.Services.AddAutoMapper(
 // --- 4. DEPENDENCY INJECTION ---
 builder.Services.AddScoped<IRabbitMQProducer, RabbitMQProducer>();
 builder.Services.AddScoped<NuaSpa.Application.Interfaces.IReportingService, NuaSpa.Application.Services.ReportingService>();
+builder.Services.AddScoped<NuaSpa.Application.Services.SoftDeletePurgeService>();
 
 
 var applicationAssembly = typeof(MappingProfile).Assembly;
@@ -353,20 +355,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-using (var scope = app.Services.CreateScope())
+if (app.Environment.IsDevelopment())
 {
-    var context = scope.ServiceProvider.GetRequiredService<NuaSpaContext>(); // Zamijeni 'NuaSpaContext' imenom tvog Context-a ako je drugačije
-    if (!context.KategorijeUsluga.Any())
-    {
-        context.KategorijeUsluga.Add(new KategorijaUsluga
-        {
-            Naziv = "General",
-            Opis = "Default category",
-            IsDeleted = false,
-            CreatedAt = DateTime.UtcNow,
-        });
-        context.SaveChanges();
-    }
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    await DevelopmentDataSeeder.SeedAsync(
+        scope.ServiceProvider,
+        app.Environment,
+        logger);
 }
 
 app.UseHttpsRedirection();
