@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.Interfaces.Messaging;
+using NuaSpa.Application.Messaging.Messages;
 
 namespace NuaSpa.Api.Controllers;
 
@@ -12,14 +14,20 @@ namespace NuaSpa.Api.Controllers;
 public class AdminTherapistAccountController : ControllerBase
 {
     private readonly ITherapistAccountService _accountService;
+    private readonly INotificationPublisher _notificationPublisher;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<AdminTherapistAccountController> _logger;
 
     public AdminTherapistAccountController(
         ITherapistAccountService accountService,
-        IConfiguration configuration)
+        INotificationPublisher notificationPublisher,
+        IConfiguration configuration,
+        ILogger<AdminTherapistAccountController> logger)
     {
         _accountService = accountService;
+        _notificationPublisher = notificationPublisher;
         _configuration = configuration;
+        _logger = logger;
     }
 
     [HttpGet("status")]
@@ -56,6 +64,26 @@ public class AdminTherapistAccountController : ControllerBase
         if (!result.Success)
         {
             return BadRequest(result);
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.RecipientEmail) &&
+            !string.IsNullOrWhiteSpace(result.InviteUrl) &&
+            result.ExpiresAt.HasValue)
+        {
+            try
+            {
+                await _notificationPublisher.PublishTherapistInviteAsync(new TherapistInviteEmailMessage
+                {
+                    ToEmail = result.RecipientEmail,
+                    TherapistName = result.TherapistName ?? result.RecipientEmail,
+                    InviteUrl = result.InviteUrl,
+                    ExpiresAtUtc = result.ExpiresAt.Value,
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "RabbitMQ pozivnica terapeutu nije poslana.");
+            }
         }
 
         return Ok(result);

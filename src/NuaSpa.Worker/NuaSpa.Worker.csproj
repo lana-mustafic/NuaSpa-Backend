@@ -8,12 +8,12 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AutoMapper" Version="16.1.1" />
+		<PackageReference Include="MailKit" Version="4.11.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
 		<PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\NuaSpa.Infrastructure\NuaSpa.Infrastructure.csproj" />
+		<ProjectReference Include="..\NuaSpa.Application\NuaSpa.Application.csproj" />
 	</ItemGroup>
 </Project>

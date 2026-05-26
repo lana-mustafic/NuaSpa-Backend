@@ -38,6 +38,10 @@ services:
       - ConnectionStrings__DefaultConnection=Server=nuaspa-db;Database=210240;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
       # Dodajemo adresu za RabbitMQ (unutar mreže koristimo ime servisa)
       - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__NotificationsQueue=nuaspa_notifications
     ports:
       - "8080:8080"
     depends_on:
@@ -45,6 +49,32 @@ services:
       - rabbitmq
     networks:
       - nuaspa-network
+
+  # 4. Pomoćni servis — RabbitMQ consumer (e-mail, notifikacije)
+  nuaspa-worker:
+    image: nuaspa-worker-image
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: nuaspa-worker-container
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__NotificationsQueue=nuaspa_notifications
+      - Email__OutboxDirectory=/app/email-outbox
+      - Smtp__Enabled=false
+    volumes:
+      - worker-email-outbox:/app/email-outbox
+    depends_on:
+      - rabbitmq
+    networks:
+      - nuaspa-network
+
+volumes:
+  worker-email-outbox:
 
 networks:
   nuaspa-network:

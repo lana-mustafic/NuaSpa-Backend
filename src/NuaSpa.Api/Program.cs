@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NuaSpa.Api.Data;
-using NuaSpa.Api.Services.Messaging;
 using NuaSpa.Application;
 using NuaSpa.Application.Common;
 using NuaSpa.Application.Interfaces.Messaging;
@@ -161,7 +160,12 @@ builder.Services.AddAutoMapper(
     typeof(MappingProfile));
 
 // --- 4. DEPENDENCY INJECTION ---
-builder.Services.AddScoped<IRabbitMQProducer, RabbitMQProducer>();
+builder.Services.Configure<NuaSpa.Application.Messaging.RabbitMqOptions>(
+    builder.Configuration.GetSection(NuaSpa.Application.Messaging.RabbitMqOptions.SectionName));
+builder.Services.AddScoped<NuaSpa.Application.Interfaces.Messaging.IRabbitMqPublisher,
+    NuaSpa.Application.Services.Messaging.RabbitMqPublisher>();
+builder.Services.AddScoped<NuaSpa.Application.Interfaces.Messaging.INotificationPublisher,
+    NuaSpa.Application.Services.Messaging.NotificationPublisher>();
 builder.Services.AddScoped<NuaSpa.Application.Interfaces.IReportingService, NuaSpa.Application.Services.ReportingService>();
 builder.Services.AddScoped<NuaSpa.Application.Services.SoftDeletePurgeService>();
 

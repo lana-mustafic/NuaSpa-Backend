@@ -181,6 +181,8 @@ public class TherapistAccountService : ITherapistAccountService
             Message = "Invitation created. Share the activation link with the therapist (valid 72 hours).",
             InviteUrl = inviteUrl,
             ExpiresAt = expires,
+            TherapistName = $"{z.Ime} {z.Prezime}".Trim(),
+            RecipientEmail = email,
         };
     }
 

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.Interfaces.Messaging;
 using NuaSpa.Application.SearchObjects;
 
 namespace NuaSpa.Api.Controllers
@@ -16,10 +17,17 @@ namespace NuaSpa.Api.Controllers
     public class RezervacijaController : ControllerBase
     {
         private readonly IRezervacijaService _rezervacijaService;
+        private readonly INotificationPublisher _notificationPublisher;
+        private readonly ILogger<RezervacijaController> _logger;
 
-        public RezervacijaController(IRezervacijaService rezervacijaService)
+        public RezervacijaController(
+            IRezervacijaService rezervacijaService,
+            INotificationPublisher notificationPublisher,
+            ILogger<RezervacijaController> logger)
         {
             _rezervacijaService = rezervacijaService;
+            _notificationPublisher = notificationPublisher;
+            _logger = logger;
         }
 
         [HttpPost]
@@ -33,6 +41,15 @@ namespace NuaSpa.Api.Controllers
                     : User.GetNuaSpaUserId();
                 var isAdminBooking = User.IsInRole("Admin");
                 var created = await _rezervacijaService.CreateAsync(korisnikId, dto, isAdminBooking);
+                try
+                {
+                    await _notificationPublisher.PublishRezervacijaPotvrdaAsync(created);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "RabbitMQ notifikacija za rezervaciju {Id} nije poslana.", created.Id);
+                }
+
                 return Ok(created);
             }
             catch (InvalidOperationException ex)

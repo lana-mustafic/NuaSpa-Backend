@@ -11,18 +11,21 @@ namespace NuaSpa.Api.Controllers;
 [Authorize]
 public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
 {
-    private readonly IRabbitMQProducer _rabbitMQProducer;
+    private readonly INotificationPublisher _notificationPublisher;
     private readonly IUslugaService _uslugaService;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<UslugaController> _logger;
 
     public UslugaController(
         IUslugaService service,
-        IRabbitMQProducer rabbitMQProducer,
-        IWebHostEnvironment env) : base(service)
+        INotificationPublisher notificationPublisher,
+        IWebHostEnvironment env,
+        ILogger<UslugaController> logger) : base(service)
     {
         _uslugaService = service;
-        _rabbitMQProducer = rabbitMQProducer;
+        _notificationPublisher = notificationPublisher;
         _env = env;
+        _logger = logger;
     }
 
     /// <summary>Admin: učitava sliku usluge u wwwroot i vraća javni URL.</summary>
@@ -71,7 +74,15 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
     public override async Task<ActionResult<UslugaDTO>> Insert([FromBody] UslugaDTO dto)
     {
         var created = await _uslugaService.Insert(dto);
-        await _rabbitMQProducer.SendMessage(created, "usluge_queue");
+        try
+        {
+            await _notificationPublisher.PublishUslugaKreiranaAsync(created);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "RabbitMQ notifikacija za novu uslugu nije poslana.");
+        }
+
         return Ok(created);
     }
 
@@ -87,7 +98,6 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
         try
         {
             var updated = await _uslugaService.UpdateAsync(dto);
-            await _rabbitMQProducer.SendMessage(updated, "usluge_queue");
             return Ok(updated);
         }
         catch (KeyNotFoundException)

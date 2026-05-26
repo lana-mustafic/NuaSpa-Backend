@@ -26,6 +26,8 @@ public class TherapistInviteResponseDto
     /// <summary>Full activation URL (for dev copy or email template).</summary>
     public string? InviteUrl { get; set; }
     public DateTime? ExpiresAt { get; set; }
+    public string? TherapistName { get; set; }
+    public string? RecipientEmail { get; set; }
 }
 
 public class AcceptTherapistInviteDto

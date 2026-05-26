@@ -1,16 +1,22 @@
-using Microsoft.EntityFrameworkCore;
-using NuaSpa.Domain;
+using NuaSpa.Application.Messaging;
 using NuaSpa.Worker;
+using NuaSpa.Worker.Email;
+using NuaSpa.Worker.Messaging;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// 1. Registracija pozadinskog servisa
-builder.Services.AddHostedService<Worker>();
+builder.Services.Configure<RabbitMqOptions>(
+    builder.Configuration.GetSection(RabbitMqOptions.SectionName));
+builder.Services.Configure<EmailOptions>(
+    builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<SmtpOptions>(
+    builder.Configuration.GetSection(SmtpOptions.SectionName));
 
-// 2. Registracija baze (samo jednom!)
-builder.Services.AddDbContext<NuaSpaContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddSingleton<SmtpEmailSender>();
+builder.Services.AddSingleton<FileOutboxEmailSender>();
+builder.Services.AddSingleton<IEmailSender, CompositeEmailSender>();
+builder.Services.AddSingleton<NotificationMessageDispatcher>();
+builder.Services.AddHostedService<RabbitMqNotificationConsumer>();
 
-// 3. Izgradnja i pokretanje
 var host = builder.Build();
 host.Run();
