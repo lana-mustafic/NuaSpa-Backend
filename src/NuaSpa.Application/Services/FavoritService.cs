@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
@@ -21,21 +22,35 @@ namespace NuaSpa.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<IEnumerable<UslugaDTO>> GetMyFavoritesAsync(int korisnikId)
+        public async Task<PagedResult<UslugaDTO>> GetMyFavoritesAsync(
+            int korisnikId,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize)
         {
-            // Prvo materijalizuj entitete s Include; projekcija .Select(f => f.Usluga) prije ToListAsync
-            // može ukinuti ThenInclude u generisanom SQL-u pa KategorijaUsluga ostane null.
-            var favoriti = await _context.Favoriti
+            (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+
+            var query = _context.Favoriti
                 .AsNoTracking()
                 .Where(f => f.KorisnikId == korisnikId)
+                .Where(f => !f.Usluga.IsDeleted)
+                .OrderByDescending(f => f.CreatedAt);
+
+            var total = await query.CountAsync();
+            var favoriti = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Include(f => f.Usluga)
                     .ThenInclude(u => u.KategorijaUsluga)
-                .OrderByDescending(f => f.CreatedAt)
                 .ToListAsync();
 
-            var usluge = favoriti.Select(f => f.Usluga).ToList();
-
-            return _mapper.Map<IEnumerable<UslugaDTO>>(usluge);
+            return new PagedResult<UslugaDTO>
+            {
+                Ukupno = total,
+                Stranica = page,
+                VelicinaStranice = pageSize,
+                Items = _mapper.Map<IReadOnlyList<UslugaDTO>>(
+                    favoriti.Select(f => f.Usluga).ToList()),
+            };
         }
 
         public async Task<HashSet<int>> GetMyFavoriteIdsAsync(int korisnikId)
@@ -43,7 +58,9 @@ namespace NuaSpa.Application.Services
             var ids = await _context.Favoriti
                 .AsNoTracking()
                 .Where(f => f.KorisnikId == korisnikId)
+                .OrderByDescending(f => f.CreatedAt)
                 .Select(f => f.UslugaId)
+                .Take(PaginationConstants.MaxPageSize)
                 .ToListAsync();
 
             return ids.ToHashSet();
@@ -82,4 +99,3 @@ namespace NuaSpa.Application.Services
         }
     }
 }
-

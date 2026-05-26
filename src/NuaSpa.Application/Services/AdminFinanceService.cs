@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
@@ -111,7 +112,9 @@ namespace NuaSpa.Application.Services
                 .OrderByDescending(p => p.DatumPlacanja)
                 .ThenByDescending(p => p.Id);
 
-            var all = await q.ToListAsync(cancellationToken);
+            var all = await q
+                .Take(PaginationConstants.MaxPageSize * 10)
+                .ToListAsync(cancellationToken);
 
             var sb = new StringBuilder();
             sb.Append('\uFEFF');
@@ -220,28 +223,20 @@ namespace NuaSpa.Application.Services
             DateTime toExclusive,
             CancellationToken ct)
         {
-            var placanja = await _db.Placanja.AsNoTracking()
+            var placanjaQ = _db.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)
-                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive)
-                .Include(p => p.Rezervacija)
-                .ToListAsync(ct);
+                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive);
 
-            decimal revenue = 0;
-            decimal refunds = 0;
-            var paidTx = 0;
+            var revenue = await placanjaQ
+                .Where(p => p.Status == PlacanjeStatus.Completed)
+                .SumAsync(p => p.NaplaceniIznos ?? p.Iznos, ct);
 
-            foreach (var p in placanja)
-            {
-                var st = MapStatus(p);
-                if (st == "paid")
-                {
-                    revenue += p.NaplaceniIznos ?? p.Iznos;
-                    paidTx++;
-                }
+            var paidTx = await placanjaQ
+                .CountAsync(p => p.Status == PlacanjeStatus.Completed, ct);
 
-                if (st == "refunded")
-                    refunds += p.NaplaceniIznos ?? p.Iznos;
-            }
+            var refunds = await placanjaQ
+                .Where(p => p.Status == PlacanjeStatus.Refunded)
+                .SumAsync(p => p.NaplaceniIznos ?? p.Iznos, ct);
 
             var placeneRez = await _db.Rezervacije.AsNoTracking()
                 .Where(r => !r.IsDeleted)
@@ -306,13 +301,12 @@ namespace NuaSpa.Application.Services
             DateTime toExclusive,
             CancellationToken ct)
         {
-            var methods = await _db.Placanja.AsNoTracking()
+            var baseQ = _db.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)
-                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive)
-                .Select(p => p.MetodaPlacanja)
-                .ToListAsync(ct);
+                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive);
 
-            if (methods.Count == 0)
+            var total = await baseQ.CountAsync(ct);
+            if (total == 0)
             {
                 return new List<AdminFinanceMethodShareDto>
                 {
@@ -323,46 +317,60 @@ namespace NuaSpa.Application.Services
                 };
             }
 
-            var buckets = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["card"] = 0,
-                ["cash"] = 0,
-                ["digital"] = 0,
-                ["other"] = 0,
-            };
+            var card = await baseQ.CountAsync(p =>
+                (p.MetodaPlacanja ?? "").Contains("stripe") ||
+                (p.MetodaPlacanja ?? "").Contains("Stripe") ||
+                (p.MetodaPlacanja ?? "").Contains("visa") ||
+                (p.MetodaPlacanja ?? "").Contains("Visa") ||
+                (p.MetodaPlacanja ?? "").Contains("master") ||
+                (p.MetodaPlacanja ?? "").Contains("Master") ||
+                (p.MetodaPlacanja ?? "").Contains("card") ||
+                (p.MetodaPlacanja ?? "").Contains("Card"), ct);
 
-            foreach (var m in methods)
+            var cash = await baseQ.CountAsync(p =>
+                (p.MetodaPlacanja ?? "").Contains("gotovin") ||
+                (p.MetodaPlacanja ?? "").Contains("Gotovin"), ct);
+
+            var digital = await baseQ.CountAsync(p =>
+                (p.MetodaPlacanja ?? "").Contains("apple") ||
+                (p.MetodaPlacanja ?? "").Contains("Apple") ||
+                (p.MetodaPlacanja ?? "").Contains("google") ||
+                (p.MetodaPlacanja ?? "").Contains("Google") ||
+                (p.MetodaPlacanja ?? "").Contains("paypal") ||
+                (p.MetodaPlacanja ?? "").Contains("PayPal"), ct);
+
+            var other = total - card - cash - digital;
+            if (other < 0)
             {
-                var key = BucketMethod(m);
-                buckets[key]++;
+                other = 0;
             }
 
-            var total = (double)methods.Count;
+            var totalD = (double)total;
             return new List<AdminFinanceMethodShareDto>
             {
                 new()
                 {
                     Kljuc = "card",
                     Label = "Kartica",
-                    Postotak = Math.Round(100.0 * buckets["card"] / total, 1),
+                    Postotak = Math.Round(100.0 * card / totalD, 1),
                 },
                 new()
                 {
                     Kljuc = "cash",
                     Label = "Gotovina",
-                    Postotak = Math.Round(100.0 * buckets["cash"] / total, 1),
+                    Postotak = Math.Round(100.0 * cash / totalD, 1),
                 },
                 new()
                 {
                     Kljuc = "digital",
                     Label = "Digital Wallets",
-                    Postotak = Math.Round(100.0 * buckets["digital"] / total, 1),
+                    Postotak = Math.Round(100.0 * digital / totalD, 1),
                 },
                 new()
                 {
                     Kljuc = "other",
                     Label = "Ostalo",
-                    Postotak = Math.Round(100.0 * buckets["other"] / total, 1),
+                    Postotak = Math.Round(100.0 * other / totalD, 1),
                 },
             };
         }
@@ -384,32 +392,29 @@ namespace NuaSpa.Application.Services
             DateTime toExclusive,
             CancellationToken ct)
         {
-            var placanja = await _db.Placanja.AsNoTracking()
+            var daily = await _db.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)
                 .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive)
-                .Include(p => p.Rezervacija)
-                .ToListAsync(ct);
+                .Where(p => p.Status == PlacanjeStatus.Completed)
+                .GroupBy(p => p.DatumPlacanja.Date)
+                .Select(g => new
+                {
+                    Datum = g.Key,
+                    Iznos = g.Sum(p => p.NaplaceniIznos ?? p.Iznos),
+                })
+                .ToDictionaryAsync(x => x.Datum, x => x.Iznos, ct);
 
-            var byDay = new Dictionary<DateTime, decimal>();
+            var points = new List<AdminFinanceTrendPointDto>();
             for (var d = from.Date; d < toExclusive.Date; d = d.AddDays(1))
-                byDay[d] = 0m;
-
-            foreach (var p in placanja)
             {
-                var st = MapStatus(p);
-                if (st != "paid")
-                    continue;
-
-                var day = p.DatumPlacanja.Date;
-                if (!byDay.ContainsKey(day))
-                    byDay[day] = 0m;
-                byDay[day] += p.NaplaceniIznos ?? p.Iznos;
+                points.Add(new AdminFinanceTrendPointDto
+                {
+                    Datum = d,
+                    Iznos = daily.GetValueOrDefault(d),
+                });
             }
 
-            return byDay
-                .OrderBy(kv => kv.Key)
-                .Select(kv => new AdminFinanceTrendPointDto { Datum = kv.Key, Iznos = kv.Value })
-                .ToList();
+            return points;
         }
 
         private async Task<IList<AdminFinanceActivityDto>> RecentActivityAsync(

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -25,19 +26,26 @@ public class LookupService : ILookupService
         _cache = cache;
     }
 
-    public async Task<List<DrzavaLookupDto>> GetDrzaveAsync(string? naziv, CancellationToken ct)
+    public async Task<PagedResult<DrzavaLookupDto>> GetDrzaveAsync(
+        string? naziv,
+        int page = 1,
+        int pageSize = PaginationConstants.DefaultPageSize,
+        CancellationToken ct = default)
     {
+        (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+
         if (!string.IsNullOrWhiteSpace(naziv))
         {
             var t = naziv.Trim();
-            return await _context.Drzave.AsNoTracking()
+            var query = _context.Drzave.AsNoTracking()
                 .Where(d => !d.IsDeleted && d.Naziv.Contains(t))
                 .OrderBy(d => d.Naziv)
-                .Select(d => new DrzavaLookupDto { Id = d.Id, Naziv = d.Naziv })
-                .ToListAsync(ct);
+                .Select(d => new DrzavaLookupDto { Id = d.Id, Naziv = d.Naziv });
+
+            return await PaginationHelper.ToPagedAsync(query, page, pageSize, ct);
         }
 
-        return await _cache.GetOrCreateAsync(DrzaveCacheKey, async entry =>
+        var cached = await _cache.GetOrCreateAsync(DrzaveCacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = CacheTtl;
             return await _context.Drzave.AsNoTracking()
@@ -46,10 +54,19 @@ public class LookupService : ILookupService
                 .Select(d => new DrzavaLookupDto { Id = d.Id, Naziv = d.Naziv })
                 .ToListAsync(ct);
         }) ?? new List<DrzavaLookupDto>();
+
+        return PaginateInMemory(cached, page, pageSize);
     }
 
-    public async Task<List<GradLookupDto>> GetGradoviAsync(int? drzavaId, string? naziv, CancellationToken ct)
+    public async Task<PagedResult<GradLookupDto>> GetGradoviAsync(
+        int? drzavaId,
+        string? naziv,
+        int page = 1,
+        int pageSize = PaginationConstants.DefaultPageSize,
+        CancellationToken ct = default)
     {
+        (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+
         var query = _context.Gradovi.AsNoTracking()
             .Include(g => g.Drzava)
             .Where(g => !g.IsDeleted);
@@ -66,7 +83,7 @@ public class LookupService : ILookupService
                 g.Naziv.Contains(t) || g.PostanskiBroj.Contains(t));
         }
 
-        return await query
+        var projected = query
             .OrderBy(g => g.Naziv)
             .Select(g => new GradLookupDto
             {
@@ -75,8 +92,28 @@ public class LookupService : ILookupService
                 PostanskiBroj = g.PostanskiBroj,
                 DrzavaId = g.DrzavaId,
                 DrzavaNaziv = g.Drzava.Naziv,
-            })
-            .Take(PaginationConstants.MaxPageSize)
-            .ToListAsync(ct);
+            });
+
+        return await PaginationHelper.ToPagedAsync(projected, page, pageSize, ct);
+    }
+
+    private static PagedResult<T> PaginateInMemory<T>(
+        List<T> all,
+        int page,
+        int pageSize)
+    {
+        var total = all.Count;
+        var items = all
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PagedResult<T>
+        {
+            Ukupno = total,
+            Stranica = page,
+            VelicinaStranice = pageSize,
+            Items = items,
+        };
     }
 }

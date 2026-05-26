@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Common;
+using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 
 namespace NuaSpa.Api.Controllers;
@@ -21,22 +21,26 @@ public class LookupController : ControllerBase
 
     [HttpGet("drzave")]
     [Authorize(Roles = RoleConstants.Admin + "," + RoleConstants.Klijent)]
-    public async Task<ActionResult<List<DrzavaLookupDto>>> GetDrzave(
+    public async Task<ActionResult<PagedResult<DrzavaLookupDto>>> GetDrzave(
         [FromQuery] string? naziv = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationConstants.DefaultPageSize,
         CancellationToken ct = default)
     {
-        var list = await _service.GetDrzaveAsync(naziv, ct);
+        var list = await _service.GetDrzaveAsync(naziv, page, pageSize, ct);
         return Ok(list);
     }
 
     [HttpGet("gradovi")]
     [Authorize(Roles = RoleConstants.Admin + "," + RoleConstants.Klijent)]
-    public async Task<ActionResult<List<GradLookupDto>>> GetGradovi(
+    public async Task<ActionResult<PagedResult<GradLookupDto>>> GetGradovi(
         [FromQuery] int? drzavaId = null,
         [FromQuery] string? naziv = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationConstants.DefaultPageSize,
         CancellationToken ct = default)
     {
-        var list = await _service.GetGradoviAsync(drzavaId, naziv, ct);
+        var list = await _service.GetGradoviAsync(drzavaId, naziv, page, pageSize, ct);
         return Ok(list);
     }
 }

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.Common;
@@ -22,10 +23,12 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<UslugaDTO>>> GetMyFavorites()
+        public async Task<ActionResult<PagedResult<UslugaDTO>>> GetMyFavorites(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = PaginationConstants.DefaultPageSize)
         {
             var userId = User.GetNuaSpaUserId();
-            var list = await _service.GetMyFavoritesAsync(userId);
+            var list = await _service.GetMyFavoritesAsync(userId, page, pageSize);
             return Ok(list);
         }
 
