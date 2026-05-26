@@ -201,12 +201,20 @@ public class AdminKlijentService : IAdminKlijentService
                 PreferiraniZaposlenikId = k.ZaposlenikId,
                 k.IsVipKlijent,
                 k.Status,
+                k.GradId,
             })
             .Take(safeTake)
             .ToListAsync(ct);
 
         var ids = rows.Select(x => x.Id).ToList();
         if (ids.Count == 0) return new List<AdminClientRowDTO>();
+
+        var gradIds = rows.Select(r => r.GradId).Distinct().ToList();
+        var gradMap = gradIds.Count == 0
+            ? new Dictionary<int, string>()
+            : await _context.Gradovi.AsNoTracking()
+                .Where(g => gradIds.Contains(g.Id))
+                .ToDictionaryAsync(g => g.Id, g => g.Naziv, ct);
 
         var (visitMap, spentMap) = await BuildAggMapsAsync(ids, ct);
         var lastTherapist = await BuildLastTherapistMapAsync(ids, ct);
@@ -268,6 +276,8 @@ public class AdminKlijentService : IAdminKlijentService
                 TerapeutPrezime = tPrez,
                 IsVipKlijent = r.IsVipKlijent,
                 Status = r.Status,
+                GradId = r.GradId,
+                GradNaziv = gradMap.GetValueOrDefault(r.GradId),
             };
         }).ToList();
 
@@ -410,6 +420,23 @@ public class AdminKlijentService : IAdminKlijentService
         if (dto.Status.HasValue) user.Status = dto.Status.Value;
         if (dto.IsVipKlijent.HasValue) user.IsVipKlijent = dto.IsVipKlijent.Value;
 
+        if (dto.GradId.HasValue)
+        {
+            if (dto.GradId.Value <= 0)
+            {
+                throw new BusinessRuleException("GradId mora biti pozitivan broj.");
+            }
+
+            var gradOk = await _context.Gradovi.AsNoTracking()
+                .AnyAsync(g => g.Id == dto.GradId.Value, ct);
+            if (!gradOk)
+            {
+                throw new BusinessRuleException("GradId ne postoji.");
+            }
+
+            user.GradId = dto.GradId.Value;
+        }
+
         if (dto.ZaposlenikId.HasValue)
         {
             if (dto.ZaposlenikId.Value <= 0)
@@ -470,8 +497,16 @@ public class AdminKlijentService : IAdminKlijentService
                 PreferiraniZaposlenikId = k.ZaposlenikId,
                 k.IsVipKlijent,
                 k.Status,
+                k.GradId,
             })
             .ToListAsync(ct);
+
+        var gradIds = rows.Select(r => r.GradId).Distinct().ToList();
+        var gradMap = gradIds.Count == 0
+            ? new Dictionary<int, string>()
+            : await _context.Gradovi.AsNoTracking()
+                .Where(g => gradIds.Contains(g.Id))
+                .ToDictionaryAsync(g => g.Id, g => g.Naziv, ct);
 
         var (visitMap, spentMap) = await BuildAggMapsAsync(ids, ct);
         var lastTherapist = await BuildLastTherapistMapAsync(ids, ct);
@@ -533,6 +568,8 @@ public class AdminKlijentService : IAdminKlijentService
                 TerapeutPrezime = tPrez,
                 IsVipKlijent = r.IsVipKlijent,
                 Status = r.Status,
+                GradId = r.GradId,
+                GradNaziv = gradMap.GetValueOrDefault(r.GradId),
             };
         }).ToList();
 

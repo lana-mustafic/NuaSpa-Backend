@@ -27,5 +27,9 @@ public class AdminClientRowDTO
 
     /// <summary>Account active (Korisnik.Status).</summary>
     public bool Status { get; set; } = true;
+
+    public int GradId { get; set; }
+
+    public string? GradNaziv { get; set; }
 }
 

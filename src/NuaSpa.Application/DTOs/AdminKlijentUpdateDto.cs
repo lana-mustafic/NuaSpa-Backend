@@ -22,6 +22,8 @@ public class AdminKlijentUpdateDto
 
     public bool? IsVipKlijent { get; set; }
 
+    public int? GradId { get; set; }
+
     public int? ZaposlenikId { get; set; }
 
     [MaxLength(1200)]

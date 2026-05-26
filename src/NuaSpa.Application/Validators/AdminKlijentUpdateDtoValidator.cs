@@ -32,6 +32,10 @@ public sealed class AdminKlijentUpdateDtoValidator : AbstractValidator<AdminKlij
                 "Unesite ispravan broj telefona u formatu: +387 61 123 456 ili samo cifre (8–15 znamenki).")
             .When(x => x.Telefon != null);
 
+        RuleFor(x => x.GradId)
+            .GreaterThan(0).WithMessage("GradId mora biti pozitivan broj.")
+            .When(x => x.GradId.HasValue);
+
         RuleFor(x => x.NapomenaZaTerapeuta)
             .MaximumLength(1200).WithMessage("Napomena može imati najviše 1200 znakova.")
             .When(x => x.NapomenaZaTerapeuta != null);
