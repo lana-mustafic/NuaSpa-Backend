@@ -41,6 +41,7 @@ builder.Services.AddValidatorsFromAssembly(typeof(NuaSpa.Application.MappingProf
 
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
+builder.Services.AddMemoryCache();
 
 // --- CORS (eksplicitno dozvoljene originale) ---
 var allowedOrigins = builder.Configuration

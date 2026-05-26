@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
@@ -32,8 +33,9 @@ namespace NuaSpa.Application.Services
         {
         }
 
-        public override async Task<IEnumerable<ZaposlenikDTO>> Get(ZaposlenikSearchObject? search = null)
+        public override async Task<PagedResult<ZaposlenikDTO>> Get(ZaposlenikSearchObject? search = null)
         {
+            var (page, pageSize) = PaginationHelper.FromSearch(search);
             var query = _context.Zaposlenici
                 .AsNoTracking()
                 .Include(z => z.KategorijaUsluga)
@@ -70,12 +72,18 @@ namespace NuaSpa.Application.Services
                 query = query.Where(z => z.Status == status);
             }
 
-            var list = await query
-                .OrderBy(z => z.Prezime)
-                .ThenBy(z => z.Ime)
-                .ToListAsync();
+            var paged = await PaginationHelper.ToPagedAsync(
+                query.OrderBy(z => z.Prezime).ThenBy(z => z.Ime),
+                page,
+                pageSize);
 
-            return list.Select(MapToDto).ToList();
+            return new PagedResult<ZaposlenikDTO>
+            {
+                Ukupno = paged.Ukupno,
+                Stranica = paged.Stranica,
+                VelicinaStranice = paged.VelicinaStranice,
+                Items = paged.Items.Select(MapToDto).ToList(),
+            };
         }
 
         public override async Task<ZaposlenikDTO> GetById(int id)

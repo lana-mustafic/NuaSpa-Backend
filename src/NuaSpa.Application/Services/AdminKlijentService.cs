@@ -111,8 +111,20 @@ public class AdminKlijentService : IAdminKlijentService
         List<int> ids,
         CancellationToken ct)
     {
-        var rez = await _context.Rezervacije.AsNoTracking()
+        var latestDates = await _context.Rezervacije.AsNoTracking()
             .Where(r => !r.IsOtkazana && ids.Contains(r.KorisnikId))
+            .GroupBy(r => r.KorisnikId)
+            .Select(g => new { KorisnikId = g.Key, Datum = g.Max(x => x.DatumRezervacije) })
+            .ToListAsync(ct);
+
+        if (latestDates.Count == 0)
+        {
+            return new Dictionary<int, LastTherapistRow>();
+        }
+
+        var korisnikIds = latestDates.Select(x => x.KorisnikId).ToList();
+        var rezRows = await _context.Rezervacije.AsNoTracking()
+            .Where(r => !r.IsOtkazana && korisnikIds.Contains(r.KorisnikId))
             .Select(r => new
             {
                 r.KorisnikId,
@@ -123,13 +135,15 @@ public class AdminKlijentService : IAdminKlijentService
             })
             .ToListAsync(ct);
 
-        return rez
-            .GroupBy(x => x.KorisnikId)
+        var dateMap = latestDates.ToDictionary(x => x.KorisnikId, x => x.Datum);
+        return rezRows
+            .Where(r => dateMap.TryGetValue(r.KorisnikId, out var d) && r.DatumRezervacije == d)
+            .GroupBy(r => r.KorisnikId)
             .ToDictionary(
                 g => g.Key,
                 g =>
                 {
-                    var x = g.OrderByDescending(t => t.DatumRezervacije).First();
+                    var x = g.First();
                     return new LastTherapistRow(x.ZaposlenikId, x.TerapeutIme, x.TerapeutPrezime);
                 });
     }
@@ -140,55 +154,69 @@ public class AdminKlijentService : IAdminKlijentService
         if (roleId == null) return new AdminClientStatsDto();
 
         var baseQuery = KlijentiQuery(roleId.Value, search: null, q);
-
-        var users = await baseQuery.Select(k => new { k.Id, k.IsVipKlijent }).ToListAsync(ct);
-        var ids = users.Select(u => u.Id).ToList();
-        if (ids.Count == 0) return new AdminClientStatsDto();
-
-        var vipDict = users.ToDictionary(u => u.Id, u => u.IsVipKlijent);
-        var (visitMap, spentMap) = await BuildAggMapsAsync(ids, ct);
+        var idsQuery = baseQuery.Select(k => k.Id);
 
         var stats = new AdminClientStatsDto
         {
-            UkupnoKlijenata = ids.Count,
-            UkupnoPosjeta = 0,
-            UkupnaPotrosnja = 0m,
-            VipKlijenata = 0,
+            UkupnoKlijenata = await baseQuery.CountAsync(ct),
+            UkupnoPosjeta = await _context.Rezervacije.AsNoTracking()
+                .Where(r => !r.IsOtkazana && idsQuery.Contains(r.KorisnikId))
+                .CountAsync(ct),
+            UkupnaPotrosnja = await (
+                from r in _context.Rezervacije.AsNoTracking()
+                join u in _context.Usluge.AsNoTracking() on r.UslugaId equals u.Id
+                where r.IsPlacena && !r.IsOtkazana && idsQuery.Contains(r.KorisnikId)
+                select u.Cijena).SumAsync(ct),
         };
 
-        foreach (var id in ids)
-        {
-            visitMap.TryGetValue(id, out var v);
-            spentMap.TryGetValue(id, out var spent);
+        var perClient = await _context.Rezervacije.AsNoTracking()
+            .Where(r => !r.IsOtkazana && idsQuery.Contains(r.KorisnikId))
+            .GroupBy(r => r.KorisnikId)
+            .Select(g => new
+            {
+                KorisnikId = g.Key,
+                Visits = g.Count(),
+                Spent = (
+                    from r in g
+                    join u in _context.Usluge.AsNoTracking() on r.UslugaId equals u.Id
+                    where r.IsPlacena
+                    select u.Cijena).Sum(),
+            })
+            .ToListAsync(ct);
 
-            var visits = v?.UkupnoPosjeta ?? 0;
-            var total = spent;
-            var manual = vipDict.GetValueOrDefault(id);
+        var vipManualIds = await baseQuery
+            .Where(k => k.IsVipKlijent)
+            .Select(k => k.Id)
+            .ToListAsync(ct);
 
-            var computedVip = manual || visits >= 10 || total >= 600m;
+        var vipComputedIds = perClient
+            .Where(p => p.Visits >= 10 || p.Spent >= 600m)
+            .Select(p => p.KorisnikId);
 
-            if (computedVip) stats.VipKlijenata++;
-            stats.UkupnoPosjeta += visits;
-            stats.UkupnaPotrosnja += total;
-        }
+        stats.VipKlijenata = vipManualIds
+            .Union(vipComputedIds)
+            .Distinct()
+            .Count();
 
         return stats;
     }
 
-    public async Task<List<AdminClientRowDTO>> GetAsync(
+    public async Task<PagedResult<AdminClientRowDTO>> GetAsync(
         KorisnikSearchObject? search,
         string? q,
-        int take,
         CancellationToken ct)
     {
         var roleId = await GetKlijentRoleIdAsync(ct);
-        if (roleId == null) return new List<AdminClientRowDTO>();
+        if (roleId == null)
+        {
+            return new PagedResult<AdminClientRowDTO>();
+        }
 
-        var safeTake = take <= 0 ? 500 : Math.Min(take, 1000);
-
+        var (page, pageSize) = PaginationHelper.FromSearch(search);
         var query = KlijentiQuery(roleId.Value, search, q)
             .OrderByDescending(k => k.DatumRegistracije);
 
+        var total = await query.CountAsync(ct);
         var rows = await query
             .Select(k => new
             {
@@ -203,11 +231,20 @@ public class AdminKlijentService : IAdminKlijentService
                 k.Status,
                 k.GradId,
             })
-            .Take(safeTake)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(ct);
 
         var ids = rows.Select(x => x.Id).ToList();
-        if (ids.Count == 0) return new List<AdminClientRowDTO>();
+        if (ids.Count == 0)
+        {
+            return new PagedResult<AdminClientRowDTO>
+            {
+                Ukupno = total,
+                Stranica = page,
+                VelicinaStranice = pageSize,
+            };
+        }
 
         var gradIds = rows.Select(r => r.GradId).Distinct().ToList();
         var gradMap = gradIds.Count == 0
@@ -281,7 +318,13 @@ public class AdminKlijentService : IAdminKlijentService
             };
         }).ToList();
 
-        return result;
+        return new PagedResult<AdminClientRowDTO>
+        {
+            Ukupno = total,
+            Stranica = page,
+            VelicinaStranice = pageSize,
+            Items = result,
+        };
     }
 
     public async Task<AdminClientRowDTO> CreateAsync(AdminKlijentCreateDto dto, CancellationToken ct)

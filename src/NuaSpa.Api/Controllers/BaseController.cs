@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Application.Common;
+using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 
 namespace NuaSpa.Api.Controllers;
@@ -20,10 +21,10 @@ public class BaseController<TModel, TSearch> : ControllerBase
     }
 
     [HttpGet]
-    public virtual async Task<ActionResult<IEnumerable<TModel>>> Get([FromQuery] TSearch? search = null)
+    public virtual async Task<ActionResult<PagedResult<TModel>>> Get([FromQuery] TSearch? search = null)
     {
-        var list = await _service.Get(search);
-        return Ok(list);
+        var page = await _service.Get(search);
+        return Ok(page);
     }
 
     [HttpGet("{id:int}")]

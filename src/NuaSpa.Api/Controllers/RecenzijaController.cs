@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.Common;
@@ -24,14 +25,17 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<RecenzijaDTO>>> Get([FromQuery] int uslugaId)
+        public async Task<ActionResult<PagedResult<RecenzijaDTO>>> Get(
+            [FromQuery] int uslugaId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = PaginationConstants.DefaultPageSize)
         {
             if (uslugaId <= 0)
             {
                 return BadRequest("Parametar uslugaId je obavezan.");
             }
 
-            var result = await _service.GetByUslugaAsync(uslugaId);
+            var result = await _service.GetByUslugaAsync(uslugaId, page, pageSize);
             return Ok(result);
         }
 

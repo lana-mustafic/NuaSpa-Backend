@@ -9,10 +9,9 @@ namespace NuaSpa.Application.Interfaces
     public interface IAdminKlijentService
     {
         Task<AdminClientStatsDto> GetStatsAsync(string? q, CancellationToken ct);
-        Task<List<AdminClientRowDTO>> GetAsync(
+        Task<PagedResult<AdminClientRowDTO>> GetAsync(
             KorisnikSearchObject? search,
             string? q,
-            int take,
             CancellationToken ct);
 
         Task<AdminClientRowDTO> CreateAsync(AdminKlijentCreateDto dto, CancellationToken ct);
@@ -20,4 +19,3 @@ namespace NuaSpa.Application.Interfaces
         Task<AdminClientRowDTO> PatchAsync(int id, AdminKlijentUpdateDto dto, CancellationToken ct);
     }
 }
-

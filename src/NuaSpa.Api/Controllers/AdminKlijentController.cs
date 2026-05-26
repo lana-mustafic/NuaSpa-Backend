@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -32,13 +31,12 @@ public class AdminKlijentController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<AdminClientRowDTO>>> Get(
+    public async Task<ActionResult<PagedResult<AdminClientRowDTO>>> Get(
         [FromQuery] KorisnikSearchObject? search = null,
         [FromQuery] string? q = null,
-        [FromQuery] int take = 500,
         CancellationToken ct = default)
     {
-        var rows = await _service.GetAsync(search, q, take, ct);
+        var rows = await _service.GetAsync(search, q, ct);
         return Ok(rows);
     }
 
@@ -70,4 +68,3 @@ public class AdminKlijentController : ControllerBase
         return Ok(updated);
     }
 }
-

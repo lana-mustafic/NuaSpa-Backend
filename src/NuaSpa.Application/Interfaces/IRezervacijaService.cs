@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 
 namespace NuaSpa.Application.Interfaces
@@ -9,18 +10,22 @@ namespace NuaSpa.Application.Interfaces
     {
         Task<RezervacijaDTO?> GetByIdAsync(int rezervacijaId);
 
-        Task<IEnumerable<RezervacijaDTO>> GetAsync(
+        Task<PagedResult<RezervacijaDTO>> GetAsync(
             int? korisnikId,
             DateTime? datum,
             bool? isPotvrdjena,
             bool includeOtkazane = false,
-            int? zaposlenikId = null);
+            int? zaposlenikId = null,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize);
 
-        Task<IEnumerable<RezervacijaDTO>> GetForZaposlenikAsync(
+        Task<PagedResult<RezervacijaDTO>> GetForZaposlenikAsync(
             int zaposlenikId,
             DateTime? datum,
             bool? isPotvrdjena,
-            bool includeOtkazane = false);
+            bool includeOtkazane = false,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize);
 
         Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto, bool isAdminBooking = false);
 

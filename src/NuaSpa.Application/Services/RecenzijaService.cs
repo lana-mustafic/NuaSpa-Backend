@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
@@ -27,17 +28,27 @@ namespace NuaSpa.Application.Services
             _mapper = mapper;
         }
 
-        public async Task<IEnumerable<RecenzijaDTO>> GetByUslugaAsync(int uslugaId)
+        public async Task<PagedResult<RecenzijaDTO>> GetByUslugaAsync(
+            int uslugaId,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize)
         {
-            var list = await _context.Recenzije
+            (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+            var query = _context.Recenzije
                 .AsNoTracking()
                 .Include(r => r.Korisnik)
                 .Include(r => r.Usluga)
                 .Where(r => r.UslugaId == uslugaId && !r.IsDeleted)
-                .OrderByDescending(r => r.CreatedAt)
-                .ToListAsync();
+                .OrderByDescending(r => r.CreatedAt);
 
-            return _mapper.Map<IEnumerable<RecenzijaDTO>>(list);
+            var paged = await PaginationHelper.ToPagedAsync(query, page, pageSize);
+            return new PagedResult<RecenzijaDTO>
+            {
+                Ukupno = paged.Ukupno,
+                Stranica = paged.Stranica,
+                VelicinaStranice = paged.VelicinaStranice,
+                Items = _mapper.Map<IReadOnlyList<RecenzijaDTO>>(paged.Items),
+            };
         }
 
         public async Task<RecenzijaDTO?> GetByIdAsync(int id)
@@ -256,37 +267,13 @@ namespace NuaSpa.Application.Services
                     .FirstOrDefaultAsync(cancellationToken);
             }
 
-            var rows = await filteredCurrent
+            var reviewEntities = await filteredCurrent
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(rev => new AdminReviewRowDto
-                {
-                    Id = rev.Id,
-                    CreatedAt = rev.CreatedAt,
-                    Ocjena = rev.Ocjena,
-                    Komentar = rev.Komentar,
-                    KorisnikPunoIme = (rev.Korisnik.Ime + " " + rev.Korisnik.Prezime).Trim(),
-                    BrojPosjeta = _context.Rezervacije.Count(r =>
-                        r.KorisnikId == rev.KorisnikId && !r.IsOtkazana && r.IsPotvrdjena),
-                    UslugaNaziv = rev.Usluga.Naziv,
-                    TerapeutIme = rev.ZaposlenikId != null
-                        ? _context.Zaposlenici
-                            .Where(z => z.Id == rev.ZaposlenikId)
-                            .Select(z => z.Ime + " " + z.Prezime)
-                            .FirstOrDefault()
-                        : _context.Rezervacije
-                            .Where(r => r.KorisnikId == rev.KorisnikId
-                                && r.UslugaId == rev.UslugaId
-                                && !r.IsOtkazana
-                                && r.DatumRezervacije <= rev.CreatedAt)
-                            .OrderByDescending(r => r.DatumRezervacije)
-                            .Select(r => r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime)
-                            .FirstOrDefault(),
-                    Izvor = "NuaSpa",
-                    AdminOdgovor = rev.AdminOdgovor
-                })
                 .ToListAsync(cancellationToken);
+
+            var rows = await MapAdminReviewRowsAsync(reviewEntities, cancellationToken);
 
             return new AdminReviewsDashboardDto
             {
@@ -320,34 +307,11 @@ namespace NuaSpa.Application.Services
             var q = BuildAdminReviewQuery(from, toExclusive, search, minOcjena, maxOcjena, uslugaId, zaposlenikId)
                 .OrderByDescending(r => r.CreatedAt);
 
-            var rows = await q
-                .Select(rev => new AdminReviewRowDto
-                {
-                    Id = rev.Id,
-                    CreatedAt = rev.CreatedAt,
-                    Ocjena = rev.Ocjena,
-                    Komentar = rev.Komentar,
-                    KorisnikPunoIme = (rev.Korisnik.Ime + " " + rev.Korisnik.Prezime).Trim(),
-                    BrojPosjeta = _context.Rezervacije.Count(r =>
-                        r.KorisnikId == rev.KorisnikId && !r.IsOtkazana && r.IsPotvrdjena),
-                    UslugaNaziv = rev.Usluga.Naziv,
-                    TerapeutIme = rev.ZaposlenikId != null
-                        ? _context.Zaposlenici
-                            .Where(z => z.Id == rev.ZaposlenikId)
-                            .Select(z => z.Ime + " " + z.Prezime)
-                            .FirstOrDefault()
-                        : _context.Rezervacije
-                            .Where(r => r.KorisnikId == rev.KorisnikId
-                                && r.UslugaId == rev.UslugaId
-                                && !r.IsOtkazana
-                                && r.DatumRezervacije <= rev.CreatedAt)
-                            .OrderByDescending(r => r.DatumRezervacije)
-                            .Select(r => r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime)
-                            .FirstOrDefault(),
-                    Izvor = "NuaSpa",
-                    AdminOdgovor = rev.AdminOdgovor
-                })
+            var reviewEntities = await q
+                .Take(PaginationConstants.MaxPageSize * 10)
                 .ToListAsync(cancellationToken);
+
+            var rows = await MapAdminReviewRowsAsync(reviewEntities, cancellationToken);
 
             var sb = new StringBuilder();
             sb.AppendLine(
@@ -417,6 +381,100 @@ namespace NuaSpa.Application.Services
             }
 
             return q;
+        }
+
+        private async Task<List<AdminReviewRowDto>> MapAdminReviewRowsAsync(
+            List<Recenzija> reviews,
+            CancellationToken ct)
+        {
+            if (reviews.Count == 0)
+            {
+                return new List<AdminReviewRowDto>();
+            }
+
+            var korisnikIds = reviews.Select(r => r.KorisnikId).Distinct().ToList();
+            var visitCounts = await _context.Rezervacije.AsNoTracking()
+                .Where(r => korisnikIds.Contains(r.KorisnikId) && !r.IsOtkazana && r.IsPotvrdjena)
+                .GroupBy(r => r.KorisnikId)
+                .Select(g => new { KorisnikId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.KorisnikId, x => x.Count, ct);
+
+            var zaposIds = reviews
+                .Where(r => r.ZaposlenikId.HasValue)
+                .Select(r => r.ZaposlenikId!.Value)
+                .Distinct()
+                .ToList();
+
+            var therapistById = zaposIds.Count == 0
+                ? new Dictionary<int, string>()
+                : await _context.Zaposlenici.AsNoTracking()
+                    .Where(z => zaposIds.Contains(z.Id))
+                    .ToDictionaryAsync(
+                        z => z.Id,
+                        z => (z.Ime + " " + z.Prezime).Trim(),
+                        ct);
+
+            var needFallback = reviews.Where(r => !r.ZaposlenikId.HasValue).ToList();
+            var fallbackTerapeut = new Dictionary<int, string>();
+            if (needFallback.Count > 0)
+            {
+                var kIds = needFallback.Select(r => r.KorisnikId).Distinct().ToList();
+                var rezData = await _context.Rezervacije.AsNoTracking()
+                    .Where(r => !r.IsOtkazana && kIds.Contains(r.KorisnikId))
+                    .Select(r => new
+                    {
+                        r.KorisnikId,
+                        r.UslugaId,
+                        r.DatumRezervacije,
+                        Terapeut = r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime,
+                    })
+                    .ToListAsync(ct);
+
+                foreach (var rev in needFallback)
+                {
+                    var match = rezData
+                        .Where(r =>
+                            r.KorisnikId == rev.KorisnikId
+                            && r.UslugaId == rev.UslugaId
+                            && r.DatumRezervacije <= rev.CreatedAt)
+                        .OrderByDescending(r => r.DatumRezervacije)
+                        .FirstOrDefault();
+
+                    if (match != null)
+                    {
+                        fallbackTerapeut[rev.Id] = match.Terapeut.Trim();
+                    }
+                }
+            }
+
+            return reviews.Select(rev =>
+            {
+                string? terapeut = null;
+                if (rev.ZaposlenikId is int zid && therapistById.TryGetValue(zid, out var direct))
+                {
+                    terapeut = direct;
+                }
+                else if (fallbackTerapeut.TryGetValue(rev.Id, out var fb))
+                {
+                    terapeut = fb;
+                }
+
+                visitCounts.TryGetValue(rev.KorisnikId, out var visits);
+
+                return new AdminReviewRowDto
+                {
+                    Id = rev.Id,
+                    CreatedAt = rev.CreatedAt,
+                    Ocjena = rev.Ocjena,
+                    Komentar = rev.Komentar,
+                    KorisnikPunoIme = (rev.Korisnik.Ime + " " + rev.Korisnik.Prezime).Trim(),
+                    BrojPosjeta = visits,
+                    UslugaNaziv = rev.Usluga.Naziv,
+                    TerapeutIme = terapeut,
+                    Izvor = "NuaSpa",
+                    AdminOdgovor = rev.AdminOdgovor,
+                };
+            }).ToList();
         }
 
         public async Task<bool> SetAdminOdgovorAsync(

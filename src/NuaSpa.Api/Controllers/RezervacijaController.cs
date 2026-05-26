@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.Common;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
@@ -91,8 +92,9 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<RezervacijaDTO>>> Get([FromQuery] RezervacijaSearchObject? search = null)
+        public async Task<ActionResult<PagedResult<RezervacijaDTO>>> Get([FromQuery] RezervacijaSearchObject? search = null)
         {
+            var (page, pageSize) = PaginationHelper.FromSearch(search);
             var isAdmin = User.IsInRole(RoleConstants.Admin);
             var isKlijent = User.IsInRole(RoleConstants.Klijent);
             var isZaposlenik = User.IsInRole(RoleConstants.Zaposlenik);
@@ -113,8 +115,9 @@ namespace NuaSpa.Api.Controllers
                     zaposlenikId,
                     search?.Datum,
                     search?.IsPotvrdjena,
-                    search?.IncludeOtkazane ?? false
-                );
+                    search?.IncludeOtkazane ?? false,
+                    page,
+                    pageSize);
 
                 return Ok(zaposResult);
             }
@@ -136,8 +139,9 @@ namespace NuaSpa.Api.Controllers
                 search?.Datum,
                 search?.IsPotvrdjena,
                 search?.IncludeOtkazane ?? false,
-                zaposlenikFilter
-            );
+                zaposlenikFilter,
+                page,
+                pageSize);
 
             return Ok(result);
         }

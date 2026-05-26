@@ -1,7 +1,10 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
+using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.SearchObjects;
 using NuaSpa.Domain;
 
 namespace NuaSpa.Application.Services
@@ -18,11 +21,21 @@ namespace NuaSpa.Application.Services
             _mapper = mapper;
         }
 
-        public virtual async Task<IEnumerable<T>> Get(TSearch? search = null)
+        public virtual async Task<PagedResult<T>> Get(TSearch? search = null)
         {
-            var entity = _context.Set<TDb>();
-            var list = await entity.ToListAsync();
-            return _mapper.Map<IEnumerable<T>>(list);
+            var (page, pageSize) = search is IPagedSearch paged
+                ? PaginationHelper.FromSearch(paged)
+                : PaginationHelper.Normalize(1, PaginationConstants.DefaultPageSize);
+
+            var query = _context.Set<TDb>().AsNoTracking();
+            var pagedEntities = await PaginationHelper.ToPagedAsync(query, page, pageSize);
+            return new PagedResult<T>
+            {
+                Ukupno = pagedEntities.Ukupno,
+                Stranica = pagedEntities.Stranica,
+                VelicinaStranice = pagedEntities.VelicinaStranice,
+                Items = _mapper.Map<IReadOnlyList<T>>(pagedEntities.Items),
+            };
         }
 
         public virtual async Task<T> GetById(int id)

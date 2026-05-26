@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
@@ -21,24 +22,54 @@ public class ObavijestService : IObavijestService
         _context = context;
     }
 
-    public async Task<IReadOnlyList<ObavijestDto>> GetPublishedAsync(CancellationToken ct = default)
+    public async Task<PagedResult<ObavijestDto>> GetPublishedAsync(
+        int page = 1,
+        int pageSize = PaginationConstants.DefaultPageSize,
+        CancellationToken ct = default)
     {
-        return await _context.Obavijesti
+        (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+        var query = _context.Obavijesti
             .AsNoTracking()
             .Where(o => !o.IsDeleted && o.Aktivna)
-            .OrderByDescending(o => o.DatumObjave)
-            .Select(Map)
-            .ToListAsync(ct);
+            .OrderByDescending(o => o.DatumObjave);
+
+        return await ToPagedDtoAsync(query, page, pageSize, ct);
     }
 
-    public async Task<IReadOnlyList<ObavijestDto>> GetAllAdminAsync(CancellationToken ct = default)
+    public async Task<PagedResult<ObavijestDto>> GetAllAdminAsync(
+        int page = 1,
+        int pageSize = PaginationConstants.DefaultPageSize,
+        CancellationToken ct = default)
     {
-        return await _context.Obavijesti
+        (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+        var query = _context.Obavijesti
             .AsNoTracking()
             .Where(o => !o.IsDeleted)
-            .OrderByDescending(o => o.DatumObjave)
+            .OrderByDescending(o => o.DatumObjave);
+
+        return await ToPagedDtoAsync(query, page, pageSize, ct);
+    }
+
+    private async Task<PagedResult<ObavijestDto>> ToPagedDtoAsync(
+        IQueryable<Obavijest> query,
+        int page,
+        int pageSize,
+        CancellationToken ct)
+    {
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(Map)
             .ToListAsync(ct);
+
+        return new PagedResult<ObavijestDto>
+        {
+            Ukupno = total,
+            Stranica = page,
+            VelicinaStranice = pageSize,
+            Items = items,
+        };
     }
 
     public async Task<ObavijestDto?> GetByIdAsync(int id, CancellationToken ct = default)

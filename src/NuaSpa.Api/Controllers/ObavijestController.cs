@@ -22,14 +22,17 @@ public class ObavijestController : ControllerBase
 
     [HttpGet]
     [Authorize]
-    public async Task<ActionResult<IReadOnlyList<ObavijestDto>>> GetPublished(CancellationToken ct = default)
+    public async Task<ActionResult<PagedResult<ObavijestDto>>> GetPublished(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationConstants.DefaultPageSize,
+        CancellationToken ct = default)
     {
         if (User.IsInRole(RoleConstants.Admin))
         {
-            return Ok(await _service.GetAllAdminAsync(ct));
+            return Ok(await _service.GetAllAdminAsync(page, pageSize, ct));
         }
 
-        return Ok(await _service.GetPublishedAsync(ct));
+        return Ok(await _service.GetPublishedAsync(page, pageSize, ct));
     }
 
     [HttpGet("{id:int}")]

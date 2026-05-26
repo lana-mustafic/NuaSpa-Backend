@@ -38,16 +38,26 @@ public class ReportingService : IReportingService
 
     public async Task<byte[]> GenerateTopUslugeReport()
     {
-        // 1. Dohvati podatke (Top 5 po broju rezervacija)
-        var data = await _context.Usluge
-            .Select(u => new TopUslugaDTO
+        var data = await _context.Rezervacije
+            .AsNoTracking()
+            .GroupBy(r => r.UslugaId)
+            .Select(g => new
             {
-                Naziv = u.Naziv,
-                BrojRezervacija = _context.Rezervacije.Count(r => r.UslugaId == u.Id),
-                UkupnaZarada = _context.Rezervacije.Count(r => r.UslugaId == u.Id) * u.Cijena
+                UslugaId = g.Key,
+                BrojRezervacija = g.Count(),
             })
             .OrderByDescending(x => x.BrojRezervacija)
             .Take(5)
+            .Join(
+                _context.Usluge.AsNoTracking(),
+                g => g.UslugaId,
+                u => u.Id,
+                (g, u) => new TopUslugaDTO
+                {
+                    Naziv = u.Naziv,
+                    BrojRezervacija = g.BrojRezervacija,
+                    UkupnaZarada = g.BrojRezervacija * u.Cijena,
+                })
             .ToListAsync();
 
         // 2. Kreiranje PDF dokumenta

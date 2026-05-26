@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.SearchObjects;
@@ -14,8 +15,9 @@ namespace NuaSpa.Application.Services
         {
         }
 
-        public override async Task<IEnumerable<UslugaDTO>> Get(UslugaSearchObject? search = null)
+        public override async Task<PagedResult<UslugaDTO>> Get(UslugaSearchObject? search = null)
         {
+            var (page, pageSize) = PaginationHelper.FromSearch(search);
             var query = _context.Usluge
                 .AsNoTracking()
                 .Include(u => u.KategorijaUsluga)
@@ -33,8 +35,18 @@ namespace NuaSpa.Application.Services
                 query = query.Where(u => u.Cijena <= maxCijena);
             }
 
-            var list = await query.OrderBy(u => u.Naziv).ToListAsync();
-            return _mapper.Map<IEnumerable<UslugaDTO>>(list);
+            var paged = await PaginationHelper.ToPagedAsync(
+                query.OrderBy(u => u.Naziv),
+                page,
+                pageSize);
+
+            return new PagedResult<UslugaDTO>
+            {
+                Ukupno = paged.Ukupno,
+                Stranica = paged.Stranica,
+                VelicinaStranice = paged.VelicinaStranice,
+                Items = _mapper.Map<IReadOnlyList<UslugaDTO>>(paged.Items),
+            };
         }
 
         public override async Task<UslugaDTO> GetById(int id)

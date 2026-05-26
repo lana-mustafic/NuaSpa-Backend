@@ -128,17 +128,6 @@ namespace NuaSpa.Application.Services
             take = Math.Clamp(take, 1, 30);
             var since = DateTime.UtcNow.AddDays(-SignalWindowDays);
 
-            var usluge = await _context.Usluge
-                .AsNoTracking()
-                .Include(u => u.KategorijaUsluga)
-                .Where(u => !u.IsDeleted)
-                .ToListAsync();
-
-            if (usluge.Count == 0)
-            {
-                return Array.Empty<PreporucenaUslugaDto>();
-            }
-
             var favIds = await _context.Favoriti.AsNoTracking()
                 .Where(f => f.KorisnikId == korisnikId)
                 .Select(f => f.UslugaId)
@@ -158,6 +147,12 @@ namespace NuaSpa.Application.Services
                 .Where(k => !k.IsDeleted)
                 .ToDictionaryAsync(k => k.Id, k => k.Naziv);
 
+            var popularity = await _context.Rezervacije.AsNoTracking()
+                .Where(r => !r.IsOtkazana)
+                .GroupBy(r => r.UslugaId)
+                .Select(g => new { UslugaId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.UslugaId, x => x.Count);
+
             var categoryScores = new Dictionary<int, double>();
             void AddCatScore(int catId, double w)
             {
@@ -170,12 +165,15 @@ namespace NuaSpa.Application.Services
                 AddCatScore(c, WeightBooking);
             }
 
-            foreach (var f in favIds)
+            if (favIds.Count > 0)
             {
-                var u = usluge.FirstOrDefault(x => x.Id == f);
-                if (u != null)
+                var favCats = await _context.Usluge.AsNoTracking()
+                    .Where(u => favIds.Contains(u.Id))
+                    .Select(u => u.KategorijaUslugaId)
+                    .ToListAsync();
+                foreach (var cat in favCats)
                 {
-                    AddCatScore(u.KategorijaUslugaId, WeightFavorite);
+                    AddCatScore(cat, WeightFavorite);
                 }
             }
 
@@ -206,11 +204,39 @@ namespace NuaSpa.Application.Services
                 .Distinct()
                 .ToList();
 
-            var popularity = await _context.Rezervacije.AsNoTracking()
-                .Where(r => !r.IsOtkazana)
-                .GroupBy(r => r.UslugaId)
-                .Select(g => new { UslugaId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.UslugaId, x => x.Count);
+            var candidateCatIds = categoryScores.Keys.ToList();
+            if (candidateCatIds.Count == 0)
+            {
+                candidateCatIds = bookingCats.Distinct().ToList();
+            }
+
+            var uslugeQuery = _context.Usluge
+                .AsNoTracking()
+                .Include(u => u.KategorijaUsluga)
+                .Where(u => !u.IsDeleted);
+
+            if (candidateCatIds.Count > 0)
+            {
+                uslugeQuery = uslugeQuery.Where(u => candidateCatIds.Contains(u.KategorijaUslugaId));
+            }
+            else
+            {
+                var popularIds = popularity
+                    .OrderByDescending(x => x.Value)
+                    .Take(take * 3)
+                    .Select(x => x.Key)
+                    .ToList();
+                if (popularIds.Count > 0)
+                {
+                    uslugeQuery = uslugeQuery.Where(u => popularIds.Contains(u.Id));
+                }
+            }
+
+            var usluge = await uslugeQuery.ToListAsync();
+            if (usluge.Count == 0)
+            {
+                return Array.Empty<PreporucenaUslugaDto>();
+            }
 
             var maxPop = popularity.Values.DefaultIfEmpty(0).Max();
             var maxCat = categoryScores.Values.DefaultIfEmpty(0).Max();

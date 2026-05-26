@@ -16,7 +16,7 @@ public class AdminTherapistAccountController : ControllerBase
 {
     private readonly ITherapistAccountService _accountService;
     private readonly INotificationPublisher _notificationPublisher;
-    private readonly IConfiguration _configuration;
+    private readonly string _therapistInviteBaseUrl;
     private readonly ILogger<AdminTherapistAccountController> _logger;
 
     public AdminTherapistAccountController(
@@ -27,7 +27,10 @@ public class AdminTherapistAccountController : ControllerBase
     {
         _accountService = accountService;
         _notificationPublisher = notificationPublisher;
-        _configuration = configuration;
+        var baseUrl = configuration["TherapistInvite:BaseUrl"]?.Trim();
+        _therapistInviteBaseUrl = string.IsNullOrWhiteSpace(baseUrl)
+            ? "nuaspa://accept-invite"
+            : baseUrl;
         _logger = logger;
     }
 
@@ -50,17 +53,11 @@ public class AdminTherapistAccountController : ControllerBase
             adminId = id;
         }
 
-        var baseUrl = _configuration["TherapistInvite:BaseUrl"]?.Trim();
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            baseUrl = "nuaspa://accept-invite";
-        }
-
         var result = await _accountService.InviteAsync(
             zaposlenikId,
             body?.Email,
             adminId,
-            baseUrl);
+            _therapistInviteBaseUrl);
 
         if (!result.Success)
         {

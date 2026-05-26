@@ -2,13 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 
 namespace NuaSpa.Application.Interfaces
 {
     public interface IRecenzijaService
     {
-        Task<IEnumerable<RecenzijaDTO>> GetByUslugaAsync(int uslugaId);
+        Task<PagedResult<RecenzijaDTO>> GetByUslugaAsync(
+            int uslugaId,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize);
 
         Task<RecenzijaDTO?> GetByIdAsync(int id);
 

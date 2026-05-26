@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
@@ -53,12 +54,58 @@ namespace NuaSpa.Application.Services
             return await MapSingleAndEnrichAsync(entity);
         }
 
-        public async Task<IEnumerable<RezervacijaDTO>> GetAsync(
+        public async Task<PagedResult<RezervacijaDTO>> GetAsync(
             int? korisnikId,
             DateTime? datum,
             bool? isPotvrdjena,
             bool includeOtkazane = false,
-            int? zaposlenikId = null)
+            int? zaposlenikId = null,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize)
+        {
+            (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+            var query = BuildListQuery(korisnikId, datum, isPotvrdjena, includeOtkazane, zaposlenikId);
+            var total = await query.CountAsync();
+            var list = await query
+                .OrderByDescending(r => r.DatumRezervacije)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var items = (await MapAndEnrichAsync(list)).ToList();
+            return new PagedResult<RezervacijaDTO>
+            {
+                Ukupno = total,
+                Stranica = page,
+                VelicinaStranice = pageSize,
+                Items = items,
+            };
+        }
+
+        public async Task<PagedResult<RezervacijaDTO>> GetForZaposlenikAsync(
+            int zaposlenikId,
+            DateTime? datum,
+            bool? isPotvrdjena,
+            bool includeOtkazane = false,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize)
+        {
+            return await GetAsync(
+                korisnikId: null,
+                datum,
+                isPotvrdjena,
+                includeOtkazane,
+                zaposlenikId: zaposlenikId,
+                page,
+                pageSize);
+        }
+
+        private IQueryable<Rezervacija> BuildListQuery(
+            int? korisnikId,
+            DateTime? datum,
+            bool? isPotvrdjena,
+            bool includeOtkazane,
+            int? zaposlenikId)
         {
             var query = _context.Rezervacije
                 .AsNoTracking()
@@ -86,8 +133,10 @@ namespace NuaSpa.Application.Services
 
             if (datum.HasValue)
             {
-                var date = datum.Value.Date;
-                query = query.Where(r => r.DatumRezervacije.Date == date);
+                var dayStart = datum.Value.Date;
+                var dayEnd = dayStart.AddDays(1);
+                query = query.Where(r =>
+                    r.DatumRezervacije >= dayStart && r.DatumRezervacije < dayEnd);
             }
 
             if (isPotvrdjena.HasValue)
@@ -95,50 +144,7 @@ namespace NuaSpa.Application.Services
                 query = query.Where(r => r.IsPotvrdjena == isPotvrdjena.Value);
             }
 
-            var list = await query
-                .OrderByDescending(r => r.DatumRezervacije)
-                .ToListAsync();
-
-            return await MapAndEnrichAsync(list);
-        }
-
-        public async Task<IEnumerable<RezervacijaDTO>> GetForZaposlenikAsync(
-            int zaposlenikId,
-            DateTime? datum,
-            bool? isPotvrdjena,
-            bool includeOtkazane = false)
-        {
-            var query = _context.Rezervacije
-                .AsNoTracking()
-                .Include(r => r.Korisnik)
-                .Include(r => r.Usluga)
-                .Include(r => r.Zaposlenik)
-                .Include(r => r.Prostorija)
-                .Include(r => r.RezervacijaOprema)
-                .Where(r => r.ZaposlenikId == zaposlenikId)
-                .AsQueryable();
-
-            if (!includeOtkazane)
-            {
-                query = query.Where(r => !r.IsOtkazana);
-            }
-
-            if (datum.HasValue)
-            {
-                var date = datum.Value.Date;
-                query = query.Where(r => r.DatumRezervacije.Date == date);
-            }
-
-            if (isPotvrdjena.HasValue)
-            {
-                query = query.Where(r => r.IsPotvrdjena == isPotvrdjena.Value);
-            }
-
-            var list = await query
-                .OrderByDescending(r => r.DatumRezervacije)
-                .ToListAsync();
-
-            return await MapAndEnrichAsync(list);
+            return query;
         }
 
         public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto, bool isAdminBooking = false)
@@ -689,23 +695,17 @@ namespace NuaSpa.Application.Services
             int? excludeRezervacijaId)
         {
             var end = start.AddMinutes(durationMinutes);
-            var bookings = await _context.Rezervacije.AsNoTracking()
-                .Where(r =>
+            var hasOverlap = await _context.Rezervacije.AsNoTracking()
+                .AnyAsync(r =>
                     r.ProstorijaId == prostorijaId &&
                     r.Status != RezervacijaStatus.Cancelled &&
                     (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value) &&
-                    r.DatumRezervacije < end)
-                .Select(r => new { r.DatumRezervacije, r.SnimakTrajanjeMinuta })
-                .ToListAsync();
+                    r.DatumRezervacije < end &&
+                    r.DatumRezervacije.AddMinutes(r.SnimakTrajanjeMinuta > 0 ? r.SnimakTrajanjeMinuta : 60) > start);
 
-            foreach (var b in bookings)
+            if (hasOverlap)
             {
-                var bDuration = RezervacijaPricing.ResolveDurationMinutes(b.SnimakTrajanjeMinuta);
-                var bEnd = b.DatumRezervacije.AddMinutes(bDuration);
-                if (b.DatumRezervacije < end && bEnd > start)
-                {
-                    throw new BusinessRuleException("Prostorija je već zauzeta u odabranom terminu.");
-                }
+                throw new BusinessRuleException("Prostorija je već zauzeta u odabranom terminu.");
             }
         }
 
@@ -728,23 +728,15 @@ namespace NuaSpa.Application.Services
             }
 
             var end = start.AddMinutes(durationMinutes);
-            var overlappingReservations = await _context.Rezervacije
+            var overlappingIds = await _context.Rezervacije
                 .AsNoTracking()
                 .Where(r =>
                     r.Status != RezervacijaStatus.Cancelled &&
                     (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value) &&
-                    r.DatumRezervacije < end)
-                .Select(r => new { r.Id, r.DatumRezervacije, r.SnimakTrajanjeMinuta })
-                .ToListAsync();
-
-            var overlappingIds = overlappingReservations
-                .Where(r =>
-                {
-                    var d = RezervacijaPricing.ResolveDurationMinutes(r.SnimakTrajanjeMinuta);
-                    return r.DatumRezervacije.AddMinutes(d) > start;
-                })
+                    r.DatumRezervacije < end &&
+                    r.DatumRezervacije.AddMinutes(r.SnimakTrajanjeMinuta > 0 ? r.SnimakTrajanjeMinuta : 60) > start)
                 .Select(r => r.Id)
-                .ToList();
+                .ToListAsync();
 
             if (overlappingIds.Count == 0)
             {

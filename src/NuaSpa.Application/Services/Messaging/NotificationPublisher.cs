@@ -9,12 +9,12 @@ namespace NuaSpa.Application.Services.Messaging;
 public sealed class NotificationPublisher : INotificationPublisher
 {
     private readonly IRabbitMqPublisher _publisher;
-    private readonly IConfiguration _configuration;
+    private readonly string? _adminNotifyEmail;
 
     public NotificationPublisher(IRabbitMqPublisher publisher, IConfiguration configuration)
     {
         _publisher = publisher;
-        _configuration = configuration;
+        _adminNotifyEmail = configuration["Email:AdminNotify"];
     }
 
     public Task PublishRezervacijaPotvrdaAsync(
@@ -84,7 +84,7 @@ public sealed class NotificationPublisher : INotificationPublisher
             Naziv = usluga.Naziv,
             KategorijaNaziv = usluga.KategorijaNaziv ?? "—",
             Cijena = usluga.Cijena,
-            AdminNotifyEmail = adminEmail ?? _configuration["Email:AdminNotify"],
+            AdminNotifyEmail = adminEmail ?? _adminNotifyEmail,
         };
 
         return _publisher.PublishAsync(NuaSpaMessageTypes.UslugaKreirana, message, cancellationToken);
