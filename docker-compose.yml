@@ -35,7 +35,7 @@ services:
     container_name: nuaspa-api-container
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=nuaspa-db;Database=NuaSpaDb;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
+      - ConnectionStrings__DefaultConnection=Server=nuaspa-db;Database=210240;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
       # Dodajemo adresu za RabbitMQ (unutar mreže koristimo ime servisa)
       - RabbitMQ__Host=rabbitmq
     ports:
