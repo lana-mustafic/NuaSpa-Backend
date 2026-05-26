@@ -34,6 +34,6 @@ public class StaffInvitationConfiguration : IEntityTypeConfiguration<StaffInvita
             .WithMany()
             .HasForeignKey(s => s.CreatedByKorisnikId)
             .IsRequired(false)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.NoAction);
     }
 }

@@ -105,93 +105,76 @@ namespace NuaSpa.Infrastructure.Migrations
                 name: "AspNetRoles",
                 comment: "Referentna tablica: uloge (ASP.NET Identity)");
 
-            migrationBuilder.AddColumn<int>(
-                name: "Status",
-                table: "Zaposlenici",
-                type: "int",
-                nullable: false,
-                defaultValue: 0);
+            // Idempotentno: kolone/tablice mogu već postojati iz ranijeg Ensure SQL-a.
+            migrationBuilder.Sql(
+                """
+                IF COL_LENGTH('dbo.Zaposlenici', 'Status') IS NULL
+                    ALTER TABLE [Zaposlenici] ADD [Status] int NOT NULL
+                        CONSTRAINT [DF_Zaposlenici_Status] DEFAULT 0;
 
-            migrationBuilder.AddColumn<int>(
-                name: "ZaposlenikId",
-                table: "Recenzije",
-                type: "int",
-                nullable: true);
+                IF COL_LENGTH('dbo.Recenzije', 'ZaposlenikId') IS NULL
+                    ALTER TABLE [Recenzije] ADD [ZaposlenikId] int NULL;
 
-            migrationBuilder.CreateTable(
-                name: "KorisnikAktivnosti",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    KorisnikId = table.Column<int>(type: "int", nullable: false),
-                    Tip = table.Column<int>(type: "int", nullable: false),
-                    UslugaId = table.Column<int>(type: "int", nullable: true),
-                    KategorijaUslugaId = table.Column<int>(type: "int", nullable: true),
-                    SearchTerm = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_KorisnikAktivnosti", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_KorisnikAktivnosti_AspNetUsers_KorisnikId",
-                        column: x => x.KorisnikId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_KorisnikAktivnosti_KategorijeUsluga_KategorijaUslugaId",
-                        column: x => x.KategorijaUslugaId,
-                        principalTable: "KategorijeUsluga",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_KorisnikAktivnosti_Usluge_UslugaId",
-                        column: x => x.UslugaId,
-                        principalTable: "Usluge",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                });
+                IF OBJECT_ID(N'dbo.KorisnikAktivnosti', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [KorisnikAktivnosti] (
+                        [Id] int NOT NULL IDENTITY,
+                        [KorisnikId] int NOT NULL,
+                        [Tip] int NOT NULL,
+                        [UslugaId] int NULL,
+                        [KategorijaUslugaId] int NULL,
+                        [SearchTerm] nvarchar(200) NULL,
+                        [CreatedAt] datetime2 NOT NULL,
+                        [IsDeleted] bit NOT NULL CONSTRAINT [DF_KorisnikAktivnosti_IsDeleted] DEFAULT 0,
+                        CONSTRAINT [PK_KorisnikAktivnosti] PRIMARY KEY ([Id]),
+                        CONSTRAINT [FK_KorisnikAktivnosti_AspNetUsers_KorisnikId]
+                            FOREIGN KEY ([KorisnikId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_KorisnikAktivnosti_KategorijeUsluga_KategorijaUslugaId]
+                            FOREIGN KEY ([KategorijaUslugaId]) REFERENCES [KategorijeUsluga]([Id]) ON DELETE SET NULL,
+                        CONSTRAINT [FK_KorisnikAktivnosti_Usluge_UslugaId]
+                            FOREIGN KEY ([UslugaId]) REFERENCES [Usluge]([Id]) ON DELETE SET NULL
+                    );
+                END
+                ELSE
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM sys.foreign_keys
+                        WHERE name = 'FK_KorisnikAktivnosti_KategorijeUsluga_KategorijaUslugaId')
+                    BEGIN
+                        ALTER TABLE [KorisnikAktivnosti] ADD CONSTRAINT [FK_KorisnikAktivnosti_KategorijeUsluga_KategorijaUslugaId]
+                            FOREIGN KEY ([KategorijaUslugaId]) REFERENCES [KategorijeUsluga]([Id]) ON DELETE SET NULL;
+                    END;
+                END;
 
-            migrationBuilder.CreateTable(
-                name: "StaffInvitations",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ZaposlenikId = table.Column<int>(type: "int", nullable: false),
-                    KorisnikId = table.Column<int>(type: "int", nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    TokenHash = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    AcceptedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByKorisnikId = table.Column<int>(type: "int", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_StaffInvitations", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_StaffInvitations_AspNetUsers_CreatedByKorisnikId",
-                        column: x => x.CreatedByKorisnikId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_StaffInvitations_AspNetUsers_KorisnikId",
-                        column: x => x.KorisnikId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_StaffInvitations_Zaposlenici_ZaposlenikId",
-                        column: x => x.ZaposlenikId,
-                        principalTable: "Zaposlenici",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
+                IF OBJECT_ID(N'dbo.StaffInvitations', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [StaffInvitations] (
+                        [Id] int NOT NULL IDENTITY,
+                        [ZaposlenikId] int NOT NULL,
+                        [KorisnikId] int NOT NULL,
+                        [Email] nvarchar(256) NOT NULL,
+                        [TokenHash] nvarchar(64) NOT NULL,
+                        [CreatedAt] datetime2 NOT NULL,
+                        [ExpiresAt] datetime2 NOT NULL,
+                        [AcceptedAt] datetime2 NULL,
+                        [CreatedByKorisnikId] int NULL,
+                        CONSTRAINT [PK_StaffInvitations] PRIMARY KEY ([Id]),
+                        CONSTRAINT [FK_StaffInvitations_AspNetUsers_CreatedByKorisnikId]
+                            FOREIGN KEY ([CreatedByKorisnikId]) REFERENCES [AspNetUsers]([Id]) ON DELETE NO ACTION,
+                        CONSTRAINT [FK_StaffInvitations_AspNetUsers_KorisnikId]
+                            FOREIGN KEY ([KorisnikId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_StaffInvitations_Zaposlenici_ZaposlenikId]
+                            FOREIGN KEY ([ZaposlenikId]) REFERENCES [Zaposlenici]([Id]) ON DELETE CASCADE
+                    );
+                END
+                ELSE IF NOT EXISTS (
+                    SELECT 1 FROM sys.foreign_keys
+                    WHERE name = 'FK_StaffInvitations_AspNetUsers_CreatedByKorisnikId')
+                BEGIN
+                    ALTER TABLE [StaffInvitations] ADD CONSTRAINT [FK_StaffInvitations_AspNetUsers_CreatedByKorisnikId]
+                        FOREIGN KEY ([CreatedByKorisnikId]) REFERENCES [AspNetUsers]([Id]) ON DELETE NO ACTION;
+                END;
+                """);
 
             migrationBuilder.UpdateData(
                 table: "AspNetRoles",
@@ -230,6 +213,8 @@ namespace NuaSpa.Infrastructure.Migrations
 
             migrationBuilder.Sql(
                 """
+                SET IDENTITY_INSERT [KategorijeUsluga] ON;
+
                 IF NOT EXISTS (SELECT 1 FROM [KategorijeUsluga] WHERE [Id] = 1)
                     INSERT INTO [KategorijeUsluga] ([Id], [Naziv], [Opis], [CreatedAt], [IsDeleted])
                     VALUES (1, N'Massage', N'Masaže i relaks tretmani', '2026-01-01', 0);
@@ -239,47 +224,36 @@ namespace NuaSpa.Infrastructure.Migrations
                 IF NOT EXISTS (SELECT 1 FROM [KategorijeUsluga] WHERE [Id] = 3)
                     INSERT INTO [KategorijeUsluga] ([Id], [Naziv], [Opis], [CreatedAt], [IsDeleted])
                     VALUES (3, N'Body', N'Tretmani tijela', '2026-01-01', 0);
+
+                SET IDENTITY_INSERT [KategorijeUsluga] OFF;
                 """);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_Recenzije_ZaposlenikId",
-                table: "Recenzije",
-                column: "ZaposlenikId");
+            migrationBuilder.Sql(
+                """
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Recenzije_ZaposlenikId' AND object_id = OBJECT_ID('dbo.Recenzije'))
+                    CREATE INDEX [IX_Recenzije_ZaposlenikId] ON [Recenzije]([ZaposlenikId]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_KorisnikAktivnosti_KategorijaUslugaId",
-                table: "KorisnikAktivnosti",
-                column: "KategorijaUslugaId");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_KorisnikAktivnosti_KategorijaUslugaId' AND object_id = OBJECT_ID('dbo.KorisnikAktivnosti'))
+                    CREATE INDEX [IX_KorisnikAktivnosti_KategorijaUslugaId] ON [KorisnikAktivnosti]([KategorijaUslugaId]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_KorisnikAktivnosti_KorisnikId_CreatedAt",
-                table: "KorisnikAktivnosti",
-                columns: new[] { "KorisnikId", "CreatedAt" });
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_KorisnikAktivnosti_KorisnikId_CreatedAt' AND object_id = OBJECT_ID('dbo.KorisnikAktivnosti'))
+                    CREATE INDEX [IX_KorisnikAktivnosti_KorisnikId_CreatedAt] ON [KorisnikAktivnosti]([KorisnikId], [CreatedAt]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_KorisnikAktivnosti_UslugaId",
-                table: "KorisnikAktivnosti",
-                column: "UslugaId");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_KorisnikAktivnosti_UslugaId' AND object_id = OBJECT_ID('dbo.KorisnikAktivnosti'))
+                    CREATE INDEX [IX_KorisnikAktivnosti_UslugaId] ON [KorisnikAktivnosti]([UslugaId]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_StaffInvitations_CreatedByKorisnikId",
-                table: "StaffInvitations",
-                column: "CreatedByKorisnikId");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_StaffInvitations_CreatedByKorisnikId' AND object_id = OBJECT_ID('dbo.StaffInvitations'))
+                    CREATE INDEX [IX_StaffInvitations_CreatedByKorisnikId] ON [StaffInvitations]([CreatedByKorisnikId]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_StaffInvitations_KorisnikId",
-                table: "StaffInvitations",
-                column: "KorisnikId");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_StaffInvitations_KorisnikId' AND object_id = OBJECT_ID('dbo.StaffInvitations'))
+                    CREATE INDEX [IX_StaffInvitations_KorisnikId] ON [StaffInvitations]([KorisnikId]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_StaffInvitations_TokenHash",
-                table: "StaffInvitations",
-                column: "TokenHash");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_StaffInvitations_TokenHash' AND object_id = OBJECT_ID('dbo.StaffInvitations'))
+                    CREATE INDEX [IX_StaffInvitations_TokenHash] ON [StaffInvitations]([TokenHash]);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_StaffInvitations_ZaposlenikId_AcceptedAt",
-                table: "StaffInvitations",
-                columns: new[] { "ZaposlenikId", "AcceptedAt" });
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_StaffInvitations_ZaposlenikId_AcceptedAt' AND object_id = OBJECT_ID('dbo.StaffInvitations'))
+                    CREATE INDEX [IX_StaffInvitations_ZaposlenikId_AcceptedAt] ON [StaffInvitations]([ZaposlenikId], [AcceptedAt]);
+                """);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_AspNetUsers_Zaposlenici_ZaposlenikId",
@@ -361,13 +335,14 @@ namespace NuaSpa.Infrastructure.Migrations
                 principalColumn: "Id",
                 onDelete: ReferentialAction.Restrict);
 
-            migrationBuilder.AddForeignKey(
-                name: "FK_Recenzije_Zaposlenici_ZaposlenikId",
-                table: "Recenzije",
-                column: "ZaposlenikId",
-                principalTable: "Zaposlenici",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+            migrationBuilder.Sql(
+                """
+                IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Recenzije_Zaposlenici_ZaposlenikId')
+                    ALTER TABLE [Recenzije] DROP CONSTRAINT [FK_Recenzije_Zaposlenici_ZaposlenikId];
+
+                ALTER TABLE [Recenzije] ADD CONSTRAINT [FK_Recenzije_Zaposlenici_ZaposlenikId]
+                    FOREIGN KEY ([ZaposlenikId]) REFERENCES [Zaposlenici]([Id]) ON DELETE SET NULL;
+                """);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_Rezervacije_AspNetUsers_KorisnikId",
