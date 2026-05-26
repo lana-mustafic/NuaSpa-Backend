@@ -58,13 +58,23 @@ public sealed class RabbitMqPublisher : IRabbitMqPublisher
                 cancellationToken: cancellationToken);
 
             _logger.LogInformation(
-                "RabbitMQ objavljena poruka {Type} na red {Queue}",
+                "RabbitMQ publish uspješan Type={Type} Queue={Queue} Host={Host}:{Port} CorrelationId={CorrelationId}",
                 messageType,
-                _options.NotificationsQueue);
+                _options.NotificationsQueue,
+                _options.Host,
+                _options.Port,
+                envelope.CorrelationId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "RabbitMQ publish nije uspio za tip {Type}", messageType);
+            _logger.LogError(
+                ex,
+                "RabbitMQ publish NIJE USPIO Type={Type} Queue={Queue} Host={Host}:{Port} CorrelationId={CorrelationId}",
+                messageType,
+                _options.NotificationsQueue,
+                _options.Host,
+                _options.Port,
+                envelope.CorrelationId);
             throw;
         }
     }

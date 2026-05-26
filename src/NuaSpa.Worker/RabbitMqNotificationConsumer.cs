@@ -10,9 +10,12 @@ namespace NuaSpa.Worker;
 
 /// <summary>
 /// Pomoćni mikroservis: prima poruke iz RabbitMQ i izvršava asinhrone zadatke (e-mail, notifikacije).
+/// Odvojen od NuaSpa.Api procesa — zadovoljava zahtjev zasebnog Worker kontejnera.
 /// </summary>
 public sealed class RabbitMqNotificationConsumer : BackgroundService
 {
+    private const int MaxConnectRetries = 36;
+
     private readonly RabbitMqOptions _options;
     private readonly NotificationMessageDispatcher _dispatcher;
     private readonly ILogger<RabbitMqNotificationConsumer> _logger;
@@ -30,6 +33,33 @@ public sealed class RabbitMqNotificationConsumer : BackgroundService
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation(
+            "NuaSpa Worker pokrenut. Cilj: red={Queue}, broker={Host}:{Port}",
+            _options.NotificationsQueue,
+            _options.Host,
+            _options.Port);
+
+        for (var attempt = 1; attempt <= MaxConnectRetries && !stoppingToken.IsCancellationRequested; attempt++)
+        {
+            try
+            {
+                await ConnectAndConsumeAsync(stoppingToken);
+                return;
+            }
+            catch (Exception ex) when (attempt < MaxConnectRetries)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "RabbitMQ nije dostupan (pokušaj {Attempt}/{Max}). Ponovni pokušaj za 5s…",
+                    attempt,
+                    MaxConnectRetries);
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
+    }
+
+    private async Task ConnectAndConsumeAsync(CancellationToken stoppingToken)
     {
         var factory = new ConnectionFactory
         {
@@ -51,7 +81,7 @@ public sealed class RabbitMqNotificationConsumer : BackgroundService
             cancellationToken: stoppingToken);
 
         _logger.LogInformation(
-            "NuaSpa Worker sluša red {Queue} na {Host}:{Port}",
+            "Worker povezan na RabbitMQ. Slušam red {Queue} ({Host}:{Port})",
             _options.NotificationsQueue,
             _options.Host,
             _options.Port);
@@ -59,23 +89,45 @@ public sealed class RabbitMqNotificationConsumer : BackgroundService
         var consumer = new AsyncEventingBasicConsumer(_channel);
         consumer.ReceivedAsync += async (_, ea) =>
         {
+            var deliveryTag = ea.DeliveryTag;
             try
             {
                 var json = Encoding.UTF8.GetString(ea.Body.ToArray());
                 var envelope = JsonSerializer.Deserialize<NuaSpaMessageEnvelope>(json);
                 if (envelope == null || string.IsNullOrWhiteSpace(envelope.Type))
                 {
-                    _logger.LogWarning("Primljena neispravna poruka (prazan envelope).");
+                    _logger.LogWarning(
+                        "Neispravna poruka (DeliveryTag={DeliveryTag}, prazan envelope)",
+                        deliveryTag);
+                    await _channel.BasicAckAsync(deliveryTag, multiple: false, cancellationToken: stoppingToken);
                     return;
                 }
 
+                _logger.LogInformation(
+                    "Primljena poruka Type={Type} CorrelationId={CorrelationId} DeliveryTag={DeliveryTag}",
+                    envelope.Type,
+                    envelope.CorrelationId,
+                    deliveryTag);
+
                 await _dispatcher.DispatchAsync(envelope, stoppingToken);
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken);
+                await _channel.BasicAckAsync(deliveryTag, multiple: false, cancellationToken: stoppingToken);
+
+                _logger.LogInformation(
+                    "Poruka obrađena Type={Type} CorrelationId={CorrelationId}",
+                    envelope.Type,
+                    envelope.CorrelationId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Greška pri obradi poruke — NACK bez requeue.");
-                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken: stoppingToken);
+                _logger.LogError(
+                    ex,
+                    "Greška pri obradi poruke DeliveryTag={DeliveryTag} — NACK bez requeue",
+                    deliveryTag);
+                await _channel.BasicNackAsync(
+                    deliveryTag,
+                    multiple: false,
+                    requeue: false,
+                    cancellationToken: stoppingToken);
             }
         };
 
@@ -90,6 +142,7 @@ public sealed class RabbitMqNotificationConsumer : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("NuaSpa Worker zaustavljanje…");
         if (_channel != null)
         {
             await _channel.CloseAsync(cancellationToken);

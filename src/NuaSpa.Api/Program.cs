@@ -38,6 +38,7 @@ builder.Services.AddFluentValidationClientsideAdapters();
 builder.Services.AddValidatorsFromAssembly(typeof(NuaSpa.Application.MappingProfile).Assembly);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks();
 
 // --- 2. SWAGGER / OPENAPI ---
 builder.Services.AddEndpointsApiExplorer();
@@ -382,5 +383,6 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();

@@ -1,23 +1,20 @@
-# 1. Stage: Build (Koristimo SDK 9.0)
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+# NuaSpa.Api — glavni REST servis
+FROM mcr.microsoft.com/dotnet/sdk:9.0.203-bookworm-slim AS build
 WORKDIR /src
-
-# Kopiramo cijeli src folder jer Api zavisi od ostalih projekata (Domain, App...)
 COPY . .
-
-# Radimo restore za cijeli solution da pohvata sve zavisnosti
 RUN dotnet restore "NuaSpa.slnx"
-
-# Buildamo konkretno API projekt
-WORKDIR "/src/src/NuaSpa.Api"
-RUN dotnet build "NuaSpa.Api.csproj" -c Release -o /app/build
-
-# 2. Stage: Publish
-FROM build AS publish
+WORKDIR /src/src/NuaSpa.Api
 RUN dotnet publish "NuaSpa.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# 3. Stage: Final (Runtime koristi ASP.NET 9.0)
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:9.0.3-bookworm-slim AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "NuaSpa.Api.dll"]
