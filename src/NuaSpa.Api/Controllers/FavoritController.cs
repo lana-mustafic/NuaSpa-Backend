@@ -5,12 +5,13 @@ using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Klijent,Admin")]
+[Authorize(Roles = RoleConstants.KlijentAdmin)]
     public class FavoritController : ControllerBase
     {
         private readonly IFavoritService _service;

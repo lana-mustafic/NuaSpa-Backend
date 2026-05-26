@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers
 {
@@ -47,7 +48,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("admin-dashboard")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<ActionResult<AdminReviewsDashboardDto>> GetAdminDashboard(
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to,
@@ -79,7 +80,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("admin-dashboard/csv")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<FileContentResult> GetAdminDashboardCsv(
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to,
@@ -107,7 +108,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPatch("{id}/admin-odgovor")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<IActionResult> PatchAdminOdgovor(
             int id,
             [FromBody] RecenzijaAdminOdgovorPatchDto? body,
@@ -118,19 +119,12 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Klijent,Admin")]
+        [Authorize(Roles = RoleConstants.KlijentAdmin)]
         public async Task<ActionResult<RecenzijaDTO>> Create([FromBody] RecenzijaCreateDTO dto)
         {
             var korisnikId = User.GetNuaSpaUserId();
-            try
-            {
-                var created = await _service.CreateAsync(korisnikId, dto);
-                return Ok(created);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            var created = await _service.CreateAsync(korisnikId, dto);
+            return Ok(created);
         }
     }
 }

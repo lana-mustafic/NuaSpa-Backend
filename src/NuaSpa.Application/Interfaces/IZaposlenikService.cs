@@ -37,6 +37,8 @@ namespace NuaSpa.Application.Interfaces
         Task<IReadOnlyList<TherapistReviewRowDto>> GetMyReviewsAsync(
             int zaposlenikId,
             int maxReviews = 30);
+
+        Task DeleteAsync(int id);
     }
 }
 

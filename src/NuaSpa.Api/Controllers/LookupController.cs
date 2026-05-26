@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.DTOs;
-using NuaSpa.Domain;
+using NuaSpa.Application.Common;
+using NuaSpa.Application.Interfaces;
 
 namespace NuaSpa.Api.Controllers;
 
@@ -12,70 +12,31 @@ namespace NuaSpa.Api.Controllers;
 [Authorize]
 public class LookupController : ControllerBase
 {
-    private readonly NuaSpaContext _context;
+    private readonly ILookupService _service;
 
-    public LookupController(NuaSpaContext context)
+    public LookupController(ILookupService service)
     {
-        _context = context;
+        _service = service;
     }
 
     [HttpGet("drzave")]
-    [Authorize(Roles = "Admin,Klijent")]
+    [Authorize(Roles = RoleConstants.Admin + "," + RoleConstants.Klijent)]
     public async Task<ActionResult<List<DrzavaLookupDto>>> GetDrzave(
         [FromQuery] string? naziv = null,
         CancellationToken ct = default)
     {
-        var query = _context.Drzave.AsNoTracking().Where(d => !d.IsDeleted);
-
-        if (!string.IsNullOrWhiteSpace(naziv))
-        {
-            var t = naziv.Trim();
-            query = query.Where(d => d.Naziv.Contains(t));
-        }
-
-        var list = await query
-            .OrderBy(d => d.Naziv)
-            .Select(d => new DrzavaLookupDto { Id = d.Id, Naziv = d.Naziv })
-            .ToListAsync(ct);
-
+        var list = await _service.GetDrzaveAsync(naziv, ct);
         return Ok(list);
     }
 
     [HttpGet("gradovi")]
-    [Authorize(Roles = "Admin,Klijent")]
+    [Authorize(Roles = RoleConstants.Admin + "," + RoleConstants.Klijent)]
     public async Task<ActionResult<List<GradLookupDto>>> GetGradovi(
         [FromQuery] int? drzavaId = null,
         [FromQuery] string? naziv = null,
         CancellationToken ct = default)
     {
-        var query = _context.Gradovi.AsNoTracking()
-            .Include(g => g.Drzava)
-            .Where(g => !g.IsDeleted);
-
-        if (drzavaId is > 0)
-        {
-            query = query.Where(g => g.DrzavaId == drzavaId);
-        }
-
-        if (!string.IsNullOrWhiteSpace(naziv))
-        {
-            var t = naziv.Trim();
-            query = query.Where(g =>
-                g.Naziv.Contains(t) || g.PostanskiBroj.Contains(t));
-        }
-
-        var list = await query
-            .OrderBy(g => g.Naziv)
-            .Select(g => new GradLookupDto
-            {
-                Id = g.Id,
-                Naziv = g.Naziv,
-                PostanskiBroj = g.PostanskiBroj,
-                DrzavaId = g.DrzavaId,
-                DrzavaNaziv = g.Drzava.Naziv,
-            })
-            .ToListAsync(ct);
-
+        var list = await _service.GetGradoviAsync(drzavaId, naziv, ct);
         return Ok(list);
     }
 }

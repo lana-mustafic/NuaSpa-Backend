@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.DTOs;
+using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
@@ -81,22 +82,22 @@ namespace NuaSpa.Application.Services
         {
             if (dto.ZaposlenikId <= 0)
             {
-                throw new InvalidOperationException("Terapeut je obavezan.");
+                throw new BusinessRuleException("Terapeut je obavezan.");
             }
 
             if (dto.UslugaId <= 0)
             {
-                throw new InvalidOperationException("Usluga je obavezna.");
+                throw new BusinessRuleException("Usluga je obavezna.");
             }
 
             if (dto.Ocjena is < 1 or > 5)
             {
-                throw new InvalidOperationException("Ocjena mora biti između 1 i 5.");
+                throw new BusinessRuleException("Ocjena mora biti između 1 i 5.");
             }
 
             if (string.IsNullOrWhiteSpace(dto.Komentar))
             {
-                throw new InvalidOperationException("Komentar je obavezan.");
+                throw new BusinessRuleException("Komentar je obavezan.");
             }
 
             var zaposlenik = await _context.Zaposlenici
@@ -104,12 +105,12 @@ namespace NuaSpa.Application.Services
                 .FirstOrDefaultAsync(z => z.Id == dto.ZaposlenikId);
             if (zaposlenik == null)
             {
-                throw new InvalidOperationException("Terapeut ne postoji.");
+                throw new BusinessRuleException("Terapeut ne postoji.");
             }
 
             if (zaposlenik.KategorijaUslugaId is not > 0)
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     "Terapeut nema dodijeljenu kategoriju usluga.");
             }
 
@@ -118,12 +119,12 @@ namespace NuaSpa.Application.Services
                 .FirstOrDefaultAsync(u => u.Id == dto.UslugaId && !u.IsDeleted);
             if (usluga == null)
             {
-                throw new InvalidOperationException("Usluga ne postoji.");
+                throw new BusinessRuleException("Usluga ne postoji.");
             }
 
             if (usluga.KategorijaUslugaId != zaposlenik.KategorijaUslugaId)
             {
-                throw new InvalidOperationException(
+                throw new BusinessRuleException(
                     "Odabrana usluga ne pripada kategoriji terapeuta.");
             }
         }

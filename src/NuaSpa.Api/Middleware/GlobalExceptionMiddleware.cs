@@ -115,6 +115,10 @@ public sealed class GlobalExceptionMiddleware
                 (HttpStatusCode.BadRequest, "Neispravan zahtjev.", "Zahtjev nije mogao biti obraden."),
             ConflictException =>
                 (HttpStatusCode.Conflict, "Konflikt.", "Operacija nije dozvoljena u trenutnom stanju."),
+            ForbiddenException =>
+                (HttpStatusCode.Forbidden, "Pristup odbijen.", "Nemate dozvolu za ovu operaciju."),
+            UnauthorizedException =>
+                (HttpStatusCode.Unauthorized, "Neautorizovan zahtjev.", "Provjerite vjerodajnice."),
             UnauthorizedAccessException =>
                 (HttpStatusCode.Forbidden, "Pristup odbijen.", "Nemate dozvolu za ovu operaciju."),
             _ =>

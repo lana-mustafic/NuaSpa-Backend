@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using NuaSpa.Domain.Enums;
+using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Data;
 
@@ -228,7 +229,7 @@ public static class DevelopmentDataSeeder
                     continue;
                 }
 
-                await userManager.AddToRoleAsync(k, "Klijent");
+                await userManager.AddToRoleAsync(k, RoleConstants.Klijent);
             }
 
             clients.Add(k);

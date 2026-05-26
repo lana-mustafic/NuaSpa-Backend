@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers;
 
@@ -28,9 +29,9 @@ public class PortalController : ControllerBase
     public async Task<ActionResult<DesktopHomeOverviewDto>> GetDesktopHomeOverview(
         [FromQuery] DateTime? day = null)
     {
-        var isAdmin = User.IsInRole("Admin");
-        var isZaposlenik = User.IsInRole("Zaposlenik");
-        var isKlijent = User.IsInRole("Klijent");
+        var isAdmin = User.IsInRole(RoleConstants.Admin);
+        var isZaposlenik = User.IsInRole(RoleConstants.Zaposlenik);
+        var isKlijent = User.IsInRole(RoleConstants.Klijent);
 
         var d = (day ?? DateTime.UtcNow).Date;
         var userId = User.GetNuaSpaUserId();

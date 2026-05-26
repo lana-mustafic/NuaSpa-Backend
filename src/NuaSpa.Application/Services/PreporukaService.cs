@@ -41,7 +41,7 @@ namespace NuaSpa.Application.Services
                 return;
             }
 
-            var tip = (KorisnikAktivnostTip)dto.Tip;
+            var tip = dto.Tip;
             var since = DateTime.UtcNow.AddMinutes(-5);
 
             if (tip == KorisnikAktivnostTip.Search)

@@ -3,12 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using System.Net.Mime;
+using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleConstants.Admin)]
     public class IzvjestajController : ControllerBase
     {
         private readonly IReportingService _reportingService;

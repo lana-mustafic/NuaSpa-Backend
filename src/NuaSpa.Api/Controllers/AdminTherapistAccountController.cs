@@ -5,12 +5,13 @@ using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.Interfaces.Messaging;
 using NuaSpa.Application.Messaging.Messages;
+using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/therapists/{zaposlenikId:int}/account")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = RoleConstants.Admin)]
 public class AdminTherapistAccountController : ControllerBase
 {
     private readonly ITherapistAccountService _accountService;

@@ -1,11 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.SearchObjects;
-using NuaSpa.Domain;
+using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers
 {
@@ -14,12 +13,10 @@ namespace NuaSpa.Api.Controllers
     [Authorize]
     public class ZaposlenikController : BaseController<ZaposlenikDTO, ZaposlenikSearchObject>
     {
-        private readonly NuaSpaContext _context;
         private readonly IZaposlenikService _zaposlenikService;
 
-        public ZaposlenikController(IZaposlenikService service, NuaSpaContext context) : base(service)
+    public ZaposlenikController(IZaposlenikService service) : base(service)
         {
-            _context = context;
             _zaposlenikService = service;
         }
 
@@ -37,53 +34,20 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public override async Task<ActionResult<ZaposlenikDTO>> Insert([FromBody] ZaposlenikDTO dto)
         {
-            if (dto.KategorijaUslugaId is > 0)
-            {
-                var katOk = await _context.KategorijeUsluga.AsNoTracking()
-                    .AnyAsync(k => k.Id == dto.KategorijaUslugaId);
-                if (!katOk)
-                {
-                    throw new BadHttpRequestException("KategorijaUslugaId ne postoji.");
-                }
-            }
-
-            var specError = await _zaposlenikService.ValidateSpecijalizacijaAsync(
-                dto.KategorijaUslugaId,
-                dto.Specijalizacija);
-            if (specError != null)
-            {
-                throw new BadHttpRequestException(specError);
-            }
-
             var created = await _zaposlenikService.Insert(dto);
             return Ok(created);
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<ActionResult<ZaposlenikDTO>> Update(int id, [FromBody] ZaposlenikDTO dto)
         {
             if (id != dto.Id && dto.Id != 0)
             {
                 return BadRequest("ID u ruti i tijelu zahtjeva se ne poklapaju.");
-            }
-
-            if (dto.KategorijaUslugaId is > 0)
-            {
-                var katOk = await _context.KategorijeUsluga.AsNoTracking()
-                    .AnyAsync(k => k.Id == dto.KategorijaUslugaId);
-                if (!katOk) return BadRequest("KategorijaUslugaId ne postoji.");
-            }
-
-            var specError = await _zaposlenikService.ValidateSpecijalizacijaAsync(
-                dto.KategorijaUslugaId,
-                dto.Specijalizacija);
-            if (specError != null)
-            {
-                return BadRequest(specError);
             }
 
             var updated = await _zaposlenikService.UpdateAsync(id, dto);
@@ -93,7 +57,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("{id}/admin-profile")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<ActionResult<TherapistAdminProfileDto>> GetAdminProfile(
             int id,
             [FromQuery] int maxReviews = 20,
@@ -106,7 +70,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPatch("{id}/interna-napomena")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<IActionResult> UpdateInternaNapomena(
             int id,
             [FromBody] TherapistNotepadUpdateDto body)
@@ -122,41 +86,15 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<IActionResult> Delete(int id)
         {
-            var entity = await _context.Zaposlenici.FindAsync(id);
-            if (entity == null) return NotFound();
-
-            var hasReservations = await _context.Rezervacije.AnyAsync(r => r.ZaposlenikId == id);
-            if (hasReservations)
-            {
-                return Conflict(new { message = "Terapeut ima rezervacije i ne može biti obrisan." });
-            }
-
-            await _context.Users
-                .Where(k => k.ZaposlenikId == id)
-                .ExecuteUpdateAsync(s => s.SetProperty(k => k.ZaposlenikId, (int?)null));
-
-            _context.Zaposlenici.Remove(entity);
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                return Conflict(new
-                {
-                    message = "Terapeut se ne može obrisati zbog povezanih podataka u bazi.",
-                });
-            }
-
+            await _zaposlenikService.DeleteAsync(id);
             return NoContent();
         }
 
         [HttpGet("for-service/{uslugaId:int}")]
-        [Authorize(Roles = "Admin,Klijent")]
+        [Authorize(Roles = RoleConstants.AdminKlijent)]
         public async Task<ActionResult<IEnumerable<ZaposlenikDTO>>> GetForService(
             int uslugaId,
             [FromQuery] bool bookableOnly = true)
@@ -166,7 +104,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("for-category/{kategorijaUslugaId:int}")]
-        [Authorize(Roles = "Admin,Klijent")]
+        [Authorize(Roles = RoleConstants.AdminKlijent)]
         public async Task<ActionResult<IEnumerable<ZaposlenikDTO>>> GetForCategory(
             int kategorijaUslugaId,
             [FromQuery] bool bookableOnly = true)
@@ -178,7 +116,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("me")]
-        [Authorize(Roles = "Zaposlenik")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
         public async Task<ActionResult<ZaposlenikDTO>> GetMe()
         {
             if (!User.TryGetNuaSpaZaposlenikId(out var id))
@@ -191,7 +129,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPatch("me")]
-        [Authorize(Roles = "Zaposlenik")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
         public async Task<ActionResult<ZaposlenikDTO>> UpdateMe([FromBody] TherapistSelfProfileUpdateDto body)
         {
             if (!User.TryGetNuaSpaZaposlenikId(out var id))
@@ -204,7 +142,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("me/dashboard")]
-        [Authorize(Roles = "Zaposlenik")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
         public async Task<ActionResult<TherapistDashboardDto>> GetMyDashboard([FromQuery] DateTime? day = null)
         {
             if (!User.TryGetNuaSpaZaposlenikId(out var id))
@@ -217,7 +155,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("me/reviews")]
-        [Authorize(Roles = "Zaposlenik")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
         public async Task<ActionResult<IReadOnlyList<TherapistReviewRowDto>>> GetMyReviews(
             [FromQuery] int maxReviews = 30)
         {
@@ -230,7 +168,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("{id}/kpi")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<ActionResult<TherapistKpiDTO>> GetKpis(
             int id,
             [FromQuery] DateTime from,

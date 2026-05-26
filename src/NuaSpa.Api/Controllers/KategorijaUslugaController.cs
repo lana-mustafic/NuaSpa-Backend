@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.SearchObjects;
+using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers
 {
@@ -17,7 +18,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public override async Task<ActionResult<KategorijaUslugaDTO>> Insert([FromBody] KategorijaUslugaDTO dto)
         {
             if (string.IsNullOrWhiteSpace(dto?.Naziv))
@@ -30,7 +31,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPut("{id:int}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<ActionResult<KategorijaUslugaDTO>> Update(int id, [FromBody] KategorijaUslugaDTO dto)
         {
             if (id != dto.Id)
@@ -49,7 +50,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpDelete("{id:int}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<IActionResult> Delete(int id)
         {
             var (ok, message) = await _kategorijaService.DeleteAsync(id);

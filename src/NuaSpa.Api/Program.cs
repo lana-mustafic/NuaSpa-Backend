@@ -10,6 +10,7 @@ using Microsoft.OpenApi.Models;
 using NuaSpa.Api.Data;
 using NuaSpa.Application;
 using NuaSpa.Application.Common;
+using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces.Messaging;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
@@ -40,6 +41,31 @@ builder.Services.AddValidatorsFromAssembly(typeof(NuaSpa.Application.MappingProf
 
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
+
+// --- CORS (eksplicitno dozvoljene originale) ---
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>();
+
+allowedOrigins ??= new[]
+{
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080"
+};
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("NuaSpaCors", policy =>
+    {
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
 
 // --- 2. SWAGGER / OPENAPI ---
 builder.Services.AddEndpointsApiExplorer();
@@ -234,7 +260,7 @@ if (app.Environment.IsDevelopment())
         var roleManager = services.GetRequiredService<RoleManager<Uloga>>();
 
         // Uloge bi trebale već postojati iz seed-a, ali osiguraj ih za svaki slučaj.
-        var rolesToEnsure = new[] { "Admin", "Klijent", "Zaposlenik" };
+        var rolesToEnsure = new[] { RoleConstants.Admin, RoleConstants.Klijent, RoleConstants.Zaposlenik };
         foreach (var roleName in rolesToEnsure)
         {
             if (!await roleManager.RoleExistsAsync(roleName))
@@ -270,7 +296,7 @@ if (app.Environment.IsDevelopment())
                 if (!create.Succeeded)
                 {
                     var msg = string.Join("; ", create.Errors.Select(e => $"{e.Code}:{e.Description}"));
-                    throw new Exception($"Dev seed: CreateAsync({username}) failed: {msg}");
+                    throw new BusinessRuleException($"Dev seed: CreateAsync({username}) failed: {msg}");
                 }
             }
 
@@ -280,7 +306,7 @@ if (app.Environment.IsDevelopment())
             if (!reset.Succeeded)
             {
                 var msg = string.Join("; ", reset.Errors.Select(e => $"{e.Code}:{e.Description}"));
-                throw new Exception($"Dev seed: ResetPasswordAsync({username}) failed: {msg}");
+                throw new BusinessRuleException($"Dev seed: ResetPasswordAsync({username}) failed: {msg}");
             }
 
             if (!await userManager.IsInRoleAsync(user, roleName))
@@ -296,7 +322,7 @@ if (app.Environment.IsDevelopment())
             prezime: "NuaSpa",
             gradId: 1,
             password: "Admin123!",
-            roleName: "Admin");
+            roleName: RoleConstants.Admin);
 
         await EnsureUserAsync(
             username: "lana",
@@ -305,7 +331,7 @@ if (app.Environment.IsDevelopment())
             prezime: "Korisnik",
             gradId: 3,
             password: "Lana123!",
-            roleName: "Klijent");
+            roleName: RoleConstants.Klijent);
 
         var context = services.GetRequiredService<NuaSpaContext>();
         var demoTherapist = await context.Zaposlenici
@@ -333,7 +359,7 @@ if (app.Environment.IsDevelopment())
             prezime: "Pist",
             gradId: 1,
             password: "Therapist123!",
-            roleName: "Zaposlenik");
+            roleName: RoleConstants.Zaposlenik);
 
         var therapistUser = await userManager.FindByNameAsync("therapist");
         if (therapistUser != null && therapistUser.ZaposlenikId != demoTherapist.Id)
@@ -375,6 +401,7 @@ if (builder.Configuration.GetValue("UseHttpsRedirection", true))
     app.UseHttpsRedirection();
 }
 
+app.UseCors("NuaSpaCors");
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 

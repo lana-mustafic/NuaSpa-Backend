@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Application.DTOs;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.SearchObjects;
 using NuaSpa.Application.Interfaces.Messaging;
@@ -30,7 +31,7 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
 
     /// <summary>Admin: učitava sliku usluge u wwwroot i vraća javni URL.</summary>
     [HttpPost("upload-image")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleConstants.Admin)]
     [RequestSizeLimit(8_000_000)]
     public async Task<ActionResult<object>> UploadImage(
         IFormFile? file,
@@ -70,7 +71,7 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleConstants.Admin)]
     public override async Task<ActionResult<UslugaDTO>> Insert([FromBody] UslugaDTO dto)
     {
         var created = await _uslugaService.Insert(dto);
@@ -87,7 +88,7 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleConstants.Admin)]
     public async Task<ActionResult<UslugaDTO>> Update(int id, [FromBody] UslugaDTO dto)
     {
         if (id != dto.Id)
@@ -107,7 +108,7 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = RoleConstants.Admin)]
     public async Task<IActionResult> Delete(int id)
     {
         var (ok, message) = await _uslugaService.DeleteAsync(id);

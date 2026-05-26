@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 
@@ -22,7 +23,7 @@ public class PreporukaController : ControllerBase
 
     /// <summary>Content-based preporuke s objašnjenjem (razlogTekst).</summary>
     [HttpGet]
-    [Authorize(Roles = "Klijent,Admin")]
+    [Authorize(Roles = RoleConstants.KlijentAdmin)]
     public async Task<ActionResult<IEnumerable<PreporucenaUslugaDto>>> Get(
         [FromQuery] int take = 10)
     {
@@ -33,7 +34,7 @@ public class PreporukaController : ControllerBase
 
     /// <summary>Zapis pretrage ili pregleda usluge (signali za recommender).</summary>
     [HttpPost("aktivnost")]
-    [Authorize(Roles = "Klijent")]
+    [Authorize(Roles = RoleConstants.Klijent)]
     public async Task<IActionResult> LogAktivnost([FromBody] KorisnikAktivnostCreateDto dto)
     {
         var userId = User.GetNuaSpaUserId();

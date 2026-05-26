@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.Interfaces.Messaging;
@@ -31,31 +32,24 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Klijent,Admin")]
+        [Authorize(Roles = RoleConstants.KlijentAdmin)]
         public async Task<ActionResult<RezervacijaDTO>> Create([FromBody] RezervacijaCreateDTO dto)
         {
+            var korisnikId = User.IsInRole(RoleConstants.Admin) && dto.KorisnikId.HasValue
+                ? dto.KorisnikId.Value
+                : User.GetNuaSpaUserId();
+            var isAdminBooking = User.IsInRole(RoleConstants.Admin);
+            var created = await _rezervacijaService.CreateAsync(korisnikId, dto, isAdminBooking);
             try
             {
-                var korisnikId = User.IsInRole("Admin") && dto.KorisnikId.HasValue
-                    ? dto.KorisnikId.Value
-                    : User.GetNuaSpaUserId();
-                var isAdminBooking = User.IsInRole("Admin");
-                var created = await _rezervacijaService.CreateAsync(korisnikId, dto, isAdminBooking);
-                try
-                {
-                    await _notificationPublisher.PublishRezervacijaPotvrdaAsync(created);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "RabbitMQ notifikacija za rezervaciju {Id} nije poslana.", created.Id);
-                }
-
-                return Ok(created);
+                await _notificationPublisher.PublishRezervacijaPotvrdaAsync(created);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                _logger.LogWarning(ex, "RabbitMQ notifikacija za rezervaciju {Id} nije poslana.", created.Id);
             }
+
+            return Ok(created);
         }
 
         [HttpGet("{id:int}")]
@@ -67,8 +61,8 @@ namespace NuaSpa.Api.Controllers
                 return NotFound("Rezervacija nije pronađena.");
             }
 
-            var isAdmin = User.IsInRole("Admin");
-            if (User.IsInRole("Klijent") && !isAdmin)
+            var isAdmin = User.IsInRole(RoleConstants.Admin);
+            if (User.IsInRole(RoleConstants.Klijent) && !isAdmin)
             {
                 if (dto.KorisnikId != User.GetNuaSpaUserId())
                 {
@@ -76,7 +70,7 @@ namespace NuaSpa.Api.Controllers
                 }
             }
 
-            if (User.IsInRole("Zaposlenik") && !isAdmin)
+            if (User.IsInRole(RoleConstants.Zaposlenik) && !isAdmin)
             {
                 if (!User.TryGetNuaSpaZaposlenikId(out var zaposlenikId) ||
                     dto.ZaposlenikId != zaposlenikId)
@@ -91,9 +85,9 @@ namespace NuaSpa.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<RezervacijaDTO>>> Get([FromQuery] RezervacijaSearchObject? search = null)
         {
-            var isAdmin = User.IsInRole("Admin");
-            var isKlijent = User.IsInRole("Klijent");
-            var isZaposlenik = User.IsInRole("Zaposlenik");
+            var isAdmin = User.IsInRole(RoleConstants.Admin);
+            var isKlijent = User.IsInRole(RoleConstants.Klijent);
+            var isZaposlenik = User.IsInRole(RoleConstants.Zaposlenik);
 
             if (!isAdmin && !isKlijent && !isZaposlenik)
             {
@@ -141,10 +135,10 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPatch("{id}")]
-        [Authorize(Roles = "Admin,Zaposlenik")]
+        [Authorize(Roles = RoleConstants.AdminZaposlenik)]
         public async Task<ActionResult> UpdatePotvrdjena(int id, [FromBody] RezervacijaUpdateDTO dto)
         {
-            if (User.IsInRole("Admin"))
+            if (User.IsInRole(RoleConstants.Admin))
             {
                 var updatedAdmin = await _rezervacijaService.UpdatePotvrdjenaAsync(id, dto.IsPotvrdjena);
                 if (!updatedAdmin) return NotFound("Rezervacija nije pronađena.");
@@ -162,23 +156,16 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<ActionResult<RezervacijaDTO>> Edit(int id, [FromBody] RezervacijaEditDTO dto)
         {
-            try
-            {
-                var updated = await _rezervacijaService.EditAsync(id, dto);
-                if (updated == null) return NotFound("Rezervacija nije pronađena.");
-                return Ok(updated);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var updated = await _rezervacijaService.EditAsync(id, dto);
+            if (updated == null) return NotFound("Rezervacija nije pronađena.");
+            return Ok(updated);
         }
 
         [HttpPatch("{id:int}/vip")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<ActionResult> SetVip(int id, [FromBody] RezervacijaVipDto dto)
         {
             if (dto == null) return BadRequest();
@@ -188,17 +175,17 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpPatch("{id}/cancel")]
-        [Authorize(Roles = "Admin,Klijent,Zaposlenik")]
+        [Authorize(Roles = RoleConstants.AdminKlijentZaposlenik)]
         public async Task<ActionResult> Cancel(int id, [FromBody] RezervacijaCancelDTO dto)
         {
             int? requireKorisnikId = null;
             int? requireZaposlenikId = null;
 
-            if (User.IsInRole("Klijent") && !User.IsInRole("Admin"))
+            if (User.IsInRole(RoleConstants.Klijent) && !User.IsInRole(RoleConstants.Admin))
             {
                 requireKorisnikId = User.GetNuaSpaUserId();
             }
-            if (User.IsInRole("Zaposlenik") && !User.IsInRole("Admin"))
+            if (User.IsInRole(RoleConstants.Zaposlenik) && !User.IsInRole(RoleConstants.Admin))
             {
                 if (!User.TryGetNuaSpaZaposlenikId(out var zid))
                 {
@@ -220,7 +207,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpDelete("{id:int}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = RoleConstants.Admin)]
         public async Task<IActionResult> Delete(int id)
         {
             var (ok, message) = await _rezervacijaService.DeleteAdminAsync(id);
@@ -233,14 +220,14 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("dostupni-termini")]
-        [Authorize(Roles = "Klijent,Admin,Zaposlenik")]
+        [Authorize(Roles = RoleConstants.AdminKlijentZaposlenik)]
         public async Task<ActionResult<List<DateTime>>> GetDostupniTermini(
             [FromQuery] int zaposlenikId,
             [FromQuery] DateTime datum,
             [FromQuery] int? uslugaId = null)
         {
             // Teraput smije tražiti samo svoje termine.
-            if (User.IsInRole("Zaposlenik"))
+            if (User.IsInRole(RoleConstants.Zaposlenik))
             {
                 if (!User.TryGetNuaSpaZaposlenikId(out var myId) || myId != zaposlenikId)
                 {
@@ -256,7 +243,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("calendar")]
-        [Authorize(Roles = "Admin,Zaposlenik")]
+        [Authorize(Roles = RoleConstants.AdminZaposlenik)]
         public async Task<ActionResult<List<RezervacijaCalendarItemDTO>>> GetCalendar(
             [FromQuery] DateTime from,
             [FromQuery] DateTime to,
@@ -273,7 +260,7 @@ namespace NuaSpa.Api.Controllers
                 return BadRequest("Period je prevelik (max 31 dana).");
             }
 
-            var isAdmin = User.IsInRole("Admin");
+            var isAdmin = User.IsInRole(RoleConstants.Admin);
             int? zFilter = zaposlenikId;
             if (!isAdmin)
             {
@@ -305,7 +292,7 @@ namespace NuaSpa.Api.Controllers
         /// Štiklirana povijest termina jednog klijenta. Terapeut samo za zajedničke rezervacije; admin sve.
         /// </summary>
         [HttpGet("povijest-za-klijenta")]
-        [Authorize(Roles = "Admin,Zaposlenik")]
+        [Authorize(Roles = RoleConstants.AdminZaposlenik)]
         [ProducesResponseType(typeof(List<RezervacijaPovijestItemDto>), StatusCodes.Status200OK)]
         public async Task<ActionResult<List<RezervacijaPovijestItemDto>>> GetPovijestZaKlijenta(
             [FromQuery] int korisnikId,
@@ -315,9 +302,9 @@ namespace NuaSpa.Api.Controllers
             if (korisnikId <= 0)
                 return BadRequest("Neispravan korisnikId.");
 
-            var isAdmin = User.IsInRole("Admin");
+            var isAdmin = User.IsInRole(RoleConstants.Admin);
             var zaposId = 0;
-            if (User.IsInRole("Zaposlenik"))
+            if (User.IsInRole(RoleConstants.Zaposlenik))
             {
                 if (!User.TryGetNuaSpaZaposlenikId(out zaposId))
                 {

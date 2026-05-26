@@ -1,5 +1,7 @@
 namespace NuaSpa.Application.DTOs;
 
+using NuaSpa.Domain.Enums;
+
 public static class PreporukaRazlogKod
 {
     public const string PastBookingCategory = "PAST_BOOKING_CATEGORY";
@@ -12,8 +14,7 @@ public static class PreporukaRazlogKod
 
 public class KorisnikAktivnostCreateDto
 {
-    /// <summary>0 = Search, 1 = ViewService</summary>
-    public int Tip { get; set; }
+    public KorisnikAktivnostTip Tip { get; set; }
 
     public int? UslugaId { get; set; }
     public int? KategorijaUslugaId { get; set; }

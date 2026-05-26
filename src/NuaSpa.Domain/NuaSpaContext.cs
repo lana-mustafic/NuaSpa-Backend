@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Common;
 using System;
 
 namespace NuaSpa.Domain
@@ -42,9 +43,30 @@ namespace NuaSpa.Domain
 
             // 1. SEED ZA ULOGE
             modelBuilder.Entity<Uloga>().HasData(
-                new Uloga { Id = 1, Name = "Admin", NormalizedName = "ADMIN", CreatedAt = seedDate, ConcurrencyStamp = Guid.NewGuid().ToString() },
-                new Uloga { Id = 2, Name = "Klijent", NormalizedName = "KLIJENT", CreatedAt = seedDate, ConcurrencyStamp = Guid.NewGuid().ToString() },
-                new Uloga { Id = 3, Name = "Zaposlenik", NormalizedName = "ZAPOSLENIK", CreatedAt = seedDate, ConcurrencyStamp = Guid.NewGuid().ToString() }
+                new Uloga
+                {
+                    Id = RoleNames.AdminRoleId,
+                    Name = RoleNames.Admin,
+                    NormalizedName = RoleNames.AdminNormalized,
+                    CreatedAt = seedDate,
+                    ConcurrencyStamp = Guid.NewGuid().ToString()
+                },
+                new Uloga
+                {
+                    Id = RoleNames.KlijentRoleId,
+                    Name = RoleNames.Klijent,
+                    NormalizedName = RoleNames.KlijentNormalized,
+                    CreatedAt = seedDate,
+                    ConcurrencyStamp = Guid.NewGuid().ToString()
+                },
+                new Uloga
+                {
+                    Id = RoleNames.ZaposlenikRoleId,
+                    Name = RoleNames.Zaposlenik,
+                    NormalizedName = RoleNames.ZaposlenikNormalized,
+                    CreatedAt = seedDate,
+                    ConcurrencyStamp = Guid.NewGuid().ToString()
+                }
             );
 
             modelBuilder.Entity<Drzava>().HasData(
@@ -104,8 +126,8 @@ namespace NuaSpa.Domain
 
             // 3. POVEZIVANJE KORISNIKA I ULOGA (Ovo ti je falilo!)
             modelBuilder.Entity<IdentityUserRole<int>>().HasData(
-                new IdentityUserRole<int> { UserId = adminId, RoleId = 1 }, // Admin je Admin
-                new IdentityUserRole<int> { UserId = lanaId, RoleId = 2 }   // Lana je Klijent
+                new IdentityUserRole<int> { UserId = adminId, RoleId = RoleNames.AdminRoleId }, // Admin je Admin
+                new IdentityUserRole<int> { UserId = lanaId, RoleId = RoleNames.KlijentRoleId }   // Lana je Klijent
             );
 
             // Seed a single default spa center (id=1) + default working hours.

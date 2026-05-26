@@ -1,189 +1,84 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.DTOs;
-using NuaSpa.Domain;
-using NuaSpa.Domain.Entities;
+using NuaSpa.Application.Common;
+using NuaSpa.Application.Interfaces;
 
 namespace NuaSpa.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = RoleConstants.Admin)]
 public class ResursiController : ControllerBase
 {
-    private const int DefaultSpaCentarId = 1;
-    private readonly NuaSpaContext _context;
+    private readonly IResursiService _service;
 
-    public ResursiController(NuaSpaContext context)
+    public ResursiController(IResursiService service)
     {
-        _context = context;
+        _service = service;
     }
 
     [HttpGet("spa-centar")]
     public async Task<ActionResult<SpaCentarDTO>> GetSpaCentar()
     {
-        var entity = await _context.SpaCentri.AsNoTracking().FirstOrDefaultAsync(x => x.Id == DefaultSpaCentarId);
-        if (entity == null) return NotFound();
-        return Ok(new SpaCentarDTO
-        {
-            Id = entity.Id,
-            Naziv = entity.Naziv,
-            Adresa = entity.Adresa,
-            Email = entity.Email,
-            Telefon = entity.Telefon,
-            Opis = entity.Opis
-        });
+        var dto = await _service.GetSpaCentarAsync(HttpContext.RequestAborted);
+        if (dto == null) return NotFound();
+        return Ok(dto);
     }
 
     [HttpPut("spa-centar")]
     public async Task<ActionResult<SpaCentarDTO>> UpdateSpaCentar([FromBody] SpaCentarDTO dto)
     {
-        var entity = await _context.SpaCentri.FirstOrDefaultAsync(x => x.Id == DefaultSpaCentarId);
-        if (entity == null) return NotFound();
-
-        entity.Naziv = string.IsNullOrWhiteSpace(dto.Naziv) ? entity.Naziv : dto.Naziv.Trim();
-        entity.Adresa = dto.Adresa?.Trim();
-        entity.Email = dto.Email?.Trim();
-        entity.Telefon = dto.Telefon?.Trim();
-        entity.Opis = dto.Opis?.Trim();
-        await _context.SaveChangesAsync();
-
-        return await GetSpaCentar();
+        var updated = await _service.UpdateSpaCentarAsync(dto, HttpContext.RequestAborted);
+        return Ok(updated);
     }
 
     [HttpGet("radno-vrijeme")]
     public async Task<ActionResult<List<RadnoVrijemeDTO>>> GetRadnoVrijeme()
     {
-        var list = await _context.RadnaVremena
-            .AsNoTracking()
-            .Where(x => x.SpaCentarId == DefaultSpaCentarId)
-            .OrderBy(x => x.DanUSedmici)
-            .Select(x => new RadnoVrijemeDTO
-            {
-                Id = x.Id,
-                SpaCentarId = x.SpaCentarId,
-                DanUSedmici = x.DanUSedmici,
-                IsClosed = x.IsClosed,
-                OtvaraMin = x.OtvaraMin,
-                ZatvaraMin = x.ZatvaraMin
-            })
-            .ToListAsync();
+        var list = await _service.GetRadnoVrijemeAsync(HttpContext.RequestAborted);
         return Ok(list);
     }
 
     [HttpPut("radno-vrijeme")]
     public async Task<ActionResult<List<RadnoVrijemeDTO>>> UpdateRadnoVrijeme([FromBody] List<RadnoVrijemeDTO> items)
     {
-        var entities = await _context.RadnaVremena
-            .Where(x => x.SpaCentarId == DefaultSpaCentarId)
-            .ToListAsync();
-
-        // Update by DanUSedmici (1..7)
-        foreach (var dto in items)
-        {
-            var day = dto.DanUSedmici;
-            if (day < 1 || day > 7) continue;
-            var e = entities.FirstOrDefault(x => x.DanUSedmici == day);
-            if (e == null) continue;
-
-            e.IsClosed = dto.IsClosed;
-            e.OtvaraMin = dto.IsClosed ? null : dto.OtvaraMin;
-            e.ZatvaraMin = dto.IsClosed ? null : dto.ZatvaraMin;
-        }
-
-        await _context.SaveChangesAsync();
-        return await GetRadnoVrijeme();
+        var updated = await _service.UpdateRadnoVrijemeAsync(items, HttpContext.RequestAborted);
+        return Ok(updated);
     }
 
     [HttpGet("prostorije")]
     public async Task<ActionResult<List<ProstorijaDTO>>> GetProstorije()
     {
-        var list = await _context.Prostorije
-            .AsNoTracking()
-            .Where(x => x.SpaCentarId == DefaultSpaCentarId)
-            .OrderByDescending(x => x.IsAktivna)
-            .ThenBy(x => x.Naziv)
-            .Select(x => new ProstorijaDTO
-            {
-                Id = x.Id,
-                SpaCentarId = x.SpaCentarId,
-                Naziv = x.Naziv,
-                Opis = x.Opis,
-                Kapacitet = x.Kapacitet,
-                IsAktivna = x.IsAktivna
-            })
-            .ToListAsync();
+        var list = await _service.GetProstorijeAsync(HttpContext.RequestAborted);
         return Ok(list);
     }
 
     [HttpPost("prostorije")]
     public async Task<ActionResult<ProstorijaDTO>> CreateProstorija([FromBody] ProstorijaDTO dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Naziv)) return BadRequest("Naziv je obavezan.");
-        var e = new Prostorija
-        {
-            SpaCentarId = DefaultSpaCentarId,
-            Naziv = dto.Naziv.Trim(),
-            Opis = dto.Opis?.Trim(),
-            Kapacitet = dto.Kapacitet <= 0 ? 1 : dto.Kapacitet,
-            IsAktivna = dto.IsAktivna,
-            CreatedAt = DateTime.UtcNow
-        };
-        _context.Prostorije.Add(e);
-        await _context.SaveChangesAsync();
-        return Ok(new ProstorijaDTO
-        {
-            Id = e.Id,
-            SpaCentarId = e.SpaCentarId,
-            Naziv = e.Naziv,
-            Opis = e.Opis,
-            Kapacitet = e.Kapacitet,
-            IsAktivna = e.IsAktivna
-        });
+        var created = await _service.CreateProstorijaAsync(dto, HttpContext.RequestAborted);
+        return Ok(created);
     }
 
     [HttpPut("prostorije/{id}")]
     public async Task<ActionResult> UpdateProstorija(int id, [FromBody] ProstorijaDTO dto)
     {
-        var e = await _context.Prostorije.FirstOrDefaultAsync(x => x.Id == id && x.SpaCentarId == DefaultSpaCentarId);
-        if (e == null) return NotFound();
-        if (!string.IsNullOrWhiteSpace(dto.Naziv)) e.Naziv = dto.Naziv.Trim();
-        e.Opis = dto.Opis?.Trim();
-        if (dto.Kapacitet > 0) e.Kapacitet = dto.Kapacitet;
-        e.IsAktivna = dto.IsAktivna;
-        await _context.SaveChangesAsync();
+        await _service.UpdateProstorijaAsync(id, dto, HttpContext.RequestAborted);
         return Ok();
     }
 
     [HttpDelete("prostorije/{id}")]
     public async Task<ActionResult> DeleteProstorija(int id)
     {
-        var e = await _context.Prostorije.FirstOrDefaultAsync(x => x.Id == id && x.SpaCentarId == DefaultSpaCentarId);
-        if (e == null) return NotFound();
-        _context.Prostorije.Remove(e);
-        await _context.SaveChangesAsync();
+        await _service.DeleteProstorijaAsync(id, HttpContext.RequestAborted);
         return Ok();
     }
 
     [HttpGet("oprema")]
     public async Task<ActionResult<List<OpremaDTO>>> GetOprema()
     {
-        var list = await _context.Oprema
-            .AsNoTracking()
-            .Where(x => x.SpaCentarId == DefaultSpaCentarId)
-            .OrderByDescending(x => x.IsIspravna)
-            .ThenBy(x => x.Naziv)
-            .Select(x => new OpremaDTO
-            {
-                Id = x.Id,
-                SpaCentarId = x.SpaCentarId,
-                Naziv = x.Naziv,
-                Napomena = x.Napomena,
-                Kolicina = x.Kolicina,
-                IsIspravna = x.IsIspravna
-            })
-            .ToListAsync();
+        var list = await _service.GetOpremaAsync(HttpContext.RequestAborted);
         return Ok(list);
     }
 
@@ -192,124 +87,32 @@ public class ResursiController : ControllerBase
         [FromQuery] DateTime slot,
         [FromQuery] int? excludeRezervacijaId = null)
     {
-        var takenRoomIds = await _context.Rezervacije
-            .AsNoTracking()
-            .Where(r =>
-                !r.IsOtkazana &&
-                r.ProstorijaId != null &&
-                r.DatumRezervacije == slot &&
-                (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value))
-            .Select(r => r.ProstorijaId!.Value)
-            .Distinct()
-            .ToListAsync();
+        var availability = await _service.GetAvailabilityAsync(
+            slot,
+            excludeRezervacijaId,
+            HttpContext.RequestAborted);
 
-        var freeRooms = await _context.Prostorije
-            .AsNoTracking()
-            .Where(p =>
-                p.SpaCentarId == DefaultSpaCentarId &&
-                p.IsAktivna &&
-                !takenRoomIds.Contains(p.Id))
-            .OrderBy(p => p.Naziv)
-            .Select(p => new ProstorijaDTO
-            {
-                Id = p.Id,
-                SpaCentarId = p.SpaCentarId,
-                Naziv = p.Naziv,
-                Opis = p.Opis,
-                Kapacitet = p.Kapacitet,
-                IsAktivna = p.IsAktivna
-            })
-            .ToListAsync();
-
-        var reserved = await _context.RezervacijeOprema
-            .AsNoTracking()
-            .Where(x =>
-                !x.Rezervacija.IsOtkazana &&
-                x.Rezervacija.DatumRezervacije == slot &&
-                (!excludeRezervacijaId.HasValue || x.RezervacijaId != excludeRezervacijaId.Value))
-            .GroupBy(x => x.OpremaId)
-            .Select(g => new { OpremaId = g.Key, Qty = g.Sum(x => x.Kolicina) })
-            .ToListAsync();
-
-        var reservedMap = reserved.ToDictionary(x => x.OpremaId, x => x.Qty);
-
-        var equipment = await _context.Oprema
-            .AsNoTracking()
-            .Where(o => o.SpaCentarId == DefaultSpaCentarId && o.IsIspravna)
-            .OrderBy(o => o.Naziv)
-            .Select(o => new { o.Id, o.Naziv, o.Kolicina })
-            .ToListAsync();
-
-        var equipmentDtos = equipment
-            .Select(o =>
-            {
-                var res = reservedMap.TryGetValue(o.Id, out var q) ? q : 0;
-                var remaining = Math.Max(0, o.Kolicina - res);
-                return new OpremaAvailabilityDTO
-                {
-                    OpremaId = o.Id,
-                    Naziv = o.Naziv,
-                    Total = o.Kolicina,
-                    Reserved = res,
-                    Remaining = remaining
-                };
-            })
-            .ToList();
-
-        return Ok(new ResourceAvailabilityDTO
-        {
-            Slot = slot,
-            FreeRooms = freeRooms,
-            Equipment = equipmentDtos
-        });
+        return Ok(availability);
     }
 
     [HttpPost("oprema")]
     public async Task<ActionResult<OpremaDTO>> CreateOprema([FromBody] OpremaDTO dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Naziv)) return BadRequest("Naziv je obavezan.");
-        var e = new Oprema
-        {
-            SpaCentarId = DefaultSpaCentarId,
-            Naziv = dto.Naziv.Trim(),
-            Napomena = dto.Napomena?.Trim(),
-            Kolicina = dto.Kolicina <= 0 ? 1 : dto.Kolicina,
-            IsIspravna = dto.IsIspravna,
-            CreatedAt = DateTime.UtcNow
-        };
-        _context.Oprema.Add(e);
-        await _context.SaveChangesAsync();
-        return Ok(new OpremaDTO
-        {
-            Id = e.Id,
-            SpaCentarId = e.SpaCentarId,
-            Naziv = e.Naziv,
-            Napomena = e.Napomena,
-            Kolicina = e.Kolicina,
-            IsIspravna = e.IsIspravna
-        });
+        var created = await _service.CreateOpremaAsync(dto, HttpContext.RequestAborted);
+        return Ok(created);
     }
 
     [HttpPut("oprema/{id}")]
     public async Task<ActionResult> UpdateOprema(int id, [FromBody] OpremaDTO dto)
     {
-        var e = await _context.Oprema.FirstOrDefaultAsync(x => x.Id == id && x.SpaCentarId == DefaultSpaCentarId);
-        if (e == null) return NotFound();
-        if (!string.IsNullOrWhiteSpace(dto.Naziv)) e.Naziv = dto.Naziv.Trim();
-        e.Napomena = dto.Napomena?.Trim();
-        if (dto.Kolicina > 0) e.Kolicina = dto.Kolicina;
-        e.IsIspravna = dto.IsIspravna;
-        await _context.SaveChangesAsync();
+        await _service.UpdateOpremaAsync(id, dto, HttpContext.RequestAborted);
         return Ok();
     }
 
     [HttpDelete("oprema/{id}")]
     public async Task<ActionResult> DeleteOprema(int id)
     {
-        var e = await _context.Oprema.FirstOrDefaultAsync(x => x.Id == id && x.SpaCentarId == DefaultSpaCentarId);
-        if (e == null) return NotFound();
-        _context.Oprema.Remove(e);
-        await _context.SaveChangesAsync();
+        await _service.DeleteOpremaAsync(id, HttpContext.RequestAborted);
         return Ok();
     }
 }

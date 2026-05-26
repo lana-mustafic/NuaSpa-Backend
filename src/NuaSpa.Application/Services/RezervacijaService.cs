@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using NuaSpa.Application.DTOs;
+using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
@@ -137,10 +138,10 @@ namespace NuaSpa.Application.Services
             // Validate working hours (SpaCentarId = 1)
             var hours = await GetWorkingHoursAsync(dto.DatumRezervacije);
             if (hours.IsClosed)
-                throw new InvalidOperationException("Spa centar je zatvoren za odabrani dan.");
+                throw new BusinessRuleException("Spa centar je zatvoren za odabrani dan.");
 
             if (!IsWithinWorkingHours(dto.DatumRezervacije, hours.OpenMin, hours.CloseMin))
-                throw new InvalidOperationException("Termin je van radnog vremena spa centra.");
+                throw new BusinessRuleException("Termin je van radnog vremena spa centra.");
 
             // Validate selected room (optional) + equipment availability for the slot.
             Prostorija? prostorija = null;
@@ -153,7 +154,7 @@ namespace NuaSpa.Application.Services
                         x.IsAktivna &&
                         x.SpaCentarId == DefaultSpaCentarId);
                 if (prostorija == null)
-                    throw new InvalidOperationException("Prostorija nije dostupna.");
+                    throw new BusinessRuleException("Prostorija nije dostupna.");
 
                 var roomTaken = await _context.Rezervacije
                     .AsNoTracking()
@@ -162,7 +163,7 @@ namespace NuaSpa.Application.Services
                         r.ProstorijaId == dto.ProstorijaId.Value &&
                         r.DatumRezervacije == dto.DatumRezervacije);
                 if (roomTaken)
-                    throw new InvalidOperationException("Prostorija je već zauzeta za odabrani termin.");
+                    throw new BusinessRuleException("Prostorija je već zauzeta za odabrani termin.");
             }
 
             var opremaItems = (dto.Oprema ?? new List<RezervacijaOpremaItemDTO>())
@@ -181,7 +182,7 @@ namespace NuaSpa.Application.Services
                     .ToListAsync();
 
                 if (opremaInDb.Count != opremaIds.Count)
-                    throw new InvalidOperationException("Dio opreme nije dostupan.");
+                    throw new BusinessRuleException("Dio opreme nije dostupan.");
 
                 var reserved = await _context.RezervacijeOprema
                     .AsNoTracking()
@@ -199,7 +200,7 @@ namespace NuaSpa.Application.Services
                     var total = opremaInDb.First(x => x.Id == item.OpremaId).Kolicina;
                     var already = reservedMap.TryGetValue(item.OpremaId, out var v) ? v : 0;
                     if (already + item.Kolicina > total)
-                        throw new InvalidOperationException("Nema dovoljno opreme za odabrani termin.");
+                        throw new BusinessRuleException("Nema dovoljno opreme za odabrani termin.");
                 }
             }
 
@@ -220,22 +221,33 @@ namespace NuaSpa.Application.Services
                 IsVip = isAdminBooking && dto.IsVip
             };
 
-            _context.Rezervacije.Add(entity);
-            await _context.SaveChangesAsync();
-
-            if (opremaItems.Count > 0)
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            try
             {
-                foreach (var item in opremaItems)
-                {
-                    _context.RezervacijeOprema.Add(new RezervacijaOprema
-                    {
-                        RezervacijaId = entity.Id,
-                        OpremaId = item.OpremaId,
-                        Kolicina = item.Kolicina,
-                        CreatedAt = DateTime.UtcNow
-                    });
-                }
+                _context.Rezervacije.Add(entity);
                 await _context.SaveChangesAsync();
+
+                if (opremaItems.Count > 0)
+                {
+                    foreach (var item in opremaItems)
+                    {
+                        _context.RezervacijeOprema.Add(new RezervacijaOprema
+                        {
+                            RezervacijaId = entity.Id,
+                            OpremaId = item.OpremaId,
+                            Kolicina = item.Kolicina,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
+                await tx.CommitAsync();
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
             }
 
             // Dohvati relacije za DTO mapiranje (Korisnik/Usluga/Zaposlenik).
@@ -257,14 +269,14 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.RezervacijaOprema)
                 .FirstOrDefaultAsync(r => r.Id == rezervacijaId);
             if (entity == null) return null;
-            if (entity.IsOtkazana) throw new InvalidOperationException("Otkazana rezervacija se ne može mijenjati.");
-            if (entity.IsPlacena) throw new InvalidOperationException("Plaćena rezervacija se ne može mijenjati.");
+            if (entity.IsOtkazana) throw new BusinessRuleException("Otkazana rezervacija se ne može mijenjati.");
+            if (entity.IsPlacena) throw new BusinessRuleException("Plaćena rezervacija se ne može mijenjati.");
 
             // Validate working hours
             var hours = await GetWorkingHoursAsync(dto.DatumRezervacije);
-            if (hours.IsClosed) throw new InvalidOperationException("Spa centar je zatvoren za odabrani dan.");
+            if (hours.IsClosed) throw new BusinessRuleException("Spa centar je zatvoren za odabrani dan.");
             if (!IsWithinWorkingHours(dto.DatumRezervacije, hours.OpenMin, hours.CloseMin))
-                throw new InvalidOperationException("Termin je van radnog vremena spa centra.");
+                throw new BusinessRuleException("Termin je van radnog vremena spa centra.");
 
             await ValidateTherapistAndSlotAsync(
                 dto.ZaposlenikId,
@@ -281,7 +293,7 @@ namespace NuaSpa.Application.Services
                         x.Id == dto.ProstorijaId.Value &&
                         x.IsAktivna &&
                         x.SpaCentarId == DefaultSpaCentarId);
-                if (prostorija == null) throw new InvalidOperationException("Prostorija nije dostupna.");
+                if (prostorija == null) throw new BusinessRuleException("Prostorija nije dostupna.");
 
                 var roomTaken = await _context.Rezervacije
                     .AsNoTracking()
@@ -290,7 +302,7 @@ namespace NuaSpa.Application.Services
                         !r.IsOtkazana &&
                         r.ProstorijaId == dto.ProstorijaId.Value &&
                         r.DatumRezervacije == dto.DatumRezervacije);
-                if (roomTaken) throw new InvalidOperationException("Prostorija je već zauzeta za odabrani termin.");
+                if (roomTaken) throw new BusinessRuleException("Prostorija je već zauzeta za odabrani termin.");
             }
 
             // Normalize equipment list
@@ -309,7 +321,7 @@ namespace NuaSpa.Application.Services
                     .Select(x => new { x.Id, x.Kolicina })
                     .ToListAsync();
                 if (opremaInDb.Count != opremaIds.Count)
-                    throw new InvalidOperationException("Dio opreme nije dostupan.");
+                    throw new BusinessRuleException("Dio opreme nije dostupan.");
 
                 // Sum reserved equipment for the slot excluding current reservation
                 var reserved = await _context.RezervacijeOprema
@@ -329,7 +341,7 @@ namespace NuaSpa.Application.Services
                     var total = opremaInDb.First(x => x.Id == item.OpremaId).Kolicina;
                     var already = reservedMap.TryGetValue(item.OpremaId, out var v) ? v : 0;
                     if (already + item.Kolicina > total)
-                        throw new InvalidOperationException("Nema dovoljno opreme za odabrani termin.");
+                        throw new BusinessRuleException("Nema dovoljno opreme za odabrani termin.");
                 }
             }
 
@@ -474,12 +486,12 @@ namespace NuaSpa.Application.Services
                 .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
             if (therapist == null)
             {
-                throw new InvalidOperationException("Terapeut nije pronađen.");
+                throw new BusinessRuleException("Terapeut nije pronađen.");
             }
 
             if (therapist.Status != ZaposlenikStatus.Active)
             {
-                throw new InvalidOperationException("Terapeut nije dostupan za rezervacije.");
+                throw new BusinessRuleException("Terapeut nije dostupan za rezervacije.");
             }
 
             var duration = await GetServiceDurationMinutesAsync(uslugaId);
@@ -502,7 +514,7 @@ namespace NuaSpa.Application.Services
                 var cEnd = c.DatumRezervacije.AddMinutes(cDuration);
                 if (c.DatumRezervacije < end && cEnd > start)
                 {
-                    throw new InvalidOperationException(
+                    throw new BusinessRuleException(
                         "Terapeut je već zauzet u odabranom terminu.");
                 }
             }
@@ -606,10 +618,10 @@ namespace NuaSpa.Application.Services
                 await tx.CommitAsync();
                 return (true, null);
             }
-            catch (Exception ex)
+            catch
             {
                 await tx.RollbackAsync();
-                return (false, $"Brisanje nije uspjelo: {ex.Message}");
+                return (false, "Brisanje nije uspjelo.");
             }
         }
 

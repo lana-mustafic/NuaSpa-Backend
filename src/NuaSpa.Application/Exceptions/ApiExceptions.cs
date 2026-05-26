@@ -23,3 +23,19 @@ public sealed class ConflictException : Exception
     {
     }
 }
+
+/// <summary>Pristup je odbijen (HTTP 403).</summary>
+public sealed class ForbiddenException : Exception
+{
+    public ForbiddenException(string message) : base(message)
+    {
+    }
+}
+
+/// <summary>Neautorizovan zahtjev (HTTP 401).</summary>
+public sealed class UnauthorizedException : Exception
+{
+    public UnauthorizedException(string message) : base(message)
+    {
+    }
+}

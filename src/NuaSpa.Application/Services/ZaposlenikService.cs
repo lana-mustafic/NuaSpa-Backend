@@ -95,6 +95,24 @@ namespace NuaSpa.Application.Services
 
         public override async Task<ZaposlenikDTO> Insert(ZaposlenikDTO dto)
         {
+            if (dto.KategorijaUslugaId is > 0)
+            {
+                var katOk = await _context.KategorijeUsluga.AsNoTracking()
+                    .AnyAsync(k => k.Id == dto.KategorijaUslugaId);
+                if (!katOk)
+                {
+                    throw new BusinessRuleException("KategorijaUslugaId ne postoji.");
+                }
+            }
+
+            var specError = await ValidateSpecijalizacijaAsync(
+                dto.KategorijaUslugaId,
+                dto.Specijalizacija);
+            if (specError != null)
+            {
+                throw new BusinessRuleException(specError);
+            }
+
             var entity = new Zaposlenik
             {
                 Ime = dto.Ime.Trim(),
@@ -120,6 +138,24 @@ namespace NuaSpa.Application.Services
                 .Include(z => z.KategorijaUsluga)
                 .FirstOrDefaultAsync(z => z.Id == id);
             if (entity == null) return null;
+
+            if (dto.KategorijaUslugaId is > 0)
+            {
+                var katOk = await _context.KategorijeUsluga.AsNoTracking()
+                    .AnyAsync(k => k.Id == dto.KategorijaUslugaId);
+                if (!katOk)
+                {
+                    throw new BusinessRuleException("KategorijaUslugaId ne postoji.");
+                }
+            }
+
+            var specError = await ValidateSpecijalizacijaAsync(
+                dto.KategorijaUslugaId,
+                dto.Specijalizacija);
+            if (specError != null)
+            {
+                throw new BusinessRuleException(specError);
+            }
 
             entity.Ime = dto.Ime.Trim();
             entity.Prezime = dto.Prezime.Trim();
@@ -663,6 +699,41 @@ namespace NuaSpa.Application.Services
                 : Math.Round(ratings.Average() ?? 0.0, 2);
 
             return new KpiMetrics(ukupno, potvrdjene, otkazane, placene, prihod, avg);
+        }
+
+        public async Task DeleteAsync(int id)
+        {
+            var entity = await _context.Zaposlenici.FirstOrDefaultAsync(z => z.Id == id);
+            if (entity == null)
+            {
+                throw new NotFoundException($"Zaposlenik id={id} ne postoji.");
+            }
+
+            var hasReservations = await _context.Rezervacije
+                .AsNoTracking()
+                .AnyAsync(r => r.ZaposlenikId == id);
+            if (hasReservations)
+            {
+                throw new ConflictException("Terapeut ima rezervacije i ne može biti obrisan.");
+            }
+
+            try
+            {
+                // Otpovezuje korisnike od terapeuta (zadrži korisnike).
+                await _context.Users
+                    .Where(k => k.ZaposlenikId == id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(
+                        k => k.ZaposlenikId,
+                        (int?)null));
+
+                _context.Zaposlenici.Remove(entity);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                throw new ConflictException(
+                    "Terapeut se ne može obrisati zbog povezanih podataka u bazi.");
+            }
         }
 
         private static string ResolveUloga(int ukupnoRezervacija) =>
