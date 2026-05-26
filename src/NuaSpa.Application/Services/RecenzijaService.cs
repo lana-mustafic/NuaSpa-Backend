@@ -12,6 +12,7 @@ using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.Services
 {
@@ -53,7 +54,7 @@ namespace NuaSpa.Application.Services
 
         public async Task<RecenzijaDTO> CreateAsync(int korisnikId, RecenzijaCreateDTO dto)
         {
-            await ValidateCreateAsync(dto);
+            await ValidateCreateAsync(korisnikId, dto);
 
             var entity = new Recenzija
             {
@@ -78,7 +79,7 @@ namespace NuaSpa.Application.Services
             return _mapper.Map<RecenzijaDTO>(created);
         }
 
-        private async Task ValidateCreateAsync(RecenzijaCreateDTO dto)
+        private async Task ValidateCreateAsync(int korisnikId, RecenzijaCreateDTO dto)
         {
             if (dto.ZaposlenikId <= 0)
             {
@@ -126,6 +127,18 @@ namespace NuaSpa.Application.Services
             {
                 throw new BusinessRuleException(
                     "Odabrana usluga ne pripada kategoriji terapeuta.");
+            }
+
+            var hasCompletedVisit = await _context.Rezervacije.AsNoTracking().AnyAsync(r =>
+                r.KorisnikId == korisnikId &&
+                r.UslugaId == dto.UslugaId &&
+                r.ZaposlenikId == dto.ZaposlenikId &&
+                r.Status == RezervacijaStatus.Completed);
+
+            if (!hasCompletedVisit)
+            {
+                throw new BusinessRuleException(
+                    "Recenziju je moguće ostaviti tek nakon završenog termina.");
             }
         }
 

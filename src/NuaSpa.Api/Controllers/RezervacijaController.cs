@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
+using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.Interfaces.Messaging;
 using NuaSpa.Application.SearchObjects;
@@ -145,21 +146,68 @@ namespace NuaSpa.Api.Controllers
         [Authorize(Roles = RoleConstants.AdminZaposlenik)]
         public async Task<ActionResult> UpdatePotvrdjena(int id, [FromBody] RezervacijaUpdateDTO dto)
         {
-            if (User.IsInRole(RoleConstants.Admin))
+            var actorUserId = User.GetNuaSpaUserId();
+            try
             {
-                var updatedAdmin = await _rezervacijaService.UpdatePotvrdjenaAsync(id, dto.IsPotvrdjena);
-                if (!updatedAdmin) return NotFound("Rezervacija nije pronađena.");
+                if (User.IsInRole(RoleConstants.Admin))
+                {
+                    var updatedAdmin = await _rezervacijaService.UpdatePotvrdjenaAsync(
+                        id, dto.IsPotvrdjena, actorUserId);
+                    if (!updatedAdmin) return NotFound("Rezervacija nije pronađena.");
+                }
+                else
+                {
+                    if (!User.TryGetNuaSpaZaposlenikId(out var zaposlenikId))
+                    {
+                        return Forbid();
+                    }
+
+                    var updated = await _rezervacijaService.UpdatePotvrdjenaForZaposlenikAsync(
+                        id, zaposlenikId, dto.IsPotvrdjena, actorUserId);
+                    if (!updated) return NotFound("Rezervacija nije pronađena (ili nemate pristup).");
+                }
+
+                if (dto.IsPotvrdjena)
+                {
+                    var confirmed = await _rezervacijaService.GetByIdAsync(id);
+                    if (confirmed != null)
+                    {
+                        try
+                        {
+                            await _notificationPublisher.PublishRezervacijaPotvrdaAsync(confirmed);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Notifikacija potvrde rezervacije {Id} nije poslana.", id);
+                        }
+                    }
+                }
+
                 return Ok();
             }
-
-            if (!User.TryGetNuaSpaZaposlenikId(out var zaposlenikId))
+            catch (BusinessRuleException ex)
             {
-                return Forbid();
+                return BadRequest(new { message = ex.Message });
             }
+        }
 
-            var updated = await _rezervacijaService.UpdatePotvrdjenaForZaposlenikAsync(id, zaposlenikId, dto.IsPotvrdjena);
-            if (!updated) return NotFound("Rezervacija nije pronađena (ili nemate pristup).");
-            return Ok();
+        [HttpPatch("{id:int}/complete")]
+        [Authorize(Roles = RoleConstants.AdminZaposlenik)]
+        public async Task<ActionResult> Complete(int id)
+        {
+            try
+            {
+                var ok = await _rezervacijaService.CompleteAsync(
+                    id,
+                    User.GetNuaSpaUserId(),
+                    allowBeforeEnd: User.IsInRole(RoleConstants.Admin));
+                if (!ok) return NotFound("Rezervacija nije pronađena.");
+                return Ok();
+            }
+            catch (BusinessRuleException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPut("{id}")]
@@ -202,15 +250,44 @@ namespace NuaSpa.Api.Controllers
                 requireZaposlenikId = zid;
             }
 
-            var ok = await _rezervacijaService.CancelAsync(
-                id,
-                requireKorisnikId,
-                requireZaposlenikId,
-                dto?.RazlogOtkaza
-            );
+            try
+            {
+                var ok = await _rezervacijaService.CancelAsync(
+                    id,
+                    requireKorisnikId,
+                    requireZaposlenikId,
+                    User.GetNuaSpaUserId(),
+                    dto?.RazlogOtkaza ?? string.Empty);
 
-            if (!ok) return BadRequest("Nije moguće otkazati rezervaciju.");
-            return Ok();
+                if (!ok) return BadRequest(new { message = "Nije moguće otkazati rezervaciju." });
+
+                var cancelled = await _rezervacijaService.GetByIdAsync(id);
+                if (cancelled != null)
+                {
+                    var uloga = User.IsInRole(RoleConstants.Admin)
+                        ? "Administrator"
+                        : User.IsInRole(RoleConstants.Zaposlenik)
+                            ? "Terapeut"
+                            : "Klijent";
+                    try
+                    {
+                        await _notificationPublisher.PublishRezervacijaOtkazanaAsync(
+                            cancelled,
+                            dto!.RazlogOtkaza!.Trim(),
+                            uloga);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Notifikacija otkazivanja rezervacije {Id} nije poslana.", id);
+                    }
+                }
+
+                return Ok();
+            }
+            catch (BusinessRuleException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpDelete("{id:int}")]
@@ -218,12 +295,7 @@ namespace NuaSpa.Api.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var (ok, message) = await _rezervacijaService.DeleteAdminAsync(id);
-            if (!ok)
-            {
-                return Conflict(new { message });
-            }
-
-            return NoContent();
+            return Conflict(new { message = message ?? "Hard delete nije dozvoljen. Koristite otkazivanje." });
         }
 
         [HttpGet("dostupni-termini")]

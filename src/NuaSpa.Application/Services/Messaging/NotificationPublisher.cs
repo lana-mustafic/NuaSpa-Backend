@@ -41,6 +41,31 @@ public sealed class NotificationPublisher : INotificationPublisher
         return _publisher.PublishAsync(NuaSpaMessageTypes.RezervacijaPotvrda, message, cancellationToken);
     }
 
+    public Task PublishRezervacijaOtkazanaAsync(
+        RezervacijaDTO rezervacija,
+        string razlogOtkaza,
+        string otkazaoUloga,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(rezervacija.KorisnikEmail))
+        {
+            return Task.CompletedTask;
+        }
+
+        var message = new RezervacijaOtkazanaMessage
+        {
+            RezervacijaId = rezervacija.Id,
+            ToEmail = rezervacija.KorisnikEmail,
+            KorisnikIme = rezervacija.KorisnikIme ?? "Klijent",
+            UslugaNaziv = rezervacija.UslugaNaziv ?? "Usluga",
+            DatumRezervacije = rezervacija.DatumRezervacije,
+            RazlogOtkaza = razlogOtkaza,
+            OtkazaoUloga = otkazaoUloga,
+        };
+
+        return _publisher.PublishAsync(NuaSpaMessageTypes.RezervacijaOtkazana, message, cancellationToken);
+    }
+
     public Task PublishTherapistInviteAsync(
         TherapistInviteEmailMessage message,
         CancellationToken cancellationToken = default)

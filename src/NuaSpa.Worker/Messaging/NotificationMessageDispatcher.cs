@@ -28,6 +28,9 @@ public sealed class NotificationMessageDispatcher
             case NuaSpaMessageTypes.RezervacijaPotvrda:
                 await HandleRezervacijaPotvrdaAsync(envelope.PayloadJson, cancellationToken);
                 break;
+            case NuaSpaMessageTypes.RezervacijaOtkazana:
+                await HandleRezervacijaOtkazanaAsync(envelope.PayloadJson, cancellationToken);
+                break;
             case NuaSpaMessageTypes.TherapistInvite:
                 await HandleTherapistInviteAsync(envelope.PayloadJson, cancellationToken);
                 break;
@@ -71,6 +74,33 @@ public sealed class NotificationMessageDispatcher
         await _emailSender.SendAsync(
             m.ToEmail,
             $"NuaSpa — rezervacija {status} (#{m.RezervacijaId})",
+            html,
+            plain,
+            ct);
+    }
+
+    private async Task HandleRezervacijaOtkazanaAsync(string json, CancellationToken ct)
+    {
+        var m = JsonSerializer.Deserialize<RezervacijaOtkazanaMessage>(json)
+            ?? throw new InvalidOperationException("Neispravan RezervacijaOtkazanaMessage payload.");
+
+        var html = $"""
+            <h2>NuaSpa — rezervacija otkazana</h2>
+            <p>Poštovani/a {System.Net.WebUtility.HtmlEncode(m.KorisnikIme)},</p>
+            <p>Vaša rezervacija <strong>#{m.RezervacijaId}</strong> je otkazana ({System.Net.WebUtility.HtmlEncode(m.OtkazaoUloga)}).</p>
+            <ul>
+              <li><strong>Usluga:</strong> {System.Net.WebUtility.HtmlEncode(m.UslugaNaziv)}</li>
+              <li><strong>Termin:</strong> {m.DatumRezervacije:dd.MM.yyyy HH:mm}</li>
+              <li><strong>Razlog:</strong> {System.Net.WebUtility.HtmlEncode(m.RazlogOtkaza)}</li>
+            </ul>
+            """;
+
+        var plain =
+            $"Rezervacija #{m.RezervacijaId} otkazana. Razlog: {m.RazlogOtkaza}";
+
+        await _emailSender.SendAsync(
+            m.ToEmail,
+            $"NuaSpa — otkazana rezervacija (#{m.RezervacijaId})",
             html,
             plain,
             ct);

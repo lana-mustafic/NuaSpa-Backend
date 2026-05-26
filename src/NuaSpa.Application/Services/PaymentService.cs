@@ -9,8 +9,9 @@ using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
+using NuaSpa.Application.Services.Booking;
+using NuaSpa.Domain.Enums;
 using NuaSpa.Domain.Entities;
-using Stripe.Infrastructure;
 
 namespace NuaSpa.Application.Services;
 
@@ -58,8 +59,20 @@ public class PaymentService : IPaymentService
             throw new BusinessRuleException("Rezervacija je već plaćena.");
         }
 
-        // Stripe očekuje integer u najmanjoj valuti (pretpostavka: 2 decimale).
-        var amount = (long)decimal.Round(rezervacija.Usluga.Cijena * 100m, 0);
+        if (rezervacija.Status == RezervacijaStatus.Cancelled)
+        {
+            throw new BusinessRuleException("Otkazana rezervacija se ne može platiti.");
+        }
+
+        if (rezervacija.Status != RezervacijaStatus.Confirmed)
+        {
+            throw new BusinessRuleException("Plaćanje je moguće samo za potvrđenu rezervaciju.");
+        }
+
+        var amount = RezervacijaPricing.ToStripeMinorUnits(
+            RezervacijaPricing.ResolveChargeAmount(
+                rezervacija.Usluga.Cijena,
+                rezervacija.SnimakCijena));
 
         var intentService = new PaymentIntentService();
         var intent = await intentService.CreateAsync(new PaymentIntentCreateOptions
@@ -80,7 +93,9 @@ public class PaymentService : IPaymentService
         // Upis u bazu (MVP).
         _context.Placanja.Add(new Placanje
         {
-            Iznos = rezervacija.Usluga.Cijena,
+            Iznos = RezervacijaPricing.ResolveChargeAmount(
+                rezervacija.Usluga.Cijena,
+                rezervacija.SnimakCijena),
             DatumPlacanja = DateTime.UtcNow,
             MetodaPlacanja = "Stripe",
             TransakcijskiBroj = intent.Id,
