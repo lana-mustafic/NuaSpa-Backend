@@ -19,11 +19,16 @@ namespace NuaSpa.Application.Services
         private const int DefaultSpaCentarId = 1;
         private readonly NuaSpaContext _context;
         private readonly IMapper _mapper;
+        private readonly IPaymentService _paymentService;
 
-        public RezervacijaService(NuaSpaContext context, IMapper mapper)
+        public RezervacijaService(
+            NuaSpaContext context,
+            IMapper mapper,
+            IPaymentService paymentService)
         {
             _context = context;
             _mapper = mapper;
+            _paymentService = paymentService;
         }
 
         public async Task<RezervacijaDTO?> GetByIdAsync(int rezervacijaId)
@@ -752,7 +757,7 @@ namespace NuaSpa.Application.Services
             }
         }
 
-        public async Task<bool> CancelAsync(
+        public async Task<RezervacijaCancelResultDto> CancelAsync(
             int rezervacijaId,
             int? requireKorisnikId,
             int? requireZaposlenikId,
@@ -765,25 +770,43 @@ namespace NuaSpa.Application.Services
             }
 
             var entity = await _context.Rezervacije.FirstOrDefaultAsync(r => r.Id == rezervacijaId);
-            if (entity == null) return false;
+            if (entity == null)
+            {
+                return new RezervacijaCancelResultDto { Otkazana = false };
+            }
 
             if (requireKorisnikId.HasValue && entity.KorisnikId != requireKorisnikId.Value)
             {
-                return false;
+                return new RezervacijaCancelResultDto { Otkazana = false };
             }
 
             if (requireZaposlenikId.HasValue && entity.ZaposlenikId != requireZaposlenikId.Value)
             {
-                return false;
+                return new RezervacijaCancelResultDto { Otkazana = false };
             }
 
+            RefundPaymentResponseDto? refund = null;
             if (entity.IsPlacena)
             {
-                throw new BusinessRuleException(
-                    "Plaćena rezervacija se ne može otkazati bez procesa povrata sredstava (refund).");
+                refund = await _paymentService.RefundIfPaidAsync(rezervacijaId, CancellationToken.None);
+                await _context.Entry(entity).ReloadAsync();
+
+                if (entity.IsPlacena)
+                {
+                    entity.IsPlacena = false;
+                }
             }
 
-            if (entity.Status == RezervacijaStatus.Cancelled) return true;
+            if (entity.Status == RezervacijaStatus.Cancelled)
+            {
+                return new RezervacijaCancelResultDto
+                {
+                    Otkazana = true,
+                    RefundIzvrsen = refund != null,
+                    RefundiraniIznos = refund?.RefundedAmount,
+                    RefundId = refund?.RefundId,
+                };
+            }
 
             RecordTransition(
                 entity,
@@ -792,7 +815,14 @@ namespace NuaSpa.Application.Services
                 razlogOtkaza.Trim());
 
             await _context.SaveChangesAsync();
-            return true;
+
+            return new RezervacijaCancelResultDto
+            {
+                Otkazana = true,
+                RefundIzvrsen = refund != null,
+                RefundiraniIznos = refund?.RefundedAmount,
+                RefundId = refund?.RefundId,
+            };
         }
 
         public Task<(bool Ok, string? Message)> DeleteAdminAsync(int rezervacijaId)

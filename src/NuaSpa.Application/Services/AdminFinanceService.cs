@@ -10,6 +10,7 @@ using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.Services
 {
@@ -70,7 +71,7 @@ namespace NuaSpa.Application.Services
                 DatumVrijeme = p.DatumPlacanja,
                 Iznos = p.Iznos,
                 MetodaLabel = FormatMethodLabel(p.MetodaPlacanja, p.TransakcijskiBroj),
-                Status = MapStatus(p.Rezervacija?.IsPlacena, p.Rezervacija?.IsOtkazana),
+                Status = MapStatus(p),
             }).ToList();
 
             // Jedan DbContext ne smije izvršavati više upita paralelno (Task.WhenAll bi bacalo 500).
@@ -124,7 +125,7 @@ namespace NuaSpa.Application.Services
                 var dt = r.DatumPlacanja.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
                 var amt = r.Iznos.ToString("0.##", CultureInfo.InvariantCulture);
                 var meth = FormatMethodLabel(r.MetodaPlacanja, r.TransakcijskiBroj);
-                var st = MapStatus(r.Rezervacija?.IsPlacena, r.Rezervacija?.IsOtkazana);
+                var st = MapStatus(r);
                 sb.AppendLine($"{id};{Csv(client)};{Csv(svc)};{dt};{amt};{Csv(meth)};{st}");
             }
 
@@ -172,12 +173,9 @@ namespace NuaSpa.Application.Services
 
             q = statusNorm switch
             {
-                "paid" => q.Where(p =>
-                    p.Rezervacija == null || (p.Rezervacija.IsPlacena && !p.Rezervacija.IsOtkazana)),
-                "unpaid" => q.Where(p =>
-                    p.Rezervacija != null && !p.Rezervacija.IsPlacena && !p.Rezervacija.IsOtkazana),
-                "refunded" => q.Where(p =>
-                    p.Rezervacija != null && p.Rezervacija.IsOtkazana && p.Rezervacija.IsPlacena),
+                "paid" => q.Where(p => p.Status == PlacanjeStatus.Completed),
+                "unpaid" => q.Where(p => p.Status == PlacanjeStatus.Pending),
+                "refunded" => q.Where(p => p.Status == PlacanjeStatus.Refunded),
                 _ => q,
             };
 
@@ -234,17 +232,15 @@ namespace NuaSpa.Application.Services
 
             foreach (var p in placanja)
             {
-                var st = MapStatus(
-                    p.Rezervacija?.IsPlacena,
-                    p.Rezervacija?.IsOtkazana);
-                if (st == "paid" && (p.Rezervacija == null || !p.Rezervacija.IsOtkazana))
+                var st = MapStatus(p);
+                if (st == "paid")
                 {
-                    revenue += p.Iznos;
+                    revenue += p.NaplaceniIznos ?? p.Iznos;
                     paidTx++;
                 }
 
                 if (st == "refunded")
-                    refunds += p.Iznos;
+                    refunds += p.NaplaceniIznos ?? p.Iznos;
             }
 
             var placeneRez = await _db.Rezervacije.AsNoTracking()
@@ -400,14 +396,14 @@ namespace NuaSpa.Application.Services
 
             foreach (var p in placanja)
             {
-                var st = MapStatus(p.Rezervacija?.IsPlacena, p.Rezervacija?.IsOtkazana);
-                if (st != "paid" || (p.Rezervacija != null && p.Rezervacija.IsOtkazana))
+                var st = MapStatus(p);
+                if (st != "paid")
                     continue;
 
                 var day = p.DatumPlacanja.Date;
                 if (!byDay.ContainsKey(day))
                     byDay[day] = 0m;
-                byDay[day] += p.Iznos;
+                byDay[day] += p.NaplaceniIznos ?? p.Iznos;
             }
 
             return byDay
@@ -433,7 +429,7 @@ namespace NuaSpa.Application.Services
             var list = new List<AdminFinanceActivityDto>();
             foreach (var p in items)
             {
-                var st = MapStatus(p.Rezervacija?.IsPlacena, p.Rezervacija?.IsOtkazana);
+                var st = MapStatus(p);
                 var klijent = FormatKlijent(p.Rezervacija);
 
                 string tip;
@@ -479,17 +475,15 @@ namespace NuaSpa.Application.Services
             return FormatUsluga(r.Usluga.Naziv, r.Usluga.TrajanjeMinuta);
         }
 
-        private static string MapStatus(bool? placena, bool? otkazana)
+        private static string MapStatus(Placanje placanje)
         {
-            if (placena == null && otkazana == null)
-                return "paid";
-            var pl = placena ?? false;
-            var ot = otkazana ?? false;
-            if (ot && pl)
-                return "refunded";
-            if (pl && !ot)
-                return "paid";
-            return "unpaid";
+            return placanje.Status switch
+            {
+                PlacanjeStatus.Refunded => "refunded",
+                PlacanjeStatus.Completed => "paid",
+                PlacanjeStatus.Pending => "unpaid",
+                _ => "unpaid",
+            };
         }
 
         private static string FormatPayId(int id, DateTime datum)

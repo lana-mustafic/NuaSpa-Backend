@@ -252,14 +252,17 @@ namespace NuaSpa.Api.Controllers
 
             try
             {
-                var ok = await _rezervacijaService.CancelAsync(
+                var result = await _rezervacijaService.CancelAsync(
                     id,
                     requireKorisnikId,
                     requireZaposlenikId,
                     User.GetNuaSpaUserId(),
                     dto?.RazlogOtkaza ?? string.Empty);
 
-                if (!ok) return BadRequest(new { message = "Nije moguće otkazati rezervaciju." });
+                if (!result.Otkazana)
+                {
+                    return BadRequest(new { message = "Nije moguće otkazati rezervaciju." });
+                }
 
                 var cancelled = await _rezervacijaService.GetByIdAsync(id);
                 if (cancelled != null)
@@ -282,7 +285,7 @@ namespace NuaSpa.Api.Controllers
                     }
                 }
 
-                return Ok();
+                return Ok(result);
             }
             catch (BusinessRuleException ex)
             {

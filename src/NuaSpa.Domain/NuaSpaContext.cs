@@ -27,6 +27,7 @@ namespace NuaSpa.Domain
         public DbSet<Skladiste> Skladista { get; set; } = null!;
         public DbSet<NarudzbaProizvoda> NarudzbeProizvoda { get; set; } = null!;
         public DbSet<Placanje> Placanja { get; set; } = null!;
+        public DbSet<StripeWebhookEvent> StripeWebhookEvents { get; set; } = null!;
         public DbSet<Popust> Popusti { get; set; } = null!;
 
         public DbSet<SpaCentar> SpaCentri { get; set; } = null!;

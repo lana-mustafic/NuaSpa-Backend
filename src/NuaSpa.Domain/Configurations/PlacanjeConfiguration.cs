@@ -11,8 +11,13 @@ public class PlacanjeConfiguration : IEntityTypeConfiguration<Placanje>
         builder.ToTable("Placanja");
 
         builder.Property(p => p.Iznos).HasPrecision(18, 2);
+        builder.Property(p => p.NaplaceniIznos).HasPrecision(18, 2);
         builder.Property(p => p.MetodaPlacanja).HasMaxLength(50).IsRequired();
         builder.Property(p => p.TransakcijskiBroj).HasMaxLength(100).IsRequired();
+        builder.Property(p => p.StripeRefundId).HasMaxLength(100);
+
+        builder.HasIndex(p => p.RezervacijaId);
+        builder.HasIndex(p => p.TransakcijskiBroj).IsUnique();
 
         builder.HasOne(p => p.Rezervacija)
             .WithMany()

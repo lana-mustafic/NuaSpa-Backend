@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace NuaSpa.Application.DTOs
 {
@@ -11,6 +12,11 @@ namespace NuaSpa.Application.DTOs
         public string Status { get; set; } = "Pending";
         public bool IsPotvrdjena { get; set; }
         public bool IsPlacena { get; set; }
+
+        /// <summary>Alias za IsPlacena — koristi se u klijentskim DTO-ovima (IsPaid).</summary>
+        [JsonPropertyName("isPaid")]
+        public bool IsPaid => IsPlacena;
+
         public bool IsOtkazana { get; set; }
         public string? RazlogOtkaza { get; set; }
         public DateTime? OtkazanaAt { get; set; }

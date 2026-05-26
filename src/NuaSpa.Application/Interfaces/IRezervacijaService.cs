@@ -45,7 +45,7 @@ namespace NuaSpa.Application.Interfaces
             int? uslugaId = null,
             int slotMinutes = 60);
 
-        Task<bool> CancelAsync(
+        Task<RezervacijaCancelResultDto> CancelAsync(
             int rezervacijaId,
             int? requireKorisnikId,
             int? requireZaposlenikId,
