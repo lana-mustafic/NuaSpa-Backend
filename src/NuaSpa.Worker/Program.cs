@@ -1,10 +1,13 @@
+using NuaSpa.Application.Configuration;
 using NuaSpa.Application.Messaging;
 using NuaSpa.Worker;
 using NuaSpa.Worker.Email;
 using NuaSpa.Worker.Messaging;
 
+EnvFileLoader.Load();
 var builder = Host.CreateApplicationBuilder(args);
 
+ConfigurationValidator.RequireRabbitMq(builder.Configuration);
 builder.Services.Configure<RabbitMqOptions>(
     builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 builder.Services.Configure<EmailOptions>(

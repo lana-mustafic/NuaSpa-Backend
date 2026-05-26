@@ -4,7 +4,7 @@ public class EmailOptions
 {
     public const string SectionName = "Email";
 
-    public string FromAddress { get; set; } = "noreply@nuaspa.ba";
-    public string FromName { get; set; } = "NuaSpa";
-    public string OutboxDirectory { get; set; } = "email-outbox";
+    public string FromAddress { get; set; } = string.Empty;
+    public string FromName { get; set; } = string.Empty;
+    public string OutboxDirectory { get; set; } = string.Empty;
 }

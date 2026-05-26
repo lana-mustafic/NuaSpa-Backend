@@ -4,18 +4,21 @@
 # - nuaspa-api     → glavni REST servis (Flutter klijent)
 # - nuaspa-worker  → pomoćni servis (RabbitMQ consumer, e-mail)
 #
+# Prije pokretanja: cp .env.docker.example .env  (prilagodi vrijednosti)
 # Pokretanje: docker compose up --build
 # API:        http://localhost:8080/health
-# RabbitMQ UI: http://localhost:15672 (guest/guest)
+# RabbitMQ UI: http://localhost:15672
 
 services:
   nuaspa-db:
     image: mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04
     container_name: nuaspa-db-container
     hostname: nuaspa-db
+    env_file:
+      - .env
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "YourStrongPassword123!"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
       MSSQL_PID: Developer
     ports:
       - "1433:1433"
@@ -27,7 +30,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrongPassword123!' -C -Q 'SELECT 1' || exit 1",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1",
         ]
       interval: 10s
       timeout: 5s
@@ -39,9 +42,11 @@ services:
     image: rabbitmq:3.13.7-management
     container_name: rabbitmq-nuaspa
     hostname: rabbitmq
+    env_file:
+      - .env
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RabbitMQ__UserName}
+      RABBITMQ_DEFAULT_PASS: ${RabbitMQ__Password}
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -64,19 +69,14 @@ services:
       dockerfile: Dockerfile
     container_name: nuaspa-api-container
     hostname: nuaspa-api
+    env_file:
+      - .env
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ASPNETCORE_URLS: http://+:8080
       UseHttpsRedirection: "false"
-      ConnectionStrings__DefaultConnection: "Server=nuaspa-db;Database=210240;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      ConnectionStrings__DefaultConnection: Server=nuaspa-db;Database=210240;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true
       RabbitMQ__Host: rabbitmq
-      RabbitMQ__Port: "5672"
-      RabbitMQ__UserName: guest
-      RabbitMQ__Password: guest
-      RabbitMQ__NotificationsQueue: nuaspa_notifications
-      Email__AdminNotify: admin@nuaspa.ba
-      Logging__LogLevel__Default: Information
-      Logging__LogLevel__NuaSpa.Application.Services.Messaging: Information
     ports:
       - "8080:8080"
     depends_on:
@@ -101,19 +101,12 @@ services:
       dockerfile: Dockerfile.worker
     container_name: nuaspa-worker-container
     hostname: nuaspa-worker
+    env_file:
+      - .env
     environment:
       DOTNET_ENVIRONMENT: Docker
       RabbitMQ__Host: rabbitmq
-      RabbitMQ__Port: "5672"
-      RabbitMQ__UserName: guest
-      RabbitMQ__Password: guest
-      RabbitMQ__NotificationsQueue: nuaspa_notifications
       Email__OutboxDirectory: /app/email-outbox
-      Email__FromAddress: noreply@nuaspa.ba
-      Email__FromName: NuaSpa
-      Smtp__Enabled: "false"
-      Logging__LogLevel__Default: Information
-      Logging__LogLevel__NuaSpa.Worker: Information
     volumes:
       - worker-email-outbox:/app/email-outbox
     depends_on:

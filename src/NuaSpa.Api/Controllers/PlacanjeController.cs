@@ -40,7 +40,7 @@ namespace NuaSpa.Api.Controllers
         public async Task<ActionResult<CreatePaymentIntentResponse>> CreateIntent([FromBody] CreatePaymentIntentRequest request)
         {
             if (string.IsNullOrWhiteSpace(_stripe.SecretKey))
-                return BadRequest("Stripe SecretKey nije konfigurisan (appsettings Stripe:SecretKey).");
+                return BadRequest("Stripe SecretKey nije konfigurisan (postavite Stripe__SecretKey u .env).");
 
             var userId = User.GetNuaSpaUserId();
 

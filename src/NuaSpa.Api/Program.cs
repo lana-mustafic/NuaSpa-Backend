@@ -21,8 +21,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.IdentityModel.Tokens.Jwt;
 using Stripe;
+using NuaSpa.Application.Configuration;
 
-
+EnvFileLoader.Load();
 var builder = WebApplication.CreateBuilder(args);
 
 // --- 1. KONTROLERI I JSON KONFIGURACIJA ---
@@ -83,8 +84,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
-        "Connection string 'DefaultConnection' nije postavljen. Za Development: postavite u appsettings.Development.json ili " +
-        "dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" \"...\" / env ConnectionStrings__DefaultConnection.");
+        "Connection string 'DefaultConnection' nije postavljen. Kopirajte .env.example u .env i postavite ConnectionStrings__DefaultConnection.");
 }
 
 builder.Services.AddDbContext<NuaSpaContext>(options =>
@@ -109,8 +109,7 @@ builder.Configuration.GetSection("JwtSettings").Bind(jwtSettings);
 if (string.IsNullOrWhiteSpace(jwtSettings.Key) || jwtSettings.Key.Length < 32)
 {
     throw new InvalidOperationException(
-        "JwtSettings:Key mora biti postavljen (najmanje 32 znaka). Za Development: appsettings.Development.json ili " +
-        "dotnet user-secrets set \"JwtSettings:Key\" \"...\" / env JwtSettings__Key.");
+        "JwtSettings:Key mora biti postavljen (najmanje 32 znaka). Postavite JwtSettings__Key u .env datoteci.");
 }
 
 builder.Services.AddSingleton(jwtSettings);
@@ -161,6 +160,7 @@ builder.Services.AddAutoMapper(
     typeof(MappingProfile));
 
 // --- 4. DEPENDENCY INJECTION ---
+NuaSpa.Application.Configuration.ConfigurationValidator.RequireRabbitMq(builder.Configuration);
 builder.Services.Configure<NuaSpa.Application.Messaging.RabbitMqOptions>(
     builder.Configuration.GetSection(NuaSpa.Application.Messaging.RabbitMqOptions.SectionName));
 builder.Services.AddScoped<NuaSpa.Application.Interfaces.Messaging.IRabbitMqPublisher,
@@ -370,7 +370,10 @@ if (app.Environment.IsDevelopment())
         logger);
 }
 
-app.UseHttpsRedirection();
+if (builder.Configuration.GetValue("UseHttpsRedirection", true))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();

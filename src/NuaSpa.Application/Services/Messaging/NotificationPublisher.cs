@@ -59,7 +59,7 @@ public sealed class NotificationPublisher : INotificationPublisher
             Naziv = usluga.Naziv,
             KategorijaNaziv = usluga.KategorijaNaziv ?? "—",
             Cijena = usluga.Cijena,
-            AdminNotifyEmail = adminEmail ?? _configuration["Email:AdminNotify"] ?? "admin@nuaspa.ba",
+            AdminNotifyEmail = adminEmail ?? _configuration["Email:AdminNotify"],
         };
 
         return _publisher.PublishAsync(NuaSpaMessageTypes.UslugaKreirana, message, cancellationToken);
