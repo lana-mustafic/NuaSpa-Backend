@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text;
 using NuaSpa.Domain.Common;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Domain.Entities
 {
@@ -13,12 +14,24 @@ namespace NuaSpa.Domain.Entities
         public DateTime DatumRezervacije { get; set; }
 
         [Required]
+        public RezervacijaStatus Status { get; set; } = RezervacijaStatus.Pending;
+
+        [Required]
         public bool IsPotvrdjena { get; set; }
 
         [Required]
         public bool IsPlacena { get; set; }
 
         public bool IsOtkazana { get; set; }
+
+        /// <summary>Snimak cijene usluge u trenutku kreiranja rezervacije.</summary>
+        [Required]
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal SnimakCijena { get; set; }
+
+        /// <summary>Snimak trajanja usluge (minute) u trenutku kreiranja.</summary>
+        [Required]
+        public int SnimakTrajanjeMinuta { get; set; }
 
         /// <summary>
         /// VIP tretman (admin) — poseban prikaz u kalendaru i sl.
@@ -29,6 +42,16 @@ namespace NuaSpa.Domain.Entities
         public string? RazlogOtkaza { get; set; }
 
         public DateTime? OtkazanaAt { get; set; }
+
+        public int? PotvrdioUserId { get; set; }
+
+        public DateTime? PotvrdjenaAt { get; set; }
+
+        public int? OtkazaoUserId { get; set; }
+
+        public int? ZavrsioUserId { get; set; }
+
+        public DateTime? ZavrsenaAt { get; set; }
 
         [Required]
         [ForeignKey("Korisnik")]
@@ -51,5 +74,8 @@ namespace NuaSpa.Domain.Entities
 
         public ICollection<RezervacijaOprema> RezervacijaOprema { get; set; } =
             new List<RezervacijaOprema>();
+
+        public ICollection<RezervacijaStatusPromjena> StatusPromjene { get; set; } =
+            new List<RezervacijaStatusPromjena>();
     }
 }

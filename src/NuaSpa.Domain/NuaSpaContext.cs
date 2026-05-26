@@ -19,6 +19,7 @@ namespace NuaSpa.Domain
         public DbSet<Usluga> Usluge { get; set; } = null!;
         public DbSet<Rezervacija> Rezervacije { get; set; } = null!;
         public DbSet<RezervacijaOprema> RezervacijeOprema { get; set; } = null!;
+        public DbSet<RezervacijaStatusPromjena> RezervacijaStatusPromjene { get; set; } = null!;
         public DbSet<Recenzija> Recenzije { get; set; } = null!;
         public DbSet<Favorit> Favoriti { get; set; } = null!;
         public DbSet<KorisnikAktivnost> KorisnikAktivnosti { get; set; } = null!;
