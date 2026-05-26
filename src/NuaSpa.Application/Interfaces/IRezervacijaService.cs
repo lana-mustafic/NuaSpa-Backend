@@ -29,9 +29,15 @@ namespace NuaSpa.Application.Interfaces
 
         Task<RezervacijaDTO?> EditAsync(int rezervacijaId, RezervacijaEditDTO dto);
 
-        Task<bool> UpdatePotvrdjenaAsync(int rezervacijaId, bool isPotvrdjena);
+        Task<bool> UpdatePotvrdjenaAsync(int rezervacijaId, bool isPotvrdjena, int actorUserId);
 
-        Task<bool> UpdatePotvrdjenaForZaposlenikAsync(int rezervacijaId, int zaposlenikId, bool isPotvrdjena);
+        Task<bool> UpdatePotvrdjenaForZaposlenikAsync(
+            int rezervacijaId,
+            int zaposlenikId,
+            bool isPotvrdjena,
+            int actorUserId);
+
+        Task<bool> CompleteAsync(int rezervacijaId, int actorUserId, bool allowBeforeEnd = false);
 
         Task<List<DateTime>> GetAvailableSlotsAsync(
             int zaposlenikId,
@@ -43,9 +49,11 @@ namespace NuaSpa.Application.Interfaces
             int rezervacijaId,
             int? requireKorisnikId,
             int? requireZaposlenikId,
-            string? razlogOtkaza);
+            int actorUserId,
+            string razlogOtkaza);
 
-        /// <summary>Trajno uklanja rezervaciju (admin). Ne smije biti plaćena.</summary>
+        /// <summary>Uklonjeno — koristite otkazivanje umjesto hard delete.</summary>
+        [Obsolete("Hard delete nije dozvoljen. Koristite CancelAsync.")]
         Task<(bool Ok, string? Message)> DeleteAdminAsync(int rezervacijaId);
 
         Task<List<RezervacijaCalendarItemDTO>> GetCalendarAsync(

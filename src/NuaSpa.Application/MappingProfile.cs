@@ -52,13 +52,18 @@ namespace NuaSpa.Application
             // Mapiranje Rezervacije (Spajanje imena i prezimena)
             CreateMap<Rezervacija, RezervacijaDTO>()
                 .ForMember(dest => dest.KorisnikId, opt => opt.MapFrom(src => src.KorisnikId))
+                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
                 .ForMember(dest => dest.KorisnikTelefon, opt => opt.MapFrom(src => src.Korisnik.PhoneNumber))
                 .ForMember(dest => dest.KorisnikEmail, opt => opt.MapFrom(src => src.Korisnik.Email))
                 .ForMember(dest => dest.NapomenaZaTerapeuta,
                     opt => opt.MapFrom(src => src.Korisnik.NapomenaZaTerapeuta))
                 .ForMember(dest => dest.UslugaTrajanjeMinuta,
-                    opt => opt.MapFrom(src => src.Usluga.TrajanjeMinuta))
-                .ForMember(dest => dest.UslugaCijena, opt => opt.MapFrom(src => src.Usluga.Cijena))
+                    opt => opt.MapFrom(src => src.SnimakTrajanjeMinuta > 0
+                        ? src.SnimakTrajanjeMinuta
+                        : src.Usluga.TrajanjeMinuta))
+                .ForMember(dest => dest.UslugaCijena, opt => opt.MapFrom(src => src.SnimakCijena > 0
+                    ? src.SnimakCijena
+                    : src.Usluga.Cijena))
                 .ForMember(dest => dest.KorisnikIme, opt => opt.MapFrom(src => src.Korisnik.Ime + " " + src.Korisnik.Prezime))
                 .ForMember(dest => dest.UslugaNaziv, opt => opt.MapFrom(src => src.Usluga.Naziv))
                 .ForMember(dest => dest.ZaposlenikIme, opt => opt.MapFrom(src => src.Zaposlenik.Ime + " " + src.Zaposlenik.Prezime))

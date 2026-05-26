@@ -8,6 +8,7 @@ namespace NuaSpa.Application.DTOs
     {
         public int Id { get; set; }
         public DateTime DatumRezervacije { get; set; }
+        public string Status { get; set; } = "Pending";
         public bool IsPotvrdjena { get; set; }
         public bool IsPlacena { get; set; }
         public bool IsOtkazana { get; set; }
