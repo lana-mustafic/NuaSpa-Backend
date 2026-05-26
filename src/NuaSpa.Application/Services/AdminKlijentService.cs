@@ -431,6 +431,17 @@ public class AdminKlijentService : IAdminKlijentService
 
         if (dto.NapomenaZaTerapeuta != null) user.NapomenaZaTerapeuta = dto.NapomenaZaTerapeuta;
 
+        if (!string.IsNullOrWhiteSpace(dto.NovaLozinka))
+        {
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var pwResult = await _userManager.ResetPasswordAsync(user, resetToken, dto.NovaLozinka);
+            if (!pwResult.Succeeded)
+            {
+                throw new BusinessRuleException(
+                    string.Join("; ", pwResult.Errors.Select(e => e.Description)));
+            }
+        }
+
         var upd = await _userManager.UpdateAsync(user);
         if (!upd.Succeeded)
         {

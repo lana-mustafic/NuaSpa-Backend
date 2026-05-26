@@ -8,6 +8,7 @@ namespace NuaSpa.Application.Interfaces
     {
         Task<AuthResponse> LoginAsync(LoginRequest loginRequest, CancellationToken ct);
         Task<string> AcceptInviteAsync(AcceptTherapistInviteDto dto, CancellationToken ct);
+        Task ChangePasswordAsync(int userId, ChangePasswordDto dto, CancellationToken ct);
     }
 }
 

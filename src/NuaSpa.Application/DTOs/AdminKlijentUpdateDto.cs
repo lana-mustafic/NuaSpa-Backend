@@ -26,4 +26,10 @@ public class AdminKlijentUpdateDto
 
     [MaxLength(1200)]
     public string? NapomenaZaTerapeuta { get; set; }
+
+    /// <summary>Nova lozinka (samo ako admin mijenja lozinku; stara lozinka nije potrebna).</summary>
+    public string? NovaLozinka { get; set; }
+
+    /// <summary>Potvrda nove lozinke (obavezna ako je NovaLozinka postavljena).</summary>
+    public string? PotvrdaNoveLozinke { get; set; }
 }

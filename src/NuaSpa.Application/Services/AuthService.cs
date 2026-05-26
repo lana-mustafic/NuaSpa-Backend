@@ -103,5 +103,34 @@ public class AuthService : IAuthService
 
         return message;
     }
+
+    public async Task ChangePasswordAsync(int userId, ChangePasswordDto dto, CancellationToken ct)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            throw new NotFoundException("Korisnik nije pronađen.");
+        }
+
+        if (!await _userManager.HasPasswordAsync(user))
+        {
+            throw new BusinessRuleException(
+                "Lozinka još nije postavljena. Koristite link za pozivnicu.");
+        }
+
+        var currentOk = await _userManager.CheckPasswordAsync(user, dto.StaraLozinka);
+        if (!currentOk)
+        {
+            throw new BusinessRuleException("Trenutna lozinka nije ispravna.");
+        }
+
+        var result = await _userManager.ChangePasswordAsync(
+            user, dto.StaraLozinka, dto.NovaLozinka);
+        if (!result.Succeeded)
+        {
+            throw new BusinessRuleException(
+                string.Join("; ", result.Errors.Select(e => e.Description)));
+        }
+    }
 }
 

@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
@@ -40,5 +42,20 @@ public class AccountController : ControllerBase
     {
         var message = await _authService.AcceptInviteAsync(dto, HttpContext.RequestAborted);
         return Ok(new { message });
+    }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        var userIdClaim = User.FindFirstValue(JwtRegisteredClaimNames.NameId)
+            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        await _authService.ChangePasswordAsync(userId, dto, HttpContext.RequestAborted);
+        return Ok(new { message = "Lozinka je uspješno promijenjena." });
     }
 }
