@@ -39,4 +39,7 @@ public class StaffInvitation
     public DateTime? AcceptedAt { get; set; }
 
     public int? CreatedByKorisnikId { get; set; }
+
+    [ForeignKey(nameof(CreatedByKorisnikId))]
+    public virtual Korisnik? CreatedByKorisnik { get; set; }
 }

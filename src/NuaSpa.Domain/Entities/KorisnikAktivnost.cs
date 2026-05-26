@@ -20,6 +20,7 @@ public class KorisnikAktivnost : BaseEntity
     public Usluga? Usluga { get; set; }
 
     public int? KategorijaUslugaId { get; set; }
+    public KategorijaUsluga? KategorijaUsluga { get; set; }
 
     [MaxLength(200)]
     public string? SearchTerm { get; set; }

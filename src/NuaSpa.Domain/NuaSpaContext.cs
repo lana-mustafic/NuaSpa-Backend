@@ -34,8 +34,9 @@ namespace NuaSpa.Domain
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // OVO MORA BITI PRVO!
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(NuaSpaContext).Assembly);
 
             var seedDate = new DateTime(2026, 1, 1);
 
@@ -53,6 +54,12 @@ namespace NuaSpa.Domain
             modelBuilder.Entity<Grad>().HasData(
                 new Grad { Id = 1, Naziv = "Sarajevo", PostanskiBroj = "71000", DrzavaId = 1, CreatedAt = seedDate },
                 new Grad { Id = 3, Naziv = "Konjic", PostanskiBroj = "88400", DrzavaId = 1, CreatedAt = seedDate }
+            );
+
+            modelBuilder.Entity<KategorijaUsluga>().HasData(
+                new KategorijaUsluga { Id = 1, Naziv = "Massage", Opis = "Masaže i relaks tretmani", CreatedAt = seedDate },
+                new KategorijaUsluga { Id = 2, Naziv = "Facial", Opis = "Tretmani lica", CreatedAt = seedDate },
+                new KategorijaUsluga { Id = 3, Naziv = "Body", Opis = "Tretmani tijela", CreatedAt = seedDate }
             );
 
             // 2. SEED ZA KORISNIKE (SecurityStamp je OBAVEZAN za Identity)
@@ -99,29 +106,6 @@ namespace NuaSpa.Domain
                 new IdentityUserRole<int> { UserId = adminId, RoleId = 1 }, // Admin je Admin
                 new IdentityUserRole<int> { UserId = lanaId, RoleId = 2 }   // Lana je Klijent
             );
-
-            // 4. FLUENT API
-            modelBuilder.Entity<Usluga>().Property(u => u.Cijena).HasPrecision(18, 2);
-
-            modelBuilder.Entity<Korisnik>()
-                .HasOne(k => k.Grad)
-                .WithMany()
-                .HasForeignKey(k => k.GradId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<Zaposlenik>()
-                .HasOne(z => z.KategorijaUsluga)
-                .WithMany()
-                .HasForeignKey(z => z.KategorijaUslugaId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<Favorit>()
-                .HasIndex(x => new { x.KorisnikId, x.UslugaId })
-                .IsUnique();
-
-            modelBuilder.Entity<RezervacijaOprema>()
-                .HasIndex(x => new { x.RezervacijaId, x.OpremaId })
-                .IsUnique();
 
             // Seed a single default spa center (id=1) + default working hours.
             modelBuilder.Entity<SpaCentar>().HasData(

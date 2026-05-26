@@ -204,9 +204,6 @@ using (var scope = app.Services.CreateScope())
         }
 
         context.Database.Migrate();
-        EnsureZaposlenikProfileColumns(context);
-        EnsureStaffInvitationsTable(context);
-        EnsureKorisnikAktivnostiTable(context);
     }
     catch (Exception ex)
     {
@@ -214,127 +211,6 @@ using (var scope = app.Services.CreateScope())
         logger.LogError(ex, "Došlo je do greške prilikom migracije baze podataka.");
         throw;
     }
-}
-
-static void EnsureZaposlenikProfileColumns(NuaSpaContext context)
-{
-    context.Database.ExecuteSqlRaw(
-        """
-        IF COL_LENGTH('dbo.Zaposlenici', 'KategorijaUslugaId') IS NULL
-        BEGIN
-            ALTER TABLE [Zaposlenici] ALTER COLUMN [Specijalizacija] nvarchar(500) NOT NULL;
-            ALTER TABLE [Zaposlenici] ADD [KategorijaUslugaId] int NULL;
-            ALTER TABLE [Zaposlenici] ADD [Jezici] nvarchar(200) NULL;
-            ALTER TABLE [Zaposlenici] ADD [Lokacija] nvarchar(120) NULL;
-            ALTER TABLE [Zaposlenici] ADD [Obrazovanje] nvarchar(1000) NULL;
-
-            IF NOT EXISTS (
-                SELECT 1 FROM sys.indexes
-                WHERE name = 'IX_Zaposlenici_KategorijaUslugaId'
-                  AND object_id = OBJECT_ID('dbo.Zaposlenici'))
-            BEGIN
-                CREATE INDEX [IX_Zaposlenici_KategorijaUslugaId]
-                    ON [Zaposlenici]([KategorijaUslugaId]);
-            END;
-
-            IF NOT EXISTS (
-                SELECT 1 FROM sys.foreign_keys
-                WHERE name = 'FK_Zaposlenici_KategorijeUsluga_KategorijaUslugaId')
-            BEGIN
-                ALTER TABLE [Zaposlenici] ADD CONSTRAINT [FK_Zaposlenici_KategorijeUsluga_KategorijaUslugaId]
-                    FOREIGN KEY ([KategorijaUslugaId]) REFERENCES [KategorijeUsluga]([Id])
-                    ON DELETE SET NULL;
-            END;
-        END
-
-        IF COL_LENGTH('dbo.Zaposlenici', 'Email') IS NULL
-        BEGIN
-            ALTER TABLE [Zaposlenici] ADD [Email] nvarchar(120) NULL;
-        END
-
-        IF COL_LENGTH('dbo.Zaposlenici', 'Status') IS NULL
-        BEGIN
-            ALTER TABLE [Zaposlenici] ADD [Status] int NOT NULL
-                CONSTRAINT [DF_Zaposlenici_Status] DEFAULT 0;
-        END
-
-        IF COL_LENGTH('dbo.Recenzije', 'ZaposlenikId') IS NULL
-        BEGIN
-            ALTER TABLE [Recenzije] ADD [ZaposlenikId] int NULL;
-
-            IF NOT EXISTS (
-                SELECT 1 FROM sys.foreign_keys
-                WHERE name = 'FK_Recenzije_Zaposlenici_ZaposlenikId')
-            BEGIN
-                ALTER TABLE [Recenzije] ADD CONSTRAINT [FK_Recenzije_Zaposlenici_ZaposlenikId]
-                    FOREIGN KEY ([ZaposlenikId]) REFERENCES [Zaposlenici]([Id])
-                    ON DELETE NO ACTION;
-            END;
-        END
-        """);
-}
-
-static void EnsureStaffInvitationsTable(NuaSpaContext context)
-{
-    context.Database.ExecuteSqlRaw(
-        """
-        IF OBJECT_ID(N'dbo.StaffInvitations', N'U') IS NULL
-        BEGIN
-            CREATE TABLE [StaffInvitations] (
-                [Id] int NOT NULL IDENTITY,
-                [ZaposlenikId] int NOT NULL,
-                [KorisnikId] int NOT NULL,
-                [Email] nvarchar(256) NOT NULL,
-                [TokenHash] nvarchar(64) NOT NULL,
-                [CreatedAt] datetime2 NOT NULL,
-                [ExpiresAt] datetime2 NOT NULL,
-                [AcceptedAt] datetime2 NULL,
-                [CreatedByKorisnikId] int NULL,
-                CONSTRAINT [PK_StaffInvitations] PRIMARY KEY ([Id]),
-                CONSTRAINT [FK_StaffInvitations_Zaposlenici_ZaposlenikId]
-                    FOREIGN KEY ([ZaposlenikId]) REFERENCES [Zaposlenici]([Id]) ON DELETE CASCADE,
-                CONSTRAINT [FK_StaffInvitations_AspNetUsers_KorisnikId]
-                    FOREIGN KEY ([KorisnikId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE
-            );
-
-            CREATE INDEX [IX_StaffInvitations_TokenHash]
-                ON [StaffInvitations]([TokenHash]);
-
-            CREATE INDEX [IX_StaffInvitations_ZaposlenikId_AcceptedAt]
-                ON [StaffInvitations]([ZaposlenikId], [AcceptedAt]);
-        END
-        """);
-}
-
-static void EnsureKorisnikAktivnostiTable(NuaSpaContext context)
-{
-    context.Database.ExecuteSqlRaw(
-        """
-        IF OBJECT_ID(N'dbo.KorisnikAktivnosti', N'U') IS NULL
-        BEGIN
-            CREATE TABLE [KorisnikAktivnosti] (
-                [Id] int NOT NULL IDENTITY,
-                [KorisnikId] int NOT NULL,
-                [Tip] int NOT NULL,
-                [UslugaId] int NULL,
-                [KategorijaUslugaId] int NULL,
-                [SearchTerm] nvarchar(200) NULL,
-                [CreatedAt] datetime2 NOT NULL,
-                [IsDeleted] bit NOT NULL CONSTRAINT [DF_KorisnikAktivnosti_IsDeleted] DEFAULT 0,
-                CONSTRAINT [PK_KorisnikAktivnosti] PRIMARY KEY ([Id]),
-                CONSTRAINT [FK_KorisnikAktivnosti_AspNetUsers_KorisnikId]
-                    FOREIGN KEY ([KorisnikId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE,
-                CONSTRAINT [FK_KorisnikAktivnosti_Usluge_UslugaId]
-                    FOREIGN KEY ([UslugaId]) REFERENCES [Usluge]([Id]) ON DELETE SET NULL
-            );
-
-            CREATE INDEX [IX_KorisnikAktivnosti_KorisnikId_CreatedAt]
-                ON [KorisnikAktivnosti]([KorisnikId], [CreatedAt]);
-
-            CREATE INDEX [IX_KorisnikAktivnosti_UslugaId]
-                ON [KorisnikAktivnosti]([UslugaId]);
-        END
-        """);
 }
 
 // --- DEV SEED LOGIN KORISNIKA (dummy hash iz migracija ne radi za login) ---
