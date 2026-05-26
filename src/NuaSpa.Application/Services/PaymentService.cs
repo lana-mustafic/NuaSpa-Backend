@@ -28,11 +28,16 @@ public class PaymentService : IPaymentService
 
     private readonly NuaSpaContext _context;
     private readonly StripeSettings _stripe;
+    private readonly ISistemskaNotifikacijaService _notifikacije;
 
-    public PaymentService(NuaSpaContext context, StripeSettings stripe)
+    public PaymentService(
+        NuaSpaContext context,
+        StripeSettings stripe,
+        ISistemskaNotifikacijaService notifikacije)
     {
         _context = context;
         _stripe = stripe;
+        _notifikacije = notifikacije;
     }
 
     public async Task<CreatePaymentIntentResponseDto> CreatePaymentIntentAsync(
@@ -290,6 +295,21 @@ public class PaymentService : IPaymentService
 
         await _context.SaveChangesAsync(ct);
 
+        if (placanje.Rezervacija != null)
+        {
+            try
+            {
+                await _notifikacije.NotifyPlacanjeRefundiranoAsync(
+                    placanje.Rezervacija,
+                    refundedAmount,
+                    ct);
+            }
+            catch
+            {
+                // Notifikacije ne smiju prekinuti refund.
+            }
+        }
+
         return new RefundPaymentResponseDto
         {
             RefundId = refund.Id,
@@ -449,6 +469,7 @@ public class PaymentService : IPaymentService
             return BuildConfirmResponse(placanje, alreadyCompleted: true);
         }
 
+        var wasAlreadyCompleted = placanje.Status == PlacanjeStatus.Completed;
         var chargedMinor = intent.AmountReceived > 0 ? intent.AmountReceived : intent.Amount;
         var chargedAmount = FromStripeMinorUnits(chargedMinor);
 
@@ -459,6 +480,18 @@ public class PaymentService : IPaymentService
         rezervacija.IsPlacena = true;
 
         await _context.SaveChangesAsync(ct);
+
+        if (!wasAlreadyCompleted)
+        {
+            try
+            {
+                await _notifikacije.NotifyPlacanjeUspjesnoAsync(rezervacija, chargedAmount, ct);
+            }
+            catch
+            {
+                // Notifikacije ne smiju prekinuti plaćanje.
+            }
+        }
 
         return BuildConfirmResponse(placanje, alreadyCompleted: false);
     }

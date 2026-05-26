@@ -20,15 +20,18 @@ namespace NuaSpa.Application.Services
         private readonly NuaSpaContext _context;
         private readonly IMapper _mapper;
         private readonly IPaymentService _paymentService;
+        private readonly ISistemskaNotifikacijaService _notifikacije;
 
         public RezervacijaService(
             NuaSpaContext context,
             IMapper mapper,
-            IPaymentService paymentService)
+            IPaymentService paymentService,
+            ISistemskaNotifikacijaService notifikacije)
         {
             _context = context;
             _mapper = mapper;
             _paymentService = paymentService;
+            _notifikacije = notifikacije;
         }
 
         public async Task<RezervacijaDTO?> GetByIdAsync(int rezervacijaId)
@@ -268,6 +271,9 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.RezervacijaOprema)
                 .FirstAsync(r => r.Id == entity.Id);
 
+            await SafeNotifyAsync(() =>
+                _notifikacije.NotifyRezervacijaKreiranaAsync(created, CancellationToken.None));
+
             return await MapSingleAndEnrichAsync(created);
         }
 
@@ -398,6 +404,8 @@ namespace NuaSpa.Application.Services
             }
 
             await _context.SaveChangesAsync();
+            await SafeNotifyAsync(() =>
+                _notifikacije.NotifyRezervacijaPotvrdenaAsync(entity, CancellationToken.None));
             return true;
         }
 
@@ -434,8 +442,14 @@ namespace NuaSpa.Application.Services
                 throw new BusinessRuleException("Rezervacija se može završiti tek nakon isteka termina.");
             }
 
-            RecordTransition(entity, RezervacijaStatus.Completed, actorUserId, "Termin završen.");
+            RecordTransition(
+                entity,
+                RezervacijaStatus.Completed,
+                actorUserId,
+                "Termin završen.");
             await _context.SaveChangesAsync();
+            await SafeNotifyAsync(() =>
+                _notifikacije.NotifyRezervacijaZavrsenaAsync(entity, CancellationToken.None));
             return true;
         }
 
@@ -816,6 +830,9 @@ namespace NuaSpa.Application.Services
 
             await _context.SaveChangesAsync();
 
+            await SafeNotifyAsync(() =>
+                _notifikacije.NotifyRezervacijaOtkazanaAsync(entity, razlogOtkaza.Trim(), CancellationToken.None));
+
             return new RezervacijaCancelResultDto
             {
                 Otkazana = true,
@@ -1008,6 +1025,18 @@ namespace NuaSpa.Application.Services
             var set = premiumIds.ToHashSet();
             foreach (var d in dtos)
                 d.PremiumKlijent = set.Contains(d.KorisnikId);
+        }
+
+        private static async Task SafeNotifyAsync(Func<Task> action)
+        {
+            try
+            {
+                await action();
+            }
+            catch
+            {
+                // Notifikacije ne smiju prekinuti poslovni tok.
+            }
         }
     }
 }

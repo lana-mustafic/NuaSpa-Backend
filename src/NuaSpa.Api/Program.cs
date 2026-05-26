@@ -173,6 +173,18 @@ builder.Services.AddAuthentication(options =>
 
     options.Events = new JwtBearerEvents
     {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken)
+                && path.StartsWithSegments("/hubs/notifications"))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        },
         OnTokenValidated = async context =>
         {
             var jti = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti);
@@ -214,6 +226,9 @@ builder.Services.AddScoped<NuaSpa.Application.Interfaces.Messaging.INotification
     NuaSpa.Application.Services.Messaging.NotificationPublisher>();
 builder.Services.AddScoped<NuaSpa.Application.Interfaces.IReportingService, NuaSpa.Application.Services.ReportingService>();
 builder.Services.AddScoped<NuaSpa.Application.Services.SoftDeletePurgeService>();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<NuaSpa.Application.Interfaces.INotificationPushService,
+    NuaSpa.Api.Services.SignalRNotificationPushService>();
 
 
 var applicationAssembly = typeof(MappingProfile).Assembly;
@@ -427,6 +442,7 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 var webRootPath = app.Environment.WebRootPath
     ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "usluge"));
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "obavijesti"));
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -447,6 +463,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.MapControllers();
+app.MapHub<NuaSpa.Api.Hubs.NotificationsHub>("/hubs/notifications");
 app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();
