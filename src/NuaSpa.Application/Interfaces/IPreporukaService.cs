@@ -6,6 +6,8 @@ namespace NuaSpa.Application.Interfaces
 {
     public interface IPreporukaService
     {
-        Task<IEnumerable<UslugaDTO>> GetForKorisnikAsync(int korisnikId, int take = 10);
+        Task LogAktivnostAsync(int korisnikId, KorisnikAktivnostCreateDto dto);
+
+        Task<IEnumerable<PreporucenaUslugaDto>> GetPreporukeAsync(int korisnikId, int take = 10);
     }
 }

@@ -10,7 +10,7 @@ namespace NuaSpa.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Klijent,Admin,Zaposlenik")]
+[Authorize]
 public class PreporukaController : ControllerBase
 {
     private readonly IPreporukaService _service;
@@ -20,11 +20,24 @@ public class PreporukaController : ControllerBase
         _service = service;
     }
 
+    /// <summary>Content-based preporuke s objašnjenjem (razlogTekst).</summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<UslugaDTO>>> Get([FromQuery] int take = 10)
+    [Authorize(Roles = "Klijent,Admin")]
+    public async Task<ActionResult<IEnumerable<PreporucenaUslugaDto>>> Get(
+        [FromQuery] int take = 10)
     {
         var userId = User.GetNuaSpaUserId();
-        var result = await _service.GetForKorisnikAsync(userId, take);
+        var result = await _service.GetPreporukeAsync(userId, take);
         return Ok(result);
+    }
+
+    /// <summary>Zapis pretrage ili pregleda usluge (signali za recommender).</summary>
+    [HttpPost("aktivnost")]
+    [Authorize(Roles = "Klijent")]
+    public async Task<IActionResult> LogAktivnost([FromBody] KorisnikAktivnostCreateDto dto)
+    {
+        var userId = User.GetNuaSpaUserId();
+        await _service.LogAktivnostAsync(userId, dto);
+        return NoContent();
     }
 }

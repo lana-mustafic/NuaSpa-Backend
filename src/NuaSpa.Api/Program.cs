@@ -206,6 +206,7 @@ using (var scope = app.Services.CreateScope())
         context.Database.Migrate();
         EnsureZaposlenikProfileColumns(context);
         EnsureStaffInvitationsTable(context);
+        EnsureKorisnikAktivnostiTable(context);
     }
     catch (Exception ex)
     {
@@ -301,6 +302,37 @@ static void EnsureStaffInvitationsTable(NuaSpaContext context)
 
             CREATE INDEX [IX_StaffInvitations_ZaposlenikId_AcceptedAt]
                 ON [StaffInvitations]([ZaposlenikId], [AcceptedAt]);
+        END
+        """);
+}
+
+static void EnsureKorisnikAktivnostiTable(NuaSpaContext context)
+{
+    context.Database.ExecuteSqlRaw(
+        """
+        IF OBJECT_ID(N'dbo.KorisnikAktivnosti', N'U') IS NULL
+        BEGIN
+            CREATE TABLE [KorisnikAktivnosti] (
+                [Id] int NOT NULL IDENTITY,
+                [KorisnikId] int NOT NULL,
+                [Tip] int NOT NULL,
+                [UslugaId] int NULL,
+                [KategorijaUslugaId] int NULL,
+                [SearchTerm] nvarchar(200) NULL,
+                [CreatedAt] datetime2 NOT NULL,
+                [IsDeleted] bit NOT NULL CONSTRAINT [DF_KorisnikAktivnosti_IsDeleted] DEFAULT 0,
+                CONSTRAINT [PK_KorisnikAktivnosti] PRIMARY KEY ([Id]),
+                CONSTRAINT [FK_KorisnikAktivnosti_AspNetUsers_KorisnikId]
+                    FOREIGN KEY ([KorisnikId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE,
+                CONSTRAINT [FK_KorisnikAktivnosti_Usluge_UslugaId]
+                    FOREIGN KEY ([UslugaId]) REFERENCES [Usluge]([Id]) ON DELETE SET NULL
+            );
+
+            CREATE INDEX [IX_KorisnikAktivnosti_KorisnikId_CreatedAt]
+                ON [KorisnikAktivnosti]([KorisnikId], [CreatedAt]);
+
+            CREATE INDEX [IX_KorisnikAktivnosti_UslugaId]
+                ON [KorisnikAktivnosti]([UslugaId]);
         END
         """);
 }
