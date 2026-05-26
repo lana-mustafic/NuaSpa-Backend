@@ -326,6 +326,33 @@ namespace NuaSpa.Application.Services
                 .ToList();
         }
 
+        public async Task<IEnumerable<ZaposlenikDTO>> GetForCategoryAsync(
+            int kategorijaUslugaId,
+            bool bookableOnly = true)
+        {
+            if (kategorijaUslugaId <= 0)
+            {
+                return Array.Empty<ZaposlenikDTO>();
+            }
+
+            var query = _context.Zaposlenici
+                .AsNoTracking()
+                .Include(z => z.KategorijaUsluga)
+                .Where(z => z.KategorijaUslugaId == kategorijaUslugaId);
+
+            if (bookableOnly)
+            {
+                query = query.Where(z => z.Status == ZaposlenikStatus.Active);
+            }
+
+            var list = await query
+                .OrderBy(z => z.Prezime)
+                .ThenBy(z => z.Ime)
+                .ToListAsync();
+
+            return list.Select(MapToDto).ToList();
+        }
+
         public async Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId)
         {
             return await GetById(zaposlenikId);

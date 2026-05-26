@@ -22,6 +22,19 @@ namespace NuaSpa.Api.Controllers
             _zaposlenikService = service;
         }
 
+        /// <summary>Override base route so literal paths like <c>me</c> are not parsed as numeric ids.</summary>
+        [HttpGet("{id:int}")]
+        public new async Task<ActionResult<ZaposlenikDTO>> GetById(int id)
+        {
+            var dto = await _zaposlenikService.GetById(id);
+            if (dto == null || dto.Id == 0)
+            {
+                return NotFound();
+            }
+
+            return Ok(dto);
+        }
+
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public override async Task<ZaposlenikDTO> Insert([FromBody] ZaposlenikDTO dto)
@@ -150,11 +163,26 @@ namespace NuaSpa.Api.Controllers
             return Ok(list);
         }
 
+        [HttpGet("for-category/{kategorijaUslugaId:int}")]
+        [Authorize(Roles = "Admin,Klijent")]
+        public async Task<ActionResult<IEnumerable<ZaposlenikDTO>>> GetForCategory(
+            int kategorijaUslugaId,
+            [FromQuery] bool bookableOnly = true)
+        {
+            var list = await _zaposlenikService.GetForCategoryAsync(
+                kategorijaUslugaId,
+                bookableOnly);
+            return Ok(list);
+        }
+
         [HttpGet("me")]
         [Authorize(Roles = "Zaposlenik")]
         public async Task<ActionResult<ZaposlenikDTO>> GetMe()
         {
-            var id = User.GetNuaSpaZaposlenikId();
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
             var dto = await _zaposlenikService.GetMeAsync(id);
             if (dto == null || dto.Id == 0) return NotFound();
             return Ok(dto);
@@ -164,7 +192,10 @@ namespace NuaSpa.Api.Controllers
         [Authorize(Roles = "Zaposlenik")]
         public async Task<ActionResult<ZaposlenikDTO>> UpdateMe([FromBody] TherapistSelfProfileUpdateDto body)
         {
-            var id = User.GetNuaSpaZaposlenikId();
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
             var updated = await _zaposlenikService.UpdateMeAsync(id, body);
             if (updated == null) return NotFound();
             return Ok(updated);
@@ -174,7 +205,10 @@ namespace NuaSpa.Api.Controllers
         [Authorize(Roles = "Zaposlenik")]
         public async Task<ActionResult<TherapistDashboardDto>> GetMyDashboard([FromQuery] DateTime? day = null)
         {
-            var id = User.GetNuaSpaZaposlenikId();
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
             var dto = await _zaposlenikService.GetDashboardAsync(id, day);
             if (dto == null) return NotFound();
             return Ok(dto);
@@ -185,7 +219,10 @@ namespace NuaSpa.Api.Controllers
         public async Task<ActionResult<IReadOnlyList<TherapistReviewRowDto>>> GetMyReviews(
             [FromQuery] int maxReviews = 30)
         {
-            var id = User.GetNuaSpaZaposlenikId();
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
             var list = await _zaposlenikService.GetMyReviewsAsync(id, maxReviews);
             return Ok(list);
         }

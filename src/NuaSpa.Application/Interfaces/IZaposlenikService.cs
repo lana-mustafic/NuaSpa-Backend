@@ -23,6 +23,10 @@ namespace NuaSpa.Application.Interfaces
 
         Task<IEnumerable<ZaposlenikDTO>> GetForServiceAsync(int uslugaId, bool bookableOnly = true);
 
+        Task<IEnumerable<ZaposlenikDTO>> GetForCategoryAsync(
+            int kategorijaUslugaId,
+            bool bookableOnly = true);
+
         Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId);
 
         Task<ZaposlenikDTO?> UpdateMeAsync(int zaposlenikId, TherapistSelfProfileUpdateDto dto);
