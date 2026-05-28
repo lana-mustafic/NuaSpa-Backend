@@ -74,8 +74,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             new[] { info.KorisnikId },
             SistemskaNotifikacijaTip.RezervacijaKreirana,
-            "Rezervacija zaprimljena",
-            $"Vaša rezervacija za {info.UslugaNaziv} ({dt}) je zaprimljena i čeka potvrdu.",
+            "Booking received",
+            $"Your booking for {info.UslugaNaziv} ({dt}) was received and is awaiting confirmation.",
             info.Id,
             ct);
 
@@ -83,8 +83,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             adminIds,
             SistemskaNotifikacijaTip.RezervacijaKreirana,
-            "Nova rezervacija",
-            $"Novi termin: {info.UslugaNaziv} — {info.KlijentIme} ({dt}).",
+            "New booking",
+            $"New appointment: {info.UslugaNaziv} — {info.KlijentIme} ({dt}).",
             info.Id,
             ct);
 
@@ -94,8 +94,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
             await NotifyUsersAsync(
                 new[] { therapistUserId.Value },
                 SistemskaNotifikacijaTip.RezervacijaKreirana,
-                "Novi termin",
-                $"Novi termin: {info.UslugaNaziv} — {info.KlijentIme} ({dt}).",
+                "New appointment",
+                $"New appointment: {info.UslugaNaziv} — {info.KlijentIme} ({dt}).",
                 info.Id,
                 ct);
         }
@@ -109,8 +109,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             new[] { info.KorisnikId },
             SistemskaNotifikacijaTip.RezervacijaPotvrdena,
-            "Rezervacija potvrđena",
-            $"Vaš termin za {info.UslugaNaziv} ({dt}) je potvrđen.",
+            "Booking confirmed",
+            $"Your appointment for {info.UslugaNaziv} ({dt}) has been confirmed.",
             info.Id,
             ct);
 
@@ -120,8 +120,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
             await NotifyUsersAsync(
                 new[] { therapistUserId.Value },
                 SistemskaNotifikacijaTip.StatusPromjena,
-                "Termin potvrđen",
-                $"Termin {info.UslugaNaziv} ({dt}) je potvrđen.",
+                "Appointment confirmed",
+                $"Appointment {info.UslugaNaziv} ({dt}) has been confirmed.",
                 info.Id,
                 ct);
         }
@@ -139,8 +139,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             new[] { info.KorisnikId },
             SistemskaNotifikacijaTip.RezervacijaOtkazana,
-            "Rezervacija otkazana",
-            $"Termin za {info.UslugaNaziv} ({dt}) je otkazan. Razlog: {reason}",
+            "Booking cancelled",
+            $"Appointment for {info.UslugaNaziv} ({dt}) was cancelled. Reason: {reason}",
             info.Id,
             ct);
 
@@ -148,8 +148,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             adminIds,
             SistemskaNotifikacijaTip.RezervacijaOtkazana,
-            "Otkazana rezervacija",
-            $"Otkazan termin {info.UslugaNaziv} — {info.KlijentIme}. Razlog: {reason}",
+            "Cancelled booking",
+            $"Cancelled appointment {info.UslugaNaziv} — {info.KlijentIme}. Reason: {reason}",
             info.Id,
             ct);
 
@@ -159,8 +159,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
             await NotifyUsersAsync(
                 new[] { therapistUserId.Value },
                 SistemskaNotifikacijaTip.RezervacijaOtkazana,
-                "Termin otkazan",
-                $"Termin {info.UslugaNaziv} ({dt}) je otkazan.",
+                "Appointment cancelled",
+                $"Appointment {info.UslugaNaziv} ({dt}) was cancelled.",
                 info.Id,
                 ct);
         }
@@ -174,8 +174,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             new[] { info.KorisnikId },
             SistemskaNotifikacijaTip.RezervacijaZavrsena,
-            "Termin završen",
-            $"Tretman {info.UslugaNaziv} ({dt}) je označen kao završen.",
+            "Appointment completed",
+            $"Treatment {info.UslugaNaziv} ({dt}) has been marked as completed.",
             info.Id,
             ct);
     }
@@ -191,8 +191,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             new[] { info.KorisnikId },
             SistemskaNotifikacijaTip.PlacanjeUspjesno,
-            "Plaćanje uspješno",
-            $"Uspješno plaćeno {amount} KM za {info.UslugaNaziv}.",
+            "Payment successful",
+            $"Successfully paid {amount} KM for {info.UslugaNaziv}.",
             info.Id,
             ct);
 
@@ -200,8 +200,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             adminIds,
             SistemskaNotifikacijaTip.PlacanjeUspjesno,
-            "Novo plaćanje",
-            $"Plaćeno {amount} KM — {info.KlijentIme}, {info.UslugaNaziv}.",
+            "New payment",
+            $"Paid {amount} KM — {info.KlijentIme}, {info.UslugaNaziv}.",
             info.Id,
             ct);
     }
@@ -217,8 +217,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             new[] { info.KorisnikId },
             SistemskaNotifikacijaTip.PlacanjeRefundirano,
-            "Povrat sredstava",
-            $"Refund {amount} KM za {info.UslugaNaziv} je obrađen.",
+            "Refund processed",
+            $"Refund of {amount} KM for {info.UslugaNaziv} has been processed.",
             info.Id,
             ct);
 
@@ -226,8 +226,8 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
         await NotifyUsersAsync(
             adminIds,
             SistemskaNotifikacijaTip.PlacanjeRefundirano,
-            "Refund izvršen",
-            $"Refund {amount} KM — {info.KlijentIme}, {info.UslugaNaziv}.",
+            "Refund completed",
+            $"Refund of {amount} KM — {info.KlijentIme}, {info.UslugaNaziv}.",
             info.Id,
             ct);
     }
@@ -348,9 +348,9 @@ public class SistemskaNotifikacijaService : ISistemskaNotifikacijaService
             row.KorisnikId,
             row.ZaposlenikId,
             row.DatumRezervacije,
-            row.Usluga?.Naziv ?? "Usluga",
+            row.Usluga?.Naziv ?? "Service",
             row.Korisnik == null
-                ? "Klijent"
+                ? "Client"
                 : $"{row.Korisnik.Ime} {row.Korisnik.Prezime}".Trim());
     }
 
