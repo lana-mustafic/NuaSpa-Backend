@@ -7,7 +7,6 @@ namespace NuaSpa.Api.Controllers;
 /// <summary>Autorizovani pristup uploadanim datotekama (ne javni static).</summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class FilesController : ControllerBase
 {
     private readonly IWebHostEnvironment _env;

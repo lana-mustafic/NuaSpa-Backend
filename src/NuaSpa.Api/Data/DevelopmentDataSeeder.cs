@@ -69,7 +69,7 @@ public static class DevelopmentDataSeeder
             logger.LogInformation("Dev seed: kreirana seed slika {Path}", path);
         }
 
-        return $"/uploads/usluge/{SeedImageFileName}";
+        return $"/api/files/usluge/{SeedImageFileName}";
     }
 
     private static async Task EnsureProstorijeAsync(NuaSpaContext context, CancellationToken ct)

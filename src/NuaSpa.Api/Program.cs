@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.FileProviders;
 using NuaSpa.Api.Middleware;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -446,6 +447,15 @@ Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "usluge"));
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "obavijesti"));
 
 app.UseAuthentication();
+
+// Javne slike usluga — mora biti prije UseAuthorization (FallbackPolicy inače vraća 401).
+var uslugeUploadRoot = Path.Combine(webRootPath, "uploads", "usluge");
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uslugeUploadRoot),
+    RequestPath = "/uploads/usluge",
+});
+
 app.UseAuthorization();
 
 app.UseStaticFiles(new StaticFileOptions
@@ -453,19 +463,11 @@ app.UseStaticFiles(new StaticFileOptions
     OnPrepareResponse = ctx =>
     {
         var path = ctx.Context.Request.Path.Value ?? string.Empty;
-        // Slike usluga u katalogu — javno (seed / legacy putanje).
-        if (path.StartsWith("/uploads/usluge", StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith("/uploads/obavijesti", StringComparison.OrdinalIgnoreCase)
+            && !(ctx.Context.User.Identity?.IsAuthenticated ?? false))
         {
-            return;
-        }
-
-        if (ctx.Context.Request.Path.StartsWithSegments("/uploads", StringComparison.OrdinalIgnoreCase))
-        {
-            if (!(ctx.Context.User.Identity?.IsAuthenticated ?? false))
-            {
-                ctx.Context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                ctx.Context.Response.ContentLength = 0;
-            }
+            ctx.Context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            ctx.Context.Response.ContentLength = 0;
         }
     }
 });

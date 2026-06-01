@@ -71,7 +71,8 @@ public class UslugaController : BaseController<UslugaDTO, UslugaSearchObject>
             await readStream.CopyToAsync(outStream, cancellationToken);
         }
 
-        var url = $"{Request.Scheme}://{Request.Host}/api/files/usluge/{safeName}";
+        // Relativni URL — klijent ga spaja s API_BASE_URL (izbjegava localhost vs 127.0.0.1).
+        var url = $"/api/files/usluge/{safeName}";
         return Ok(new { url });
     }
 
