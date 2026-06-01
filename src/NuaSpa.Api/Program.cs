@@ -452,6 +452,13 @@ app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
     {
+        var path = ctx.Context.Request.Path.Value ?? string.Empty;
+        // Slike usluga u katalogu — javno (seed / legacy putanje).
+        if (path.StartsWith("/uploads/usluge", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         if (ctx.Context.Request.Path.StartsWithSegments("/uploads", StringComparison.OrdinalIgnoreCase))
         {
             if (!(ctx.Context.User.Identity?.IsAuthenticated ?? false))

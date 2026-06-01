@@ -19,6 +19,8 @@ public class FilesController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>Javno — koristi se u &lt;img&gt; / Image.network bez JWT zaglavlja.</summary>
+    [AllowAnonymous]
     [HttpGet("usluge/{fileName}")]
     [ResponseCache(Duration = 3600)]
     public IActionResult GetUslugaImage(string fileName)
