@@ -212,20 +212,28 @@ public class ReportingService : IReportingService
             .Where(r => !r.IsDeleted)
             .Where(r => r.DatumRezervacije >= start && r.DatumRezervacije < endExclusive)
             .GroupBy(r => r.DatumRezervacije.Date)
-            .Select(g => new { Datum = g.Key, Count = g.Count() })
+            .Select(g => new
+            {
+                Datum = g.Key,
+                Count = g.Count(),
+                Potvrdjeni = g.Count(r => r.IsPotvrdjena && !r.IsOtkazana),
+                Otkazani = g.Count(r => r.IsOtkazana),
+            })
             .ToListAsync();
 
         var revenueMap = fromDb.ToDictionary(x => x.Datum, x => x.Prihod);
-        var bookingMap = bookingsByDay.ToDictionary(x => x.Datum, x => x.Count);
+        var bookingMap = bookingsByDay.ToDictionary(x => x.Datum);
         var list = new List<RevenuePointDTO>();
         for (var d = start; d < endExclusive; d = d.AddDays(1))
         {
             revenueMap.TryGetValue(d, out var prihod);
-            bookingMap.TryGetValue(d, out var brojRezervacija);
+            bookingMap.TryGetValue(d, out var dayStats);
             list.Add(new RevenuePointDTO
             {
                 Datum = d,
-                BrojRezervacija = brojRezervacija,
+                BrojRezervacija = dayStats?.Count ?? 0,
+                BrojPotvrdjenih = dayStats?.Potvrdjeni ?? 0,
+                BrojOtkazanih = dayStats?.Otkazani ?? 0,
                 Prihod = prihod,
             });
         }
