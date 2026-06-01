@@ -2,6 +2,7 @@
 using NuaSpa.Application.DTOs;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 using Microsoft.EntityFrameworkCore; // Obavezno za ToListAsync() i Count()
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -131,7 +132,9 @@ public class ReportingService : IReportingService
         // Prihod iz stvarnih uplata (Placanja), ne iz cijene usluge na rezervaciji.
         var prihodDanas = await QueryPrihodnaPlacanja(day, next).SumAsync(p => p.Iznos);
 
-        var aktivniTerapeuti = await _context.Zaposlenici.CountAsync();
+        var aktivniTerapeuti = await _context.Zaposlenici
+            .AsNoTracking()
+            .CountAsync(z => !z.IsDeleted && z.Status == ZaposlenikStatus.Active);
 
         var prosjecnaOcjena = await _context.Recenzije
             .Select(r => (double?)r.Ocjena)
@@ -157,7 +160,7 @@ public class ReportingService : IReportingService
     {
         var dayStart = day.Date;
         var next = dayStart.AddDays(1);
-        var registracijeOd = DateTime.Today.AddDays(-7);
+        var registracijeOd = dayStart.AddDays(-6);
 
         int? noviKlijenti = null;
         decimal prihod = 0m;
@@ -201,33 +204,30 @@ public class ReportingService : IReportingService
             .Select(g => new
             {
                 Datum = g.Key,
-                BrojPlacanja = g.Count(),
                 Prihod = g.Sum(x => x.Iznos),
             })
             .ToListAsync();
 
-        var map = fromDb.ToDictionary(x => x.Datum, x => (x.BrojPlacanja, x.Prihod));
+        var bookingsByDay = await _context.Rezervacije.AsNoTracking()
+            .Where(r => !r.IsDeleted)
+            .Where(r => r.DatumRezervacije >= start && r.DatumRezervacije < endExclusive)
+            .GroupBy(r => r.DatumRezervacije.Date)
+            .Select(g => new { Datum = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var revenueMap = fromDb.ToDictionary(x => x.Datum, x => x.Prihod);
+        var bookingMap = bookingsByDay.ToDictionary(x => x.Datum, x => x.Count);
         var list = new List<RevenuePointDTO>();
         for (var d = start; d < endExclusive; d = d.AddDays(1))
         {
-            if (map.TryGetValue(d, out var row))
+            revenueMap.TryGetValue(d, out var prihod);
+            bookingMap.TryGetValue(d, out var brojRezervacija);
+            list.Add(new RevenuePointDTO
             {
-                list.Add(new RevenuePointDTO
-                {
-                    Datum = d,
-                    BrojRezervacija = row.BrojPlacanja,
-                    Prihod = row.Prihod,
-                });
-            }
-            else
-            {
-                list.Add(new RevenuePointDTO
-                {
-                    Datum = d,
-                    BrojRezervacija = 0,
-                    Prihod = 0m,
-                });
-            }
+                Datum = d,
+                BrojRezervacija = brojRezervacija,
+                Prihod = prihod,
+            });
         }
 
         return list;
