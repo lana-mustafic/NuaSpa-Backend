@@ -8,6 +8,9 @@ public class RezervacijaCalendarItemDTO
     public bool IsPlacena { get; set; }
     public bool IsOtkazana { get; set; }
 
+    /// <summary>Pending, Confirmed, Cancelled, Completed.</summary>
+    public string Status { get; set; } = "Pending";
+
     public int ZaposlenikId { get; set; }
     public string? ZaposlenikIme { get; set; }
 
@@ -19,9 +22,12 @@ public class RezervacijaCalendarItemDTO
     public string? KorisnikTelefon { get; set; }
     public string? KorisnikEmail { get; set; }
 
+    /// <summary>Medicinska / tehnička napomena s kartice klijenta.</summary>
+    public string? NapomenaZaTerapeuta { get; set; }
+
     public int UslugaId { get; set; }
     public string? UslugaNaziv { get; set; }
-    /// <summary>Trajanje tretmana u minutama (iz usluge).</summary>
+    /// <summary>Trajanje tretmana u minutama (snimak s rezervacije).</summary>
     public int UslugaTrajanjeMinuta { get; set; }
     /// <summary>Redovna cijena usluge (ne mora odgovarati stvarnoj naplati).</summary>
     public decimal UslugaCijena { get; set; }

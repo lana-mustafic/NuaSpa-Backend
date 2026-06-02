@@ -939,6 +939,7 @@ namespace NuaSpa.Application.Services
                     IsPotvrdjena = r.IsPotvrdjena,
                     IsPlacena = r.IsPlacena,
                     IsOtkazana = r.IsOtkazana,
+                    Status = r.Status.ToString(),
                     ZaposlenikId = r.ZaposlenikId,
                     ZaposlenikIme = r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime,
                     ProstorijaId = r.ProstorijaId,
@@ -947,10 +948,13 @@ namespace NuaSpa.Application.Services
                     KorisnikIme = r.Korisnik.Ime + " " + r.Korisnik.Prezime,
                     KorisnikTelefon = r.Korisnik.PhoneNumber,
                     KorisnikEmail = r.Korisnik.Email,
+                    NapomenaZaTerapeuta = r.Korisnik.NapomenaZaTerapeuta,
                     UslugaId = r.UslugaId,
                     UslugaNaziv = r.Usluga.Naziv,
-                    UslugaTrajanjeMinuta = r.Usluga.TrajanjeMinuta,
-                    UslugaCijena = r.Usluga.Cijena,
+                    UslugaTrajanjeMinuta = r.SnimakTrajanjeMinuta > 0
+                        ? r.SnimakTrajanjeMinuta
+                        : r.Usluga.TrajanjeMinuta,
+                    UslugaCijena = r.SnimakCijena > 0 ? r.SnimakCijena : r.Usluga.Cijena,
                     IsVip = r.IsVip,
                     RazlogOtkaza = r.RazlogOtkaza,
                 })
