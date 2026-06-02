@@ -71,11 +71,13 @@ public sealed class GlobalExceptionMiddleware
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = (int)status;
 
+        var clientDetail = ResolveClientDetail(ex, detail);
+
         var problem = new ProblemDetails
         {
             Status = (int)status,
             Title = title,
-            Detail = _env.IsDevelopment() ? ex.Message : detail,
+            Detail = clientDetail,
             Instance = context.Request.Path,
             Type = $"https://httpstatuses.com/{(int)status}",
         };
@@ -91,6 +93,21 @@ public sealed class GlobalExceptionMiddleware
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         });
         await context.Response.WriteAsync(json);
+    }
+
+    private static string ResolveClientDetail(Exception ex, string fallbackDetail)
+    {
+        if (ex is BusinessRuleException or ConflictException or NotFoundException
+            or ForbiddenException or UnauthorizedException)
+        {
+            var message = ex.Message?.Trim();
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                return message;
+            }
+        }
+
+        return fallbackDetail;
     }
 
     private static (HttpStatusCode status, string title, string clientDetail) MapException(Exception ex)
