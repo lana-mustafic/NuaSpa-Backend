@@ -28,6 +28,8 @@ public class TherapistInviteResponseDto
     public DateTime? ExpiresAt { get; set; }
     public string? TherapistName { get; set; }
     public string? RecipientEmail { get; set; }
+    /// <summary>False when invite was saved but the email queue publish failed.</summary>
+    public bool EmailQueued { get; set; } = true;
 }
 
 public class AcceptTherapistInviteDto

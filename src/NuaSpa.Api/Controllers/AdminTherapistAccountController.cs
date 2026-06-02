@@ -77,10 +77,15 @@ public class AdminTherapistAccountController : ControllerBase
                     InviteUrl = result.InviteUrl,
                     ExpiresAtUtc = result.ExpiresAt.Value,
                 });
+                result.EmailQueued = true;
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "RabbitMQ pozivnica terapeutu nije poslana.");
+                result.EmailQueued = false;
+                result.Message = string.IsNullOrWhiteSpace(result.Message)
+                    ? "Invitation saved, but the email could not be queued. Copy the activation link for the therapist."
+                    : $"{result.Message} Email was not queued — share the activation link manually.";
             }
         }
 
