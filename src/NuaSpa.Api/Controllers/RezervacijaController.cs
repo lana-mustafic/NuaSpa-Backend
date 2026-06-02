@@ -278,9 +278,10 @@ namespace NuaSpa.Api.Controllers
                             : "Klijent";
                     try
                     {
+                        var reason = dto?.RazlogOtkaza?.Trim() ?? string.Empty;
                         await _notificationPublisher.PublishRezervacijaOtkazanaAsync(
                             cancelled,
-                            dto!.RazlogOtkaza!.Trim(),
+                            reason,
                             uloga);
                     }
                     catch (Exception ex)
