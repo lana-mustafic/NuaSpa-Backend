@@ -22,9 +22,6 @@ public class AdminKlijentCreateDto
     [MaxLength(50)]
     public string? Telefon { get; set; }
 
-    [Range(1, int.MaxValue)]
-    public int GradId { get; set; } = 1;
-
     public bool IsVipKlijent { get; set; }
 
     [MaxLength(1200)]

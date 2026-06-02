@@ -36,6 +36,23 @@ public class AdminKlijentService : IAdminKlijentService
             .FirstOrDefaultAsync(ct);
     }
 
+    /// <summary>Single-spa default: lowest Id in Gradovi (seed Sarajevo = 1).</summary>
+    private async Task<int> GetDefaultSpaGradIdAsync(CancellationToken ct)
+    {
+        var id = await _context.Gradovi.AsNoTracking()
+            .OrderBy(g => g.Id)
+            .Select(g => g.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (id <= 0)
+        {
+            throw new BusinessRuleException(
+                "Nema konfigurisanog grada u bazi. Dodajte grad u referentnu tablicu Gradovi.");
+        }
+
+        return id;
+    }
+
     private IQueryable<Korisnik> KlijentiQuery(
         int klijentRoleId,
         KorisnikSearchObject? search,
@@ -186,7 +203,6 @@ public class AdminKlijentService : IAdminKlijentService
                 k.DatumRegistracije,
                 k.IsVipKlijent,
                 k.Status,
-                k.GradId,
                 k.NapomenaZaTerapeuta,
             })
             .Skip((page - 1) * pageSize)
@@ -203,13 +219,6 @@ public class AdminKlijentService : IAdminKlijentService
                 VelicinaStranice = pageSize,
             };
         }
-
-        var gradIds = rows.Select(r => r.GradId).Distinct().ToList();
-        var gradMap = gradIds.Count == 0
-            ? new Dictionary<int, string>()
-            : await _context.Gradovi.AsNoTracking()
-                .Where(g => gradIds.Contains(g.Id))
-                .ToDictionaryAsync(g => g.Id, g => g.Naziv, ct);
 
         var (visitMap, spentMap) = await BuildAggMapsAsync(ids, ct);
 
@@ -236,8 +245,6 @@ public class AdminKlijentService : IAdminKlijentService
                 IsVip = computedVip,
                 IsVipKlijent = r.IsVipKlijent,
                 Status = r.Status,
-                GradId = r.GradId,
-                GradNaziv = gradMap.GetValueOrDefault(r.GradId),
                 NapomenaZaTerapeuta = r.NapomenaZaTerapeuta,
             };
         }).ToList();
@@ -271,11 +278,7 @@ public class AdminKlijentService : IAdminKlijentService
             throw new ConflictException("Korisničko ime je zauzeto.");
         }
 
-        var gradOk = await _context.Gradovi.AsNoTracking().AnyAsync(g => g.Id == dto.GradId, ct);
-        if (!gradOk)
-        {
-            throw new BusinessRuleException("GradId ne postoji.");
-        }
+        var defaultGradId = await GetDefaultSpaGradIdAsync(ct);
 
         var user = new Korisnik
         {
@@ -284,7 +287,7 @@ public class AdminKlijentService : IAdminKlijentService
             Ime = dto.Ime.Trim(),
             Prezime = dto.Prezime.Trim(),
             PhoneNumber = string.IsNullOrWhiteSpace(dto.Telefon) ? null : dto.Telefon.Trim(),
-            GradId = dto.GradId,
+            GradId = defaultGradId,
             DatumRegistracije = DateTime.UtcNow,
             Status = true,
             ZaposlenikId = null,
@@ -381,23 +384,6 @@ public class AdminKlijentService : IAdminKlijentService
         if (dto.Status.HasValue) user.Status = dto.Status.Value;
         if (dto.IsVipKlijent.HasValue) user.IsVipKlijent = dto.IsVipKlijent.Value;
 
-        if (dto.GradId.HasValue)
-        {
-            if (dto.GradId.Value <= 0)
-            {
-                throw new BusinessRuleException("GradId mora biti pozitivan broj.");
-            }
-
-            var gradOk = await _context.Gradovi.AsNoTracking()
-                .AnyAsync(g => g.Id == dto.GradId.Value, ct);
-            if (!gradOk)
-            {
-                throw new BusinessRuleException("GradId ne postoji.");
-            }
-
-            user.GradId = dto.GradId.Value;
-        }
-
         if (dto.NapomenaZaTerapeuta != null) user.NapomenaZaTerapeuta = dto.NapomenaZaTerapeuta;
 
         if (!string.IsNullOrWhiteSpace(dto.NovaLozinka))
@@ -439,17 +425,9 @@ public class AdminKlijentService : IAdminKlijentService
                 k.DatumRegistracije,
                 k.IsVipKlijent,
                 k.Status,
-                k.GradId,
                 k.NapomenaZaTerapeuta,
             })
             .ToListAsync(ct);
-
-        var gradIds = rows.Select(r => r.GradId).Distinct().ToList();
-        var gradMap = gradIds.Count == 0
-            ? new Dictionary<int, string>()
-            : await _context.Gradovi.AsNoTracking()
-                .Where(g => gradIds.Contains(g.Id))
-                .ToDictionaryAsync(g => g.Id, g => g.Naziv, ct);
 
         var (visitMap, spentMap) = await BuildAggMapsAsync(ids, ct);
 
@@ -476,8 +454,6 @@ public class AdminKlijentService : IAdminKlijentService
                 IsVip = computedVip,
                 IsVipKlijent = r.IsVipKlijent,
                 Status = r.Status,
-                GradId = r.GradId,
-                GradNaziv = gradMap.GetValueOrDefault(r.GradId),
                 NapomenaZaTerapeuta = r.NapomenaZaTerapeuta,
             };
         }).ToList();
