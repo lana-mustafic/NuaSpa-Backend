@@ -31,5 +31,8 @@ public class AdminClientRowDTO
     public int GradId { get; set; }
 
     public string? GradNaziv { get; set; }
+
+    /// <summary>Client notes for therapists (not staff internal notes).</summary>
+    public string? NapomenaZaTerapeuta { get; set; }
 }
 

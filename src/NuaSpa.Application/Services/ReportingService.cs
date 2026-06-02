@@ -1,4 +1,5 @@
-﻿using NuaSpa.Application.Interfaces; // Ovo omogućava da vidi IReportingService
+﻿using NuaSpa.Application.Common;
+using NuaSpa.Application.Interfaces; // Ovo omogućava da vidi IReportingService
 using NuaSpa.Application.DTOs;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
@@ -167,9 +168,24 @@ public class ReportingService : IReportingService
 
         if (isAdmin)
         {
-            noviKlijenti = await _context.Users
-                .AsNoTracking()
-                .CountAsync(u => u.DatumRegistracije >= registracijeOd);
+            var klijentRoleId = await _context.Roles.AsNoTracking()
+                .Where(r => r.NormalizedName == RoleConstants.Klijent.ToUpperInvariant())
+                .Select(r => (int?)r.Id)
+                .FirstOrDefaultAsync();
+
+            if (klijentRoleId != null)
+            {
+                noviKlijenti = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.DatumRegistracije >= registracijeOd)
+                    .Where(u => _context.UserRoles.Any(
+                        ur => ur.UserId == u.Id && ur.RoleId == klijentRoleId.Value))
+                    .CountAsync();
+            }
+            else
+            {
+                noviKlijenti = 0;
+            }
 
             prihod = await QueryPrihodnaPlacanja(dayStart, next).SumAsync(p => p.Iznos);
         }

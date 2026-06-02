@@ -46,7 +46,7 @@ public class AdminKlijentController : ControllerBase
         CancellationToken ct = default)
     {
         var created = await _service.CreateAsync(dto, ct);
-        return Ok(created);
+        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
     [HttpGet("{id:int}")]

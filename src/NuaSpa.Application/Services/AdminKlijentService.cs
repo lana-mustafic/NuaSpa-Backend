@@ -230,6 +230,7 @@ public class AdminKlijentService : IAdminKlijentService
                 k.IsVipKlijent,
                 k.Status,
                 k.GradId,
+                k.NapomenaZaTerapeuta,
             })
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -315,6 +316,7 @@ public class AdminKlijentService : IAdminKlijentService
                 Status = r.Status,
                 GradId = r.GradId,
                 GradNaziv = gradMap.GetValueOrDefault(r.GradId),
+                NapomenaZaTerapeuta = r.NapomenaZaTerapeuta,
             };
         }).ToList();
 
@@ -414,7 +416,7 @@ public class AdminKlijentService : IAdminKlijentService
 
         if (!await _userManager.IsInRoleAsync(user, RoleConstants.Klijent))
         {
-            throw new BusinessRuleException("User is not a client.");
+            throw new BusinessRuleException("Korisnik nije klijent.");
         }
 
         if (dto.Status == false)
@@ -427,7 +429,8 @@ public class AdminKlijentService : IAdminKlijentService
 
             if (hasUpcoming)
             {
-                throw new ConflictException("Client has upcoming appointments. Cancel or reschedule them first.");
+                throw new ConflictException(
+                    "Klijent ima buduće termine. Prvo ih otkažite ili premjestite.");
             }
         }
 
@@ -439,13 +442,13 @@ public class AdminKlijentService : IAdminKlijentService
             var email = dto.Email.Trim();
             if (string.IsNullOrEmpty(email))
             {
-                throw new BusinessRuleException("Email cannot be empty.");
+                throw new BusinessRuleException("Email ne može biti prazan.");
             }
 
             var existingMail = await _userManager.FindByEmailAsync(email);
             if (existingMail != null && existingMail.Id != user.Id)
             {
-                throw new ConflictException("Email is already registered.");
+                throw new ConflictException("Email je već registriran.");
             }
 
             var setMail = await _userManager.SetEmailAsync(user, email);
@@ -492,7 +495,7 @@ public class AdminKlijentService : IAdminKlijentService
                     .AnyAsync(z => z.Id == dto.ZaposlenikId.Value, ct);
                 if (!zOk)
                 {
-                    throw new BusinessRuleException("Therapist id does not exist.");
+                    throw new BusinessRuleException("ZaposlenikId ne postoji.");
                 }
 
                 user.ZaposlenikId = dto.ZaposlenikId.Value;
@@ -541,6 +544,7 @@ public class AdminKlijentService : IAdminKlijentService
                 k.IsVipKlijent,
                 k.Status,
                 k.GradId,
+                k.NapomenaZaTerapeuta,
             })
             .ToListAsync(ct);
 
@@ -613,6 +617,7 @@ public class AdminKlijentService : IAdminKlijentService
                 Status = r.Status,
                 GradId = r.GradId,
                 GradNaziv = gradMap.GetValueOrDefault(r.GradId),
+                NapomenaZaTerapeuta = r.NapomenaZaTerapeuta,
             };
         }).ToList();
 
