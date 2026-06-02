@@ -1003,6 +1003,7 @@ namespace NuaSpa.Application.Services
                     IsPotvrdjena = r.IsPotvrdjena,
                     IsPlacena = r.IsPlacena,
                     IsOtkazana = r.IsOtkazana,
+                    Status = r.Status.ToString(),
                 })
                 .ToListAsync();
         }

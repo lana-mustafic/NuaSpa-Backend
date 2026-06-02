@@ -8,4 +8,7 @@ public class RezervacijaPovijestItemDto
     public bool IsPotvrdjena { get; set; }
     public bool IsPlacena { get; set; }
     public bool IsOtkazana { get; set; }
+
+    /// <summary>Pending, Confirmed, Cancelled, Completed.</summary>
+    public string Status { get; set; } = "Pending";
 }
