@@ -49,5 +49,9 @@ public sealed class AdminKlijentCreateDtoValidator : AbstractValidator<AdminKlij
         RuleFor(x => x.ZaposlenikId)
             .GreaterThan(0).When(x => x.ZaposlenikId.HasValue)
             .WithMessage("ZaposlenikId mora biti pozitivan broj.");
+
+        RuleFor(x => x.NapomenaZaTerapeuta)
+            .MaximumLength(1200).WithMessage("Napomena može imati najviše 1200 znakova.")
+            .When(x => x.NapomenaZaTerapeuta != null);
     }
 }

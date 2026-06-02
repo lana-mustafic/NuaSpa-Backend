@@ -224,6 +224,7 @@ public class AdminKlijentService : IAdminKlijentService
                 k.Ime,
                 k.Prezime,
                 Email = k.Email ?? "",
+                UserName = k.UserName ?? "",
                 Telefon = k.PhoneNumber ?? "",
                 k.DatumRegistracije,
                 PreferiraniZaposlenikId = k.ZaposlenikId,
@@ -302,6 +303,7 @@ public class AdminKlijentService : IAdminKlijentService
                 Ime = r.Ime,
                 Prezime = r.Prezime,
                 Email = r.Email,
+                UserName = r.UserName,
                 Telefon = r.Telefon,
                 DatumRegistracije = r.DatumRegistracije,
                 ZadnjaPosjeta = a?.ZadnjaPosjeta,
@@ -377,6 +379,9 @@ public class AdminKlijentService : IAdminKlijentService
             Status = true,
             ZaposlenikId = dto.ZaposlenikId,
             IsVipKlijent = dto.IsVipKlijent,
+            NapomenaZaTerapeuta = string.IsNullOrWhiteSpace(dto.NapomenaZaTerapeuta)
+                ? null
+                : dto.NapomenaZaTerapeuta.Trim(),
         };
 
         var result = await _userManager.CreateAsync(user, dto.Password);
@@ -538,6 +543,7 @@ public class AdminKlijentService : IAdminKlijentService
                 k.Ime,
                 k.Prezime,
                 Email = k.Email ?? "",
+                UserName = k.UserName ?? "",
                 Telefon = k.PhoneNumber ?? "",
                 k.DatumRegistracije,
                 PreferiraniZaposlenikId = k.ZaposlenikId,
@@ -603,6 +609,7 @@ public class AdminKlijentService : IAdminKlijentService
                 Ime = r.Ime,
                 Prezime = r.Prezime,
                 Email = r.Email,
+                UserName = r.UserName,
                 Telefon = r.Telefon,
                 DatumRegistracije = r.DatumRegistracije,
                 ZadnjaPosjeta = a?.ZadnjaPosjeta,

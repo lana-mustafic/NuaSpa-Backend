@@ -6,6 +6,10 @@ public class AdminClientRowDTO
     public string Ime { get; set; } = string.Empty;
     public string Prezime { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>Login username (read-only in admin UI).</summary>
+    public string UserName { get; set; } = string.Empty;
+
     public string Telefon { get; set; } = string.Empty;
     public DateTime DatumRegistracije { get; set; }
 

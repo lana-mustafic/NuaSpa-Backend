@@ -28,4 +28,7 @@ public class AdminKlijentCreateDto
     public int? ZaposlenikId { get; set; }
 
     public bool IsVipKlijent { get; set; }
+
+    [MaxLength(1200)]
+    public string? NapomenaZaTerapeuta { get; set; }
 }
