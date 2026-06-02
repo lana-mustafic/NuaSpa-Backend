@@ -24,6 +24,9 @@ namespace NuaSpa.Application.Interfaces
 
         Task<IEnumerable<ZaposlenikDTO>> GetForServiceAsync(int uslugaId, bool bookableOnly = true);
 
+        /// <summary>Whether the therapist is allowed to perform the given service (category + specialization).</summary>
+        Task<bool> IsEligibleForServiceAsync(int zaposlenikId, int uslugaId, bool requireActive = true);
+
         Task<IEnumerable<ZaposlenikDTO>> GetForCategoryAsync(
             int kategorijaUslugaId,
             bool bookableOnly = true);

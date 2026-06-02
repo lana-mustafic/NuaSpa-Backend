@@ -4,6 +4,7 @@ using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using NuaSpa.Domain.Enums;
 using NuaSpa.Application.Common;
+using NuaSpa.Application.Services.Booking;
 
 namespace NuaSpa.Api.Data;
 
@@ -306,8 +307,12 @@ public static class DevelopmentDataSeeder
         {
             var client = clients[rng.Next(clients.Count)];
             var usluga = usluge[rng.Next(usluge.Count)];
-            var terapeut = therapists.FirstOrDefault(t => t.KategorijaUslugaId == usluga.KategorijaUslugaId)
-                ?? therapists[rng.Next(therapists.Count)];
+            var eligible = therapists
+                .Where(t => TherapistServiceEligibility.Matches(usluga, t))
+                .ToList();
+            var terapeut = eligible.Count > 0
+                ? eligible[rng.Next(eligible.Count)]
+                : therapists[rng.Next(therapists.Count)];
 
             var daysOffset = rng.Next(-14, 21);
             var hour = rng.Next(9, 17);

@@ -14,6 +14,7 @@ using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using NuaSpa.Domain.Enums;
+using NuaSpa.Application.Services.Booking;
 
 namespace NuaSpa.Application.Services
 {
@@ -120,12 +121,6 @@ namespace NuaSpa.Application.Services
                 throw new BusinessRuleException("Terapeut ne postoji.");
             }
 
-            if (zaposlenik.KategorijaUslugaId is not > 0)
-            {
-                throw new BusinessRuleException(
-                    "Terapeut nema dodijeljenu kategoriju usluga.");
-            }
-
             var usluga = await _context.Usluge
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == dto.UslugaId && !u.IsDeleted);
@@ -134,10 +129,10 @@ namespace NuaSpa.Application.Services
                 throw new BusinessRuleException("Usluga ne postoji.");
             }
 
-            if (usluga.KategorijaUslugaId != zaposlenik.KategorijaUslugaId)
+            if (!TherapistServiceEligibility.Matches(usluga, zaposlenik))
             {
                 throw new BusinessRuleException(
-                    "Odabrana usluga ne pripada kategoriji terapeuta.");
+                    "Odabrani terapeut ne može izvoditi ovu uslugu.");
             }
 
             var hasCompletedVisit = await _context.Rezervacije.AsNoTracking().AnyAsync(r =>

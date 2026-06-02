@@ -12,6 +12,7 @@ using NuaSpa.Application.SearchObjects;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using NuaSpa.Domain.Enums;
+using NuaSpa.Application.Services.Booking;
 
 namespace NuaSpa.Application.Services
 {
@@ -384,13 +385,10 @@ namespace NuaSpa.Application.Services
                 .FirstOrDefaultAsync(u => u.Id == uslugaId && !u.IsDeleted);
             if (usluga == null) return Array.Empty<ZaposlenikDTO>();
 
-            var serviceName = usluga.Naziv.Trim();
             var query = _context.Zaposlenici
                 .AsNoTracking()
                 .Include(z => z.KategorijaUsluga)
-                .Where(z =>
-                    z.KategorijaUslugaId == usluga.KategorijaUslugaId
-                    && z.Specijalizacija.Contains(serviceName));
+                .Where(z => z.KategorijaUslugaId == usluga.KategorijaUslugaId);
 
             if (bookableOnly)
             {
@@ -403,10 +401,27 @@ namespace NuaSpa.Application.Services
                 .ToListAsync();
 
             return list
-                .Where(z => ParseSpecNames(z.Specijalizacija)
-                    .Any(n => string.Equals(n, serviceName, StringComparison.OrdinalIgnoreCase)))
+                .Where(z => TherapistServiceEligibility.Matches(usluga, z, bookableOnly))
                 .Select(MapToDto)
                 .ToList();
+        }
+
+        public async Task<bool> IsEligibleForServiceAsync(
+            int zaposlenikId,
+            int uslugaId,
+            bool requireActive = true)
+        {
+            var usluga = await _context.Usluge
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == uslugaId && !u.IsDeleted);
+            if (usluga == null) return false;
+
+            var therapist = await _context.Zaposlenici
+                .AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (therapist == null) return false;
+
+            return TherapistServiceEligibility.Matches(usluga, therapist, requireActive);
         }
 
         public async Task<IEnumerable<ZaposlenikDTO>> GetForCategoryAsync(
@@ -756,15 +771,8 @@ namespace NuaSpa.Application.Services
             return day.AddDays(-diff);
         }
 
-        private static List<string> ParseSpecNames(string raw)
-        {
-            return raw
-                .Split(new[] { ',', ';', '/' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim())
-                .Where(s => s.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
+        private static List<string> ParseSpecNames(string raw) =>
+            TherapistServiceEligibility.ParseSpecNames(raw);
 
         private static double? PercentTrend(int current, int previous)
         {

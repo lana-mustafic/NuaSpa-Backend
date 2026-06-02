@@ -484,6 +484,14 @@ namespace NuaSpa.Application.Services
 
             if (uslugaId is > 0)
             {
+                var usluga = await _context.Usluge.AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == uslugaId.Value && !u.IsDeleted);
+                if (usluga == null ||
+                    !TherapistServiceEligibility.Matches(usluga, therapist))
+                {
+                    return new List<DateTime>();
+                }
+
                 slotMinutes = await GetServiceDurationMinutesAsync(uslugaId.Value);
             }
 
@@ -549,6 +557,19 @@ namespace NuaSpa.Application.Services
             if (therapist.Status != ZaposlenikStatus.Active)
             {
                 throw new BusinessRuleException("Terapeut nije dostupan za rezervacije.");
+            }
+
+            var usluga = await _context.Usluge.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == uslugaId && !u.IsDeleted);
+            if (usluga == null)
+            {
+                throw new BusinessRuleException("Usluga nije pronađena.");
+            }
+
+            if (!TherapistServiceEligibility.Matches(usluga, therapist))
+            {
+                throw new BusinessRuleException(
+                    "Odabrani terapeut ne može izvoditi ovu uslugu.");
             }
 
             var duration = RezervacijaPricing.ResolveDurationMinutes(durationMinutes);
