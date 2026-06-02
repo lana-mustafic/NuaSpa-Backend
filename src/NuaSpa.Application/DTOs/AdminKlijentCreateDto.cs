@@ -25,8 +25,6 @@ public class AdminKlijentCreateDto
     [Range(1, int.MaxValue)]
     public int GradId { get; set; } = 1;
 
-    public int? ZaposlenikId { get; set; }
-
     public bool IsVipKlijent { get; set; }
 
     [MaxLength(1200)]

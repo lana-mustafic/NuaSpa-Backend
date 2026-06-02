@@ -18,15 +18,6 @@ public class AdminClientRowDTO
     public decimal UkupnoPotroseno { get; set; }
     public bool IsVip { get; set; }
 
-    /// <summary>Preferirani terapeut (Korisnik.ZaposlenikId).</summary>
-    public int? PreferiraniZaposlenikId { get; set; }
-
-    /// <summary>Terapeut prikazan u tablici: preferirani ako postoji, inače zadnji s neotkazane posjete.</summary>
-    public int? TerapeutZaposlenikId { get; set; }
-
-    public string? TerapeutIme { get; set; }
-    public string? TerapeutPrezime { get; set; }
-
     public bool IsVipKlijent { get; set; }
 
     /// <summary>Account active (Korisnik.Status).</summary>
@@ -39,4 +30,3 @@ public class AdminClientRowDTO
     /// <summary>Client notes for therapists (not staff internal notes).</summary>
     public string? NapomenaZaTerapeuta { get; set; }
 }
-

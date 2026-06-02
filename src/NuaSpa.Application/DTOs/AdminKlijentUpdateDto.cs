@@ -24,8 +24,6 @@ public class AdminKlijentUpdateDto
 
     public int? GradId { get; set; }
 
-    public int? ZaposlenikId { get; set; }
-
     [MaxLength(1200)]
     public string? NapomenaZaTerapeuta { get; set; }
 

@@ -105,49 +105,6 @@ public class AdminKlijentService : IAdminKlijentService
         return (visitMap, spentMap);
     }
 
-    private sealed record LastTherapistRow(int ZaposlenikId, string Ime, string Prezime);
-
-    private async Task<Dictionary<int, LastTherapistRow>> BuildLastTherapistMapAsync(
-        List<int> ids,
-        CancellationToken ct)
-    {
-        var latestDates = await _context.Rezervacije.AsNoTracking()
-            .Where(r => !r.IsOtkazana && ids.Contains(r.KorisnikId))
-            .GroupBy(r => r.KorisnikId)
-            .Select(g => new { KorisnikId = g.Key, Datum = g.Max(x => x.DatumRezervacije) })
-            .ToListAsync(ct);
-
-        if (latestDates.Count == 0)
-        {
-            return new Dictionary<int, LastTherapistRow>();
-        }
-
-        var korisnikIds = latestDates.Select(x => x.KorisnikId).ToList();
-        var rezRows = await _context.Rezervacije.AsNoTracking()
-            .Where(r => !r.IsOtkazana && korisnikIds.Contains(r.KorisnikId))
-            .Select(r => new
-            {
-                r.KorisnikId,
-                r.DatumRezervacije,
-                r.ZaposlenikId,
-                TerapeutIme = r.Zaposlenik.Ime,
-                TerapeutPrezime = r.Zaposlenik.Prezime,
-            })
-            .ToListAsync(ct);
-
-        var dateMap = latestDates.ToDictionary(x => x.KorisnikId, x => x.Datum);
-        return rezRows
-            .Where(r => dateMap.TryGetValue(r.KorisnikId, out var d) && r.DatumRezervacije == d)
-            .GroupBy(r => r.KorisnikId)
-            .ToDictionary(
-                g => g.Key,
-                g =>
-                {
-                    var x = g.First();
-                    return new LastTherapistRow(x.ZaposlenikId, x.TerapeutIme, x.TerapeutPrezime);
-                });
-    }
-
     public async Task<AdminClientStatsDto> GetStatsAsync(string? q, CancellationToken ct)
     {
         var roleId = await GetKlijentRoleIdAsync(ct);
@@ -227,7 +184,6 @@ public class AdminKlijentService : IAdminKlijentService
                 UserName = k.UserName ?? "",
                 Telefon = k.PhoneNumber ?? "",
                 k.DatumRegistracije,
-                PreferiraniZaposlenikId = k.ZaposlenikId,
                 k.IsVipKlijent,
                 k.Status,
                 k.GradId,
@@ -256,20 +212,6 @@ public class AdminKlijentService : IAdminKlijentService
                 .ToDictionaryAsync(g => g.Id, g => g.Naziv, ct);
 
         var (visitMap, spentMap) = await BuildAggMapsAsync(ids, ct);
-        var lastTherapist = await BuildLastTherapistMapAsync(ids, ct);
-
-        var prefIds = rows
-            .Select(r => r.PreferiraniZaposlenikId)
-            .Where(id => id is > 0)
-            .Cast<int>()
-            .Distinct()
-            .ToList();
-
-        var prefMap = prefIds.Count == 0
-            ? new Dictionary<int, (string Ime, string Prezime)>()
-            : await _context.Zaposlenici.AsNoTracking()
-                .Where(z => prefIds.Contains(z.Id))
-                .ToDictionaryAsync(z => z.Id, z => (z.Ime, z.Prezime), ct);
 
         var result = rows.Select(r =>
         {
@@ -278,24 +220,6 @@ public class AdminKlijentService : IAdminKlijentService
             var visits = a?.UkupnoPosjeta ?? 0;
             var total = ukupno;
             var computedVip = r.IsVipKlijent || visits >= 10 || total >= 600m;
-
-            int? terId = null;
-            string? tIme = null;
-            string? tPrez = null;
-
-            if (r.PreferiraniZaposlenikId is > 0 &&
-                prefMap.TryGetValue(r.PreferiraniZaposlenikId.Value, out var pref))
-            {
-                terId = r.PreferiraniZaposlenikId;
-                tIme = pref.Ime;
-                tPrez = pref.Prezime;
-            }
-            else if (lastTherapist.TryGetValue(r.Id, out var lt))
-            {
-                terId = lt.ZaposlenikId;
-                tIme = lt.Ime;
-                tPrez = lt.Prezime;
-            }
 
             return new AdminClientRowDTO
             {
@@ -310,10 +234,6 @@ public class AdminKlijentService : IAdminKlijentService
                 UkupnoPosjeta = visits,
                 UkupnoPotroseno = total,
                 IsVip = computedVip,
-                PreferiraniZaposlenikId = r.PreferiraniZaposlenikId,
-                TerapeutZaposlenikId = terId,
-                TerapeutIme = tIme,
-                TerapeutPrezime = tPrez,
                 IsVipKlijent = r.IsVipKlijent,
                 Status = r.Status,
                 GradId = r.GradId,
@@ -351,16 +271,6 @@ public class AdminKlijentService : IAdminKlijentService
             throw new ConflictException("Korisničko ime je zauzeto.");
         }
 
-        if (dto.ZaposlenikId is > 0)
-        {
-            var zOk = await _context.Zaposlenici.AsNoTracking()
-                .AnyAsync(z => z.Id == dto.ZaposlenikId, ct);
-            if (!zOk)
-            {
-                throw new BusinessRuleException("ZaposlenikId ne postoji.");
-            }
-        }
-
         var gradOk = await _context.Gradovi.AsNoTracking().AnyAsync(g => g.Id == dto.GradId, ct);
         if (!gradOk)
         {
@@ -377,7 +287,7 @@ public class AdminKlijentService : IAdminKlijentService
             GradId = dto.GradId,
             DatumRegistracije = DateTime.UtcNow,
             Status = true,
-            ZaposlenikId = dto.ZaposlenikId,
+            ZaposlenikId = null,
             IsVipKlijent = dto.IsVipKlijent,
             NapomenaZaTerapeuta = string.IsNullOrWhiteSpace(dto.NapomenaZaTerapeuta)
                 ? null
@@ -488,25 +398,6 @@ public class AdminKlijentService : IAdminKlijentService
             user.GradId = dto.GradId.Value;
         }
 
-        if (dto.ZaposlenikId.HasValue)
-        {
-            if (dto.ZaposlenikId.Value <= 0)
-            {
-                user.ZaposlenikId = null;
-            }
-            else
-            {
-                var zOk = await _context.Zaposlenici.AsNoTracking()
-                    .AnyAsync(z => z.Id == dto.ZaposlenikId.Value, ct);
-                if (!zOk)
-                {
-                    throw new BusinessRuleException("ZaposlenikId ne postoji.");
-                }
-
-                user.ZaposlenikId = dto.ZaposlenikId.Value;
-            }
-        }
-
         if (dto.NapomenaZaTerapeuta != null) user.NapomenaZaTerapeuta = dto.NapomenaZaTerapeuta;
 
         if (!string.IsNullOrWhiteSpace(dto.NovaLozinka))
@@ -546,7 +437,6 @@ public class AdminKlijentService : IAdminKlijentService
                 UserName = k.UserName ?? "",
                 Telefon = k.PhoneNumber ?? "",
                 k.DatumRegistracije,
-                PreferiraniZaposlenikId = k.ZaposlenikId,
                 k.IsVipKlijent,
                 k.Status,
                 k.GradId,
@@ -562,20 +452,6 @@ public class AdminKlijentService : IAdminKlijentService
                 .ToDictionaryAsync(g => g.Id, g => g.Naziv, ct);
 
         var (visitMap, spentMap) = await BuildAggMapsAsync(ids, ct);
-        var lastTherapist = await BuildLastTherapistMapAsync(ids, ct);
-
-        var prefIds = rows
-            .Select(r => r.PreferiraniZaposlenikId)
-            .Where(id => id is > 0)
-            .Cast<int>()
-            .Distinct()
-            .ToList();
-
-        var prefMap = prefIds.Count == 0
-            ? new Dictionary<int, (string Ime, string Prezime)>()
-            : await _context.Zaposlenici.AsNoTracking()
-                .Where(z => prefIds.Contains(z.Id))
-                .ToDictionaryAsync(z => z.Id, z => (z.Ime, z.Prezime), ct);
 
         var result = rows.Select(r =>
         {
@@ -584,24 +460,6 @@ public class AdminKlijentService : IAdminKlijentService
             var visits = a?.UkupnoPosjeta ?? 0;
             var total = ukupno;
             var computedVip = r.IsVipKlijent || visits >= 10 || total >= 600m;
-
-            int? terId = null;
-            string? tIme = null;
-            string? tPrez = null;
-
-            if (r.PreferiraniZaposlenikId is > 0 &&
-                prefMap.TryGetValue(r.PreferiraniZaposlenikId.Value, out var pref))
-            {
-                terId = r.PreferiraniZaposlenikId;
-                tIme = pref.Ime;
-                tPrez = pref.Prezime;
-            }
-            else if (lastTherapist.TryGetValue(r.Id, out var lt))
-            {
-                terId = lt.ZaposlenikId;
-                tIme = lt.Ime;
-                tPrez = lt.Prezime;
-            }
 
             return new AdminClientRowDTO
             {
@@ -616,10 +474,6 @@ public class AdminKlijentService : IAdminKlijentService
                 UkupnoPosjeta = visits,
                 UkupnoPotroseno = total,
                 IsVip = computedVip,
-                PreferiraniZaposlenikId = r.PreferiraniZaposlenikId,
-                TerapeutZaposlenikId = terId,
-                TerapeutIme = tIme,
-                TerapeutPrezime = tPrez,
                 IsVipKlijent = r.IsVipKlijent,
                 Status = r.Status,
                 GradId = r.GradId,
