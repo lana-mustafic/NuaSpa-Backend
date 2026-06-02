@@ -20,6 +20,26 @@ namespace NuaSpa.Api.Controllers
             _zaposlenikService = service;
         }
 
+        [HttpGet]
+        [Authorize(Roles = RoleConstants.Admin)]
+        public override async Task<ActionResult<PagedResult<ZaposlenikDTO>>> Get(
+            [FromQuery] ZaposlenikSearchObject? search = null)
+        {
+            var page = await _zaposlenikService.Get(search);
+            return Ok(page);
+        }
+
+        [HttpGet("admin-roster")]
+        [Authorize(Roles = RoleConstants.Admin)]
+        public async Task<ActionResult<TherapistAdminRosterDto>> GetAdminRoster(
+            [FromQuery] DateTime? kpiFrom = null,
+            [FromQuery] DateTime? kpiTo = null,
+            [FromQuery] DateTime? weekStart = null)
+        {
+            var dto = await _zaposlenikService.GetAdminRosterAsync(kpiFrom, kpiTo, weekStart);
+            return Ok(dto);
+        }
+
         /// <summary>Override base route so literal paths like <c>me</c> are not parsed as numeric ids.</summary>
         [HttpGet("{id:int}")]
         public new async Task<ActionResult<ZaposlenikDTO>> GetById(int id)

@@ -16,6 +16,11 @@ namespace NuaSpa.Application.Interfaces
 
         Task<TherapistKpiDTO?> GetKpiAsync(int zaposlenikId, DateTime from, DateTime to);
 
+        Task<TherapistAdminRosterDto> GetAdminRosterAsync(
+            DateTime? kpiFrom = null,
+            DateTime? kpiTo = null,
+            DateTime? weekStart = null);
+
         Task<ZaposlenikDTO?> UpdateAsync(int id, ZaposlenikDTO dto);
 
         Task<string?> ValidateSpecijalizacijaAsync(int? kategorijaUslugaId, string specijalizacija);

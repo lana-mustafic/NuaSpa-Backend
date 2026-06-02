@@ -310,6 +310,7 @@ namespace NuaSpa.Application.Services
                 PlaceneRezervacije = current.Placene,
                 Prihod = current.Prihod,
                 ProsjecnaOcjena = current.AvgRating,
+                BrojRecenzija = current.ReviewCount,
                 StopaOtkazivanjaPostotak = cancelRate,
                 ZadovoljstvoKlijenataPostotak = satisfaction,
                 Uloga = ResolveUloga(current.Ukupno),
@@ -453,8 +454,100 @@ namespace NuaSpa.Application.Services
 
         public async Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId)
         {
-            return await GetById(zaposlenikId);
+            var entity = await _context.Zaposlenici
+                .AsNoTracking()
+                .Include(z => z.KategorijaUsluga)
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            return entity == null ? null : MapToDto(entity);
         }
+
+        public async Task<TherapistAdminRosterDto> GetAdminRosterAsync(
+            DateTime? kpiFrom = null,
+            DateTime? kpiTo = null,
+            DateTime? weekStart = null)
+        {
+            var today = DateTime.UtcNow.Date;
+            var toD = (kpiTo ?? today).Date;
+            var fromD = (kpiFrom ?? toD.AddDays(-30)).Date;
+            var week = MondayOf((weekStart ?? today).Date);
+            var weekEnd = week.AddDays(7);
+
+            var therapists = await _context.Zaposlenici
+                .AsNoTracking()
+                .Include(z => z.KategorijaUsluga)
+                .OrderBy(z => z.Prezime)
+                .ThenBy(z => z.Ime)
+                .ToListAsync();
+
+            var bookingCounts = await _context.Rezervacije
+                .AsNoTracking()
+                .Where(r =>
+                    !r.IsOtkazana
+                    && r.DatumRezervacije >= week
+                    && r.DatumRezervacije < weekEnd)
+                .GroupBy(r => new
+                {
+                    r.ZaposlenikId,
+                    Day = r.DatumRezervacije.Date,
+                })
+                .Select(g => new
+                {
+                    g.Key.ZaposlenikId,
+                    g.Key.Day,
+                    Count = g.Count(),
+                })
+                .ToListAsync();
+
+            var countLookup = bookingCounts.ToDictionary(
+                x => (x.ZaposlenikId, x.Day),
+                x => x.Count);
+
+            var rows = new List<TherapistRosterRowDto>();
+            foreach (var therapist in therapists)
+            {
+                var kpi = await GetKpiAsync(therapist.Id, fromD, toD);
+                var weekDays = new List<TherapistRosterDayDto>();
+                for (var i = 0; i < 7; i++)
+                {
+                    var day = week.AddDays(i);
+                    var count = countLookup.GetValueOrDefault((therapist.Id, day));
+                    weekDays.Add(new TherapistRosterDayDto
+                    {
+                        Date = day,
+                        AppointmentCount = count,
+                        Load = ResolveWeekLoad(count),
+                    });
+                }
+
+                rows.Add(new TherapistRosterRowDto
+                {
+                    Terapeut = MapToDto(therapist),
+                    ProsjecnaOcjena = kpi?.ProsjecnaOcjena ?? 0,
+                    UkupnoRezervacija = kpi?.UkupnoRezervacija ?? 0,
+                    BrojRecenzija = kpi?.BrojRecenzija ?? 0,
+                    Uloga = kpi?.Uloga ?? ResolveUloga(0),
+                    WeekDays = weekDays,
+                });
+            }
+
+            return new TherapistAdminRosterDto
+            {
+                WeekStart = week,
+                WeekEnd = weekEnd.AddDays(-1),
+                KpiFrom = fromD,
+                KpiTo = toD,
+                Therapists = rows,
+            };
+        }
+
+        private static string ResolveWeekLoad(int appointmentCount) =>
+            appointmentCount switch
+            {
+                0 => "off",
+                >= 5 => "heavy",
+                >= 3 => "moderate",
+                _ => "light",
+            };
 
         public async Task<ZaposlenikDTO?> UpdateMeAsync(int zaposlenikId, TherapistSelfProfileUpdateDto dto)
         {
@@ -530,10 +623,15 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Usluga)
                 .SumAsync(r => (decimal?)r.Usluga.Cijena ?? 0m);
 
-            var reviews = await _context.Recenzije.AsNoTracking()
-                .Where(r => r.ZaposlenikId == zaposlenikId)
-                .Select(r => r.Ocjena)
-                .ToListAsync();
+            var reviews = await (
+                from rev in _context.Recenzije.AsNoTracking()
+                where _context.Rezervacije.Any(rez =>
+                    rez.ZaposlenikId == zaposlenikId
+                    && !rez.IsOtkazana
+                    && rez.KorisnikId == rev.KorisnikId
+                    && rez.UslugaId == rev.UslugaId)
+                select rev.Ocjena
+            ).ToListAsync();
 
             return new TherapistDashboardDto
             {
@@ -721,7 +819,9 @@ namespace NuaSpa.Application.Services
                 ? 0.0
                 : Math.Round(ratings.Average() ?? 0.0, 2);
 
-            return new KpiMetrics(ukupno, potvrdjene, otkazane, placene, prihod, avg);
+            var reviewCount = ratings.Count;
+
+            return new KpiMetrics(ukupno, potvrdjene, otkazane, placene, prihod, avg, reviewCount);
         }
 
         public async Task DeleteAsync(int id)
@@ -806,7 +906,8 @@ namespace NuaSpa.Application.Services
             int Otkazane,
             int Placene,
             decimal Prihod,
-            double AvgRating);
+            double AvgRating,
+            int ReviewCount);
 
         private sealed record DayAppointment(DateTime Start, int DurationMinutes);
     }

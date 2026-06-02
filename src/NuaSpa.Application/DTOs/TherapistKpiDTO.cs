@@ -12,6 +12,7 @@ public class TherapistKpiDTO
     public int PlaceneRezervacije { get; set; }
     public decimal Prihod { get; set; }
     public double ProsjecnaOcjena { get; set; }
+    public int BrojRecenzija { get; set; }
 
     public double StopaOtkazivanjaPostotak { get; set; }
     public int? ZadovoljstvoKlijenataPostotak { get; set; }
