@@ -50,6 +50,10 @@ namespace NuaSpa.Application.Interfaces
             int? uslugaId = null,
             int slotMinutes = 60);
 
+        Task<TherapistDayAvailabilityDto?> GetTherapistDayAvailabilityAsync(
+            int zaposlenikId,
+            DateTime date);
+
         Task<RezervacijaCancelResultDto> CancelAsync(
             int rezervacijaId,
             int? requireKorisnikId,

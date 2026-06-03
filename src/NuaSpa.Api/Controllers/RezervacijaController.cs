@@ -329,6 +329,27 @@ namespace NuaSpa.Api.Controllers
             return Ok(slots);
         }
 
+        [HttpGet("therapist-day-availability")]
+        [Authorize(Roles = RoleConstants.AdminZaposlenik)]
+        public async Task<ActionResult<TherapistDayAvailabilityDto>> GetTherapistDayAvailability(
+            [FromQuery] int zaposlenikId,
+            [FromQuery] DateTime datum)
+        {
+            if (User.IsInRole(RoleConstants.Zaposlenik))
+            {
+                if (!User.TryGetNuaSpaZaposlenikId(out var myId) || myId != zaposlenikId)
+                {
+                    return Forbid();
+                }
+            }
+
+            var dto = await _rezervacijaService.GetTherapistDayAvailabilityAsync(
+                zaposlenikId,
+                datum);
+            if (dto == null) return NotFound();
+            return Ok(dto);
+        }
+
         [HttpGet("calendar")]
         [Authorize(Roles = RoleConstants.AdminZaposlenik)]
         public async Task<ActionResult<List<RezervacijaCalendarItemDTO>>> GetCalendar(

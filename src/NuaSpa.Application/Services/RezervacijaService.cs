@@ -531,6 +531,72 @@ namespace NuaSpa.Application.Services
             return slots;
         }
 
+        public async Task<TherapistDayAvailabilityDto?> GetTherapistDayAvailabilityAsync(
+            int zaposlenikId,
+            DateTime date)
+        {
+            var therapist = await _context.Zaposlenici
+                .AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (therapist == null) return null;
+
+            var day = date.Date;
+            var hours = await GetWorkingHoursAsync(day);
+            var isTherapistUnavailable = therapist.Status != ZaposlenikStatus.Active;
+
+            var bookings = await _context.Rezervacije
+                .AsNoTracking()
+                .Where(r =>
+                    r.ZaposlenikId == zaposlenikId
+                    && r.Status != RezervacijaStatus.Cancelled
+                    && r.DatumRezervacije.Date == day)
+                .OrderBy(r => r.DatumRezervacije)
+                .Select(r => new TherapistDayBookedSlotDto
+                {
+                    RezervacijaId = r.Id,
+                    Start = r.DatumRezervacije,
+                    DurationMinutes = r.SnimakTrajanjeMinuta > 0 ? r.SnimakTrajanjeMinuta : 60,
+                    ServiceName = r.Usluga.Naziv,
+                    ClientName = (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Trim(),
+                    Status = r.Status.ToString(),
+                })
+                .ToListAsync();
+
+            var appointmentCount = bookings.Count;
+            var availableSlots = isTherapistUnavailable || hours.IsClosed
+                ? new List<DateTime>()
+                : await GetAvailableSlotsAsync(zaposlenikId, day);
+
+            return new TherapistDayAvailabilityDto
+            {
+                Date = day,
+                ZaposlenikId = zaposlenikId,
+                TherapistName = $"{therapist.Ime} {therapist.Prezime}".Trim(),
+                TherapistStatus = therapist.Status.ToString(),
+                IsSpaClosed = hours.IsClosed,
+                IsTherapistUnavailable = isTherapistUnavailable,
+                WorkingHoursLabel = hours.IsClosed
+                    ? null
+                    : $"{FormatClockMinutes(hours.OpenMin)} – {FormatClockMinutes(hours.CloseMin)}",
+                AppointmentCount = appointmentCount,
+                Load = ResolveDayLoad(appointmentCount),
+                Bookings = bookings,
+                AvailableSlots = availableSlots,
+            };
+        }
+
+        private static string ResolveDayLoad(int appointmentCount) =>
+            appointmentCount switch
+            {
+                0 => "off",
+                >= 5 => "heavy",
+                >= 3 => "moderate",
+                _ => "light",
+            };
+
+        private static string FormatClockMinutes(int minutes) =>
+            $"{minutes / 60:D2}:{minutes % 60:D2}";
+
         private async Task<int> GetServiceDurationMinutesAsync(int uslugaId)
         {
             var minutes = await _context.Usluge.AsNoTracking()
