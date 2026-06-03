@@ -12,7 +12,8 @@ namespace NuaSpa.Application.Interfaces
             int zaposlenikId,
             int maxReviews = 20,
             DateTime? kpiFrom = null,
-            DateTime? kpiTo = null);
+            DateTime? kpiTo = null,
+            DateTime? weekStart = null);
 
         Task<TherapistKpiDTO?> GetKpiAsync(int zaposlenikId, DateTime from, DateTime to);
 

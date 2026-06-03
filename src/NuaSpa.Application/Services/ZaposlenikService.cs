@@ -208,7 +208,8 @@ namespace NuaSpa.Application.Services
             int zaposlenikId,
             int maxReviews = 20,
             DateTime? kpiFrom = null,
-            DateTime? kpiTo = null)
+            DateTime? kpiTo = null,
+            DateTime? weekStart = null)
         {
             var z = await _context.Zaposlenici
                 .AsNoTracking()
@@ -226,11 +227,14 @@ namespace NuaSpa.Application.Services
                 .AsNoTracking()
                 .Include(r => r.Usluga)
                 .Include(r => r.Korisnik)
-                .Where(rev => _context.Rezervacije.Any(rez =>
-                    rez.ZaposlenikId == zaposlenikId
-                    && !rez.IsOtkazana
-                    && rez.KorisnikId == rev.KorisnikId
-                    && rez.UslugaId == rev.UslugaId))
+                .Where(rev =>
+                    !rev.IsDeleted
+                    && (rev.ZaposlenikId == zaposlenikId
+                        || _context.Rezervacije.Any(rez =>
+                            rez.ZaposlenikId == zaposlenikId
+                            && !rez.IsOtkazana
+                            && rez.KorisnikId == rev.KorisnikId
+                            && rez.UslugaId == rev.UslugaId)))
                 .OrderByDescending(rev => rev.CreatedAt)
                 .Take(take)
                 .Select(rev => new TherapistReviewRowDto
@@ -246,13 +250,13 @@ namespace NuaSpa.Application.Services
                 })
                 .ToListAsync();
 
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.Now.Date;
             var toD = (kpiTo ?? today).Date;
             var fromD = (kpiFrom ?? toD.AddDays(-30)).Date;
 
             var kpi = await GetKpiAsync(zaposlenikId, fromD, toD);
-            var weekStart = MondayOf(today);
-            var schedule = await BuildWeeklyScheduleAsync(zaposlenikId, weekStart);
+            var week = MondayOf((weekStart ?? today).Date);
+            var schedule = await BuildWeeklyScheduleAsync(zaposlenikId, week);
             var topFrom = toD.AddDays(-90);
             var topServices = await BuildTopServicesAsync(zaposlenikId, topFrom, toD.AddDays(1));
 
@@ -574,11 +578,14 @@ namespace NuaSpa.Application.Services
                 .AsNoTracking()
                 .Include(r => r.Usluga)
                 .Include(r => r.Korisnik)
-                .Where(rev => _context.Rezervacije.Any(rez =>
-                    rez.ZaposlenikId == zaposlenikId
-                    && !rez.IsOtkazana
-                    && rez.KorisnikId == rev.KorisnikId
-                    && rez.UslugaId == rev.UslugaId))
+                .Where(rev =>
+                    !rev.IsDeleted
+                    && (rev.ZaposlenikId == zaposlenikId
+                        || _context.Rezervacije.Any(rez =>
+                            rez.ZaposlenikId == zaposlenikId
+                            && !rez.IsOtkazana
+                            && rez.KorisnikId == rev.KorisnikId
+                            && rez.UslugaId == rev.UslugaId)))
                 .OrderByDescending(rev => rev.CreatedAt)
                 .Take(take)
                 .Select(rev => new TherapistReviewRowDto
@@ -805,15 +812,20 @@ namespace NuaSpa.Application.Services
                     (r, u) => u.Cijena)
                 .SumAsync(x => (decimal?)x) ?? 0m;
 
-            var ratings = await (
-                from r in _context.Recenzije.AsNoTracking()
-                join rez in _context.Rezervacije.AsNoTracking()
-                    on new { r.UslugaId, r.KorisnikId } equals new { rez.UslugaId, rez.KorisnikId }
-                where rez.ZaposlenikId == zaposlenikId
-                      && rez.DatumRezervacije >= start
-                      && rez.DatumRezervacije < endExclusive
-                select (double?)r.Ocjena
-            ).ToListAsync();
+            var ratings = await _context.Recenzije
+                .AsNoTracking()
+                .Where(r =>
+                    !r.IsDeleted
+                    && r.CreatedAt >= start
+                    && r.CreatedAt < endExclusive
+                    && (r.ZaposlenikId == zaposlenikId
+                        || _context.Rezervacije.Any(rez =>
+                            rez.ZaposlenikId == zaposlenikId
+                            && !rez.IsOtkazana
+                            && rez.KorisnikId == r.KorisnikId
+                            && rez.UslugaId == r.UslugaId)))
+                .Select(r => (double?)r.Ocjena)
+                .ToListAsync();
 
             var avg = ratings.Count == 0
                 ? 0.0

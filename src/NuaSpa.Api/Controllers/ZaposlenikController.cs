@@ -82,9 +82,11 @@ namespace NuaSpa.Api.Controllers
             int id,
             [FromQuery] int maxReviews = 20,
             [FromQuery] DateTime? from = null,
-            [FromQuery] DateTime? to = null)
+            [FromQuery] DateTime? to = null,
+            [FromQuery] DateTime? weekStart = null)
         {
-            var dto = await _zaposlenikService.GetAdminProfileAsync(id, maxReviews, from, to);
+            var dto = await _zaposlenikService.GetAdminProfileAsync(
+                id, maxReviews, from, to, weekStart);
             if (dto == null) return NotFound();
             return Ok(dto);
         }
