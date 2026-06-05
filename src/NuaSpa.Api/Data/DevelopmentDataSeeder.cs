@@ -25,13 +25,15 @@ public static class DevelopmentDataSeeder
         var context = services.GetRequiredService<NuaSpaContext>();
         var userManager = services.GetRequiredService<UserManager<Korisnik>>();
 
+        var seedImageUrl = await EnsureSeedImageAsync(env, logger, cancellationToken);
+        await EnsureCatalogReferenceDataAsync(context, seedImageUrl, logger, cancellationToken);
+
         if (await context.Usluge.CountAsync(cancellationToken) >= 8)
         {
             logger.LogInformation("Dev seed: dovoljno usluga već postoji, preskačem obogaćivanje.");
             return;
         }
 
-        var seedImageUrl = await EnsureSeedImageAsync(env, logger, cancellationToken);
         await EnsureProstorijeAsync(context, cancellationToken);
 
         var catMassage = await context.KategorijeUsluga
@@ -71,6 +73,86 @@ public static class DevelopmentDataSeeder
         }
 
         return $"/api/files/usluge/{SeedImageFileName}";
+    }
+
+    /// <summary>
+    /// Idempotent catalog reference data (runs even when full dev seed is skipped).
+    /// </summary>
+    private static async Task EnsureCatalogReferenceDataAsync(
+        NuaSpaContext context,
+        string slikaUrl,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        var catBeauty = await EnsureCategoryAsync(
+            context,
+            "Beauty",
+            "Brows, lashes, and makeup treatments.",
+            ct);
+
+        var seedDate = DateTime.UtcNow;
+        var beautyServices = new (string Naziv, int KatId, decimal Cijena, int Trajanje, string Opis)[]
+        {
+            ("Brow Lamination", catBeauty.Id, 55m, 45, "Defined, fuller-looking brows."),
+            ("Classic Lash Extensions", catBeauty.Id, 85m, 90, "Natural volume lash set."),
+            ("Event Makeup", catBeauty.Id, 95m, 60, "Professional makeup for events."),
+        };
+
+        var added = 0;
+        foreach (var (naziv, katId, cijena, trajanje, opis) in beautyServices)
+        {
+            if (await context.Usluge.AnyAsync(u => u.Naziv == naziv && !u.IsDeleted, ct))
+            {
+                continue;
+            }
+
+            context.Usluge.Add(new Usluga
+            {
+                Naziv = naziv,
+                KategorijaUslugaId = katId,
+                Cijena = cijena,
+                TrajanjeMinuta = trajanje,
+                Opis = opis,
+                SlikaUrl = slikaUrl,
+                CreatedAt = seedDate,
+                IsDeleted = false,
+            });
+            added++;
+        }
+
+        if (added > 0)
+        {
+            await context.SaveChangesAsync(ct);
+        }
+
+        logger.LogInformation(
+            "Dev seed: catalog reference data ensured (Beauty category + {Added} services).",
+            added);
+    }
+
+    private static async Task<KategorijaUsluga> EnsureCategoryAsync(
+        NuaSpaContext context,
+        string naziv,
+        string? opis,
+        CancellationToken ct)
+    {
+        var existing = await context.KategorijeUsluga
+            .FirstOrDefaultAsync(k => !k.IsDeleted && k.Naziv == naziv, ct);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        var entity = new KategorijaUsluga
+        {
+            Naziv = naziv,
+            Opis = opis,
+            CreatedAt = DateTime.UtcNow,
+            IsDeleted = false,
+        };
+        context.KategorijeUsluga.Add(entity);
+        await context.SaveChangesAsync(ct);
+        return entity;
     }
 
     private static async Task EnsureProstorijeAsync(NuaSpaContext context, CancellationToken ct)
