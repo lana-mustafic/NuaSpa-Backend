@@ -18,6 +18,7 @@ public sealed class RecenzijaCreateDtoValidator : AbstractValidator<RecenzijaCre
 
         RuleFor(x => x.Komentar)
             .NotEmpty().WithMessage("Komentar je obavezan.")
-            .MaximumLength(2000);
+            .MaximumLength(1000)
+            .WithMessage("Komentar može imati najviše 1000 znakova.");
     }
 }

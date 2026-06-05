@@ -11,5 +11,7 @@ namespace NuaSpa.Application.DTOs
         public string? Komentar { get; set; }
         public string? KorisnikIme { get; set; }
         public string? UslugaNaziv { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? AdminOdgovor { get; set; }
     }
 }

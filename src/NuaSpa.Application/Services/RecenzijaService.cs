@@ -75,7 +75,7 @@ namespace NuaSpa.Application.Services
                 ZaposlenikId = dto.ZaposlenikId,
                 Ocjena = dto.Ocjena,
                 Komentar = dto.Komentar.Trim(),
-                CreatedAt = DateTime.Now,
+                CreatedAt = DateTime.UtcNow,
                 IsDeleted = false
             };
 
@@ -111,6 +111,11 @@ namespace NuaSpa.Application.Services
             if (string.IsNullOrWhiteSpace(dto.Komentar))
             {
                 throw new BusinessRuleException("Komentar je obavezan.");
+            }
+
+            if (dto.Komentar.Trim().Length > 1000)
+            {
+                throw new BusinessRuleException("Komentar može imati najviše 1000 znakova.");
             }
 
             var zaposlenik = await _context.Zaposlenici
@@ -358,11 +363,14 @@ namespace NuaSpa.Application.Services
 
             if (zaposlenikId is { } zid)
             {
-                q = q.Where(rev => _context.Rezervacije.Any(rez =>
-                    rez.ZaposlenikId == zid
-                    && rez.KorisnikId == rev.KorisnikId
-                    && rez.UslugaId == rev.UslugaId
-                    && !rez.IsOtkazana));
+                q = q.Where(rev =>
+                    rev.ZaposlenikId == zid
+                    || (rev.ZaposlenikId == null && _context.Rezervacije.Any(rez =>
+                        rez.ZaposlenikId == zid
+                        && rez.KorisnikId == rev.KorisnikId
+                        && rez.UslugaId == rev.UslugaId
+                        && rez.Status == RezervacijaStatus.Completed
+                        && !rez.IsOtkazana)));
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -389,10 +397,23 @@ namespace NuaSpa.Application.Services
 
             var korisnikIds = reviews.Select(r => r.KorisnikId).Distinct().ToList();
             var visitCounts = await _context.Rezervacije.AsNoTracking()
-                .Where(r => korisnikIds.Contains(r.KorisnikId) && !r.IsOtkazana && r.IsPotvrdjena)
-                .GroupBy(r => r.KorisnikId)
-                .Select(g => new { KorisnikId = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.KorisnikId, x => x.Count, ct);
+                .Where(r =>
+                    korisnikIds.Contains(r.KorisnikId)
+                    && !r.IsOtkazana
+                    && r.IsPotvrdjena
+                    && r.Status == RezervacijaStatus.Completed)
+                .GroupBy(r => new { r.KorisnikId, r.UslugaId })
+                .Select(g => new
+                {
+                    g.Key.KorisnikId,
+                    g.Key.UslugaId,
+                    Count = g.Count(),
+                })
+                .ToListAsync(ct);
+
+            var visitCountByClientService = visitCounts.ToDictionary(
+                x => (x.KorisnikId, x.UslugaId),
+                x => x.Count);
 
             var zaposIds = reviews
                 .Where(r => r.ZaposlenikId.HasValue)
@@ -454,7 +475,9 @@ namespace NuaSpa.Application.Services
                     terapeut = fb;
                 }
 
-                visitCounts.TryGetValue(rev.KorisnikId, out var visits);
+                visitCountByClientService.TryGetValue(
+                    (rev.KorisnikId, rev.UslugaId),
+                    out var visits);
 
                 return new AdminReviewRowDto
                 {
