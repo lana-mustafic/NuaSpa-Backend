@@ -376,56 +376,68 @@ public static class DevelopmentDataSeeder
         List<Usluga> usluge,
         CancellationToken ct)
     {
-        if (await context.Rezervacije.CountAsync(r => !r.IsDeleted, ct) >= 15)
-        {
-            return;
-        }
-
         var rng = new Random(210240);
         var now = DateTime.UtcNow;
         var prostorija = await context.Prostorije.FirstOrDefaultAsync(ct);
 
-        for (var i = 0; i < 18; i++)
+        if (await context.Rezervacije.CountAsync(r => !r.IsDeleted, ct) < 15)
         {
-            var client = clients[rng.Next(clients.Count)];
-            var usluga = usluge[rng.Next(usluge.Count)];
-            var eligible = therapists
-                .Where(t => TherapistServiceEligibility.Matches(usluga, t))
-                .ToList();
-            var terapeut = eligible.Count > 0
-                ? eligible[rng.Next(eligible.Count)]
-                : therapists[rng.Next(therapists.Count)];
-
-            var daysOffset = rng.Next(-14, 21);
-            var hour = rng.Next(9, 17);
-            var datum = now.Date.AddDays(daysOffset).AddHours(hour);
-
-            var rez = new Rezervacija
+            for (var i = 0; i < 18; i++)
             {
-                KorisnikId = client.Id,
-                UslugaId = usluga.Id,
-                ZaposlenikId = terapeut.Id,
-                ProstorijaId = prostorija?.Id,
-                DatumRezervacije = datum,
-                IsPotvrdjena = daysOffset >= 0,
-                IsPlacena = daysOffset < 0 && rng.NextDouble() > 0.3,
-                IsOtkazana = false,
-                CreatedAt = now,
-                IsDeleted = false,
-            };
-            context.Rezervacije.Add(rez);
+                var client = clients[rng.Next(clients.Count)];
+                var usluga = usluge[rng.Next(usluge.Count)];
+                var eligible = therapists
+                    .Where(t => TherapistServiceEligibility.Matches(usluga, t))
+                    .ToList();
+                var terapeut = eligible.Count > 0
+                    ? eligible[rng.Next(eligible.Count)]
+                    : therapists[rng.Next(therapists.Count)];
+
+                var daysOffset = rng.Next(-14, 21);
+                var hour = rng.Next(9, 17);
+                var datum = now.Date.AddDays(daysOffset).AddHours(hour);
+                var isPast = daysOffset < 0;
+
+                var rez = new Rezervacija
+                {
+                    KorisnikId = client.Id,
+                    UslugaId = usluga.Id,
+                    ZaposlenikId = terapeut.Id,
+                    ProstorijaId = prostorija?.Id,
+                    DatumRezervacije = datum,
+                    Status = isPast ? RezervacijaStatus.Completed : RezervacijaStatus.Pending,
+                    IsPotvrdjena = true,
+                    IsPlacena = isPast && rng.NextDouble() > 0.3,
+                    IsOtkazana = false,
+                    CreatedAt = now,
+                    IsDeleted = false,
+                };
+                context.Rezervacije.Add(rez);
+            }
+
+            await context.SaveChangesAsync(ct);
         }
 
-        await context.SaveChangesAsync(ct);
+        if (await context.Recenzije.CountAsync(r => !r.IsDeleted, ct) >= 8)
+        {
+            return;
+        }
 
         var pastRez = await context.Rezervacije
-            .Where(r => !r.IsDeleted && r.DatumRezervacije < now)
+            .Where(r =>
+                !r.IsDeleted
+                && r.DatumRezervacije < now
+                && r.Status == RezervacijaStatus.Completed)
             .Take(12)
             .ToListAsync(ct);
 
         foreach (var rez in pastRez)
         {
-            if (await context.Recenzije.AnyAsync(r => r.KorisnikId == rez.KorisnikId && r.UslugaId == rez.UslugaId, ct))
+            if (await context.Recenzije.AnyAsync(
+                    r => r.KorisnikId == rez.KorisnikId
+                        && r.UslugaId == rez.UslugaId
+                        && r.ZaposlenikId == rez.ZaposlenikId,
+                    ct))
             {
                 continue;
             }
@@ -436,7 +448,7 @@ public static class DevelopmentDataSeeder
                 UslugaId = rez.UslugaId,
                 ZaposlenikId = rez.ZaposlenikId,
                 Ocjena = rng.Next(3, 6),
-                Komentar = "Odličan tretman, preporučujem NuaSpa tim.",
+                Komentar = "Excellent treatment — highly recommend the NuaSpa team.",
                 CreatedAt = rez.DatumRezervacije.AddHours(2),
                 IsDeleted = false,
             });

@@ -230,11 +230,12 @@ namespace NuaSpa.Application.Services
                 .Where(rev =>
                     !rev.IsDeleted
                     && (rev.ZaposlenikId == zaposlenikId
-                        || _context.Rezervacije.Any(rez =>
+                        || (rev.ZaposlenikId == null && _context.Rezervacije.Any(rez =>
                             rez.ZaposlenikId == zaposlenikId
+                            && rez.Status == RezervacijaStatus.Completed
                             && !rez.IsOtkazana
                             && rez.KorisnikId == rev.KorisnikId
-                            && rez.UslugaId == rev.UslugaId)))
+                            && rez.UslugaId == rev.UslugaId))))
                 .OrderByDescending(rev => rev.CreatedAt)
                 .Take(take)
                 .Select(rev => new TherapistReviewRowDto
@@ -581,11 +582,12 @@ namespace NuaSpa.Application.Services
                 .Where(rev =>
                     !rev.IsDeleted
                     && (rev.ZaposlenikId == zaposlenikId
-                        || _context.Rezervacije.Any(rez =>
+                        || (rev.ZaposlenikId == null && _context.Rezervacije.Any(rez =>
                             rez.ZaposlenikId == zaposlenikId
+                            && rez.Status == RezervacijaStatus.Completed
                             && !rez.IsOtkazana
                             && rez.KorisnikId == rev.KorisnikId
-                            && rez.UslugaId == rev.UslugaId)))
+                            && rez.UslugaId == rev.UslugaId))))
                 .OrderByDescending(rev => rev.CreatedAt)
                 .Take(take)
                 .Select(rev => new TherapistReviewRowDto
@@ -632,11 +634,14 @@ namespace NuaSpa.Application.Services
 
             var reviews = await (
                 from rev in _context.Recenzije.AsNoTracking()
-                where _context.Rezervacije.Any(rez =>
-                    rez.ZaposlenikId == zaposlenikId
-                    && !rez.IsOtkazana
-                    && rez.KorisnikId == rev.KorisnikId
-                    && rez.UslugaId == rev.UslugaId)
+                where !rev.IsDeleted
+                    && (rev.ZaposlenikId == zaposlenikId
+                        || (rev.ZaposlenikId == null && _context.Rezervacije.Any(rez =>
+                            rez.ZaposlenikId == zaposlenikId
+                            && rez.Status == RezervacijaStatus.Completed
+                            && !rez.IsOtkazana
+                            && rez.KorisnikId == rev.KorisnikId
+                            && rez.UslugaId == rev.UslugaId)))
                 select rev.Ocjena
             ).ToListAsync();
 

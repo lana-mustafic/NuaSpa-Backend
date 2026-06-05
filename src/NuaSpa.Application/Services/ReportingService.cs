@@ -138,6 +138,7 @@ public class ReportingService : IReportingService
             .CountAsync(z => !z.IsDeleted && z.Status == ZaposlenikStatus.Active);
 
         var prosjecnaOcjena = await _context.Recenzije
+            .Where(r => !r.IsDeleted)
             .Select(r => (double?)r.Ocjena)
             .AverageAsync() ?? 0.0;
 
