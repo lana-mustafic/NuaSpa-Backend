@@ -55,7 +55,7 @@ namespace NuaSpa.Api.Controllers
         [ProducesResponseType(typeof(AdminKpiDTO), StatusCodes.Status200OK)]
         public async Task<ActionResult<AdminKpiDTO>> GetKpis([FromQuery] DateTime? date = null)
         {
-            var d = (date ?? DateTime.Now).Date;
+            var d = (date ?? DateTime.UtcNow).Date;
             var kpis = await _reportingService.GetAdminKpisAsync(d);
             return Ok(kpis);
         }
