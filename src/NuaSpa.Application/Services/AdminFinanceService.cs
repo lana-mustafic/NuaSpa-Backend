@@ -352,8 +352,8 @@ namespace NuaSpa.Application.Services
                 .Where(p => p.Status == PlacanjeStatus.Completed)
                 .Where(p => p.Rezervacija == null || !p.Rezervacija.IsDeleted);
 
-            var completed = await baseQ.ToListAsync(ct);
-            if (completed.Count == 0)
+            var methods = await baseQ.Select(p => p.MetodaPlacanja).ToListAsync(ct);
+            if (methods.Count == 0)
             {
                 return new List<AdminFinanceMethodShareDto>
                 {
@@ -364,13 +364,13 @@ namespace NuaSpa.Application.Services
                 };
             }
 
-            var card = completed.Count(p => BucketMethod(p.MetodaPlacanja) == "card");
-            var cash = completed.Count(p => BucketMethod(p.MetodaPlacanja) == "cash");
-            var digital = completed.Count(p => BucketMethod(p.MetodaPlacanja) == "digital");
-            var other = completed.Count - card - cash - digital;
+            var card = methods.Count(m => BucketMethod(m) == "card");
+            var cash = methods.Count(m => BucketMethod(m) == "cash");
+            var digital = methods.Count(m => BucketMethod(m) == "digital");
+            var other = methods.Count - card - cash - digital;
             if (other < 0) other = 0;
 
-            var totalD = (double)completed.Count;
+            var totalD = (double)methods.Count;
             var shares = new[]
             {
                 ("card", "Card", card),
