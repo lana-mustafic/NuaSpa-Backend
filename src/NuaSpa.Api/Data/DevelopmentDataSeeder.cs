@@ -27,6 +27,7 @@ public static class DevelopmentDataSeeder
 
         var seedImageUrl = await EnsureSeedImageAsync(env, logger, cancellationToken);
         await EnsureCatalogReferenceDataAsync(context, seedImageUrl, logger, cancellationToken);
+        await SyncTherapistServiceSpecializationsAsync(context, logger, cancellationToken);
 
         if (await context.Usluge.CountAsync(cancellationToken) >= 8)
         {
@@ -50,7 +51,69 @@ public static class DevelopmentDataSeeder
         await EnsureRezervacijeAndRecenzijeAsync(
             context, clients, therapists, servicesList, cancellationToken);
 
+        await SyncTherapistServiceSpecializationsAsync(context, logger, cancellationToken);
         logger.LogInformation("Dev seed: test podaci uspješno dodani.");
+    }
+
+    /// <summary>
+    /// Specijalizacija terapeuta mora sadržavati točne nazive usluga iz kataloga
+    /// (vidi <see cref="TherapistServiceEligibility"/>).
+    /// </summary>
+    private static async Task SyncTherapistServiceSpecializationsAsync(
+        NuaSpaContext context,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        var usluge = await context.Usluge
+            .AsNoTracking()
+            .Where(u => !u.IsDeleted)
+            .ToListAsync(ct);
+        if (usluge.Count == 0)
+        {
+            return;
+        }
+
+        var therapists = await context.Zaposlenici
+            .Where(z => !z.IsDeleted)
+            .ToListAsync(ct);
+        var changed = 0;
+
+        foreach (var therapist in therapists)
+        {
+            if (therapist.KategorijaUslugaId is not int categoryId)
+            {
+                continue;
+            }
+
+            var names = usluge
+                .Where(u => u.KategorijaUslugaId == categoryId)
+                .Select(u => u.Naziv.Trim())
+                .Where(n => n.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(n => n)
+                .ToList();
+            if (names.Count == 0)
+            {
+                continue;
+            }
+
+            var spec = string.Join(", ", names);
+            if (string.Equals(therapist.Specijalizacija, spec, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            therapist.Specijalizacija = spec;
+            changed++;
+        }
+
+        if (changed > 0)
+        {
+            await context.SaveChangesAsync(ct);
+            logger.LogInformation(
+                "Dev seed: ažurirano {Count} terapeutskih specijalizacija prema katalogu usluga.",
+                changed);
+        }
     }
 
     private static async Task<string> EnsureSeedImageAsync(
