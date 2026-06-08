@@ -89,6 +89,10 @@ namespace NuaSpa.Application
                         ? string.Empty
                         : src.Korisnik.Prezime.Substring(0, 1) + ".")))
                 .ForMember(dest => dest.UslugaNaziv, opt => opt.MapFrom(src => src.Usluga.Naziv))
+                .ForMember(dest => dest.ZaposlenikIme, opt => opt.MapFrom(src =>
+                    src.Zaposlenik == null
+                        ? null
+                        : (src.Zaposlenik.Ime + " " + src.Zaposlenik.Prezime).Trim()))
                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CreatedAt))
                 .ForMember(dest => dest.AdminOdgovor, opt => opt.MapFrom(src => src.AdminOdgovor));
         }

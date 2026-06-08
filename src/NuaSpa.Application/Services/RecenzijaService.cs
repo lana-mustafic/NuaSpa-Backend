@@ -39,6 +39,7 @@ namespace NuaSpa.Application.Services
                 .AsNoTracking()
                 .Include(r => r.Korisnik)
                 .Include(r => r.Usluga)
+                .Include(r => r.Zaposlenik)
                 .Where(r => r.UslugaId == uslugaId && !r.IsDeleted)
                 .OrderByDescending(r => r.CreatedAt);
 
@@ -86,6 +87,7 @@ namespace NuaSpa.Application.Services
                 .AsNoTracking()
                 .Include(r => r.Korisnik)
                 .Include(r => r.Usluga)
+                .Include(r => r.Zaposlenik)
                 .FirstAsync(r => r.Id == entity.Id);
 
             return _mapper.Map<RecenzijaDTO>(created);
@@ -140,7 +142,20 @@ namespace NuaSpa.Application.Services
                     "Odabrani terapeut ne može izvoditi ovu uslugu.");
             }
 
+            var alreadyReviewed = await _context.Recenzije.AsNoTracking().AnyAsync(r =>
+                !r.IsDeleted &&
+                r.KorisnikId == korisnikId &&
+                r.UslugaId == dto.UslugaId &&
+                r.ZaposlenikId == dto.ZaposlenikId);
+            if (alreadyReviewed)
+            {
+                throw new BusinessRuleException(
+                    "Već ste ostavili recenziju za ovu uslugu i terapeuta.");
+            }
+
             var hasCompletedVisit = await _context.Rezervacije.AsNoTracking().AnyAsync(r =>
+                !r.IsDeleted &&
+                !r.IsOtkazana &&
                 r.KorisnikId == korisnikId &&
                 r.UslugaId == dto.UslugaId &&
                 r.ZaposlenikId == dto.ZaposlenikId &&
