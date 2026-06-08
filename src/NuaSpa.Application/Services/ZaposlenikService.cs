@@ -612,13 +612,15 @@ namespace NuaSpa.Application.Services
                 && r.DatumRezervacije < monthEnd
                 && r.IsPotvrdjena);
 
-            var revenueMonth = await baseQuery
-                .Where(r =>
-                    r.DatumRezervacije >= monthStart
-                    && r.DatumRezervacije < monthEnd
-                    && r.IsPlacena)
-                .Include(r => r.Usluga)
-                .SumAsync(r => (decimal?)r.Usluga.Cijena ?? 0m);
+            var revenueMonth = await _context.Placanja.AsNoTracking()
+                .Where(p => !p.IsDeleted)
+                .Where(p => p.Status == PlacanjeStatus.Completed)
+                .Where(p => p.DatumPlacanja >= monthStart && p.DatumPlacanja < monthEnd)
+                .Where(p =>
+                    p.Rezervacija != null
+                    && !p.Rezervacija.IsDeleted
+                    && p.Rezervacija.ZaposlenikId == zaposlenikId)
+                .SumAsync(p => (decimal?)(p.NaplaceniIznos ?? p.Iznos)) ?? 0m;
 
             var reviews = await _context.Recenzije
                 .AsNoTracking()
@@ -793,14 +795,15 @@ namespace NuaSpa.Application.Services
             var otkazane = await rezQuery.Where(r => r.IsOtkazana).CountAsync();
             var placene = await rezQuery.Where(r => r.IsPlacena && !r.IsOtkazana).CountAsync();
 
-            var prihod = await rezQuery
-                .Where(r => r.IsPlacena && !r.IsOtkazana)
-                .Join(
-                    _context.Usluge.AsNoTracking(),
-                    r => r.UslugaId,
-                    u => u.Id,
-                    (r, u) => u.Cijena)
-                .SumAsync(x => (decimal?)x) ?? 0m;
+            var prihod = await _context.Placanja.AsNoTracking()
+                .Where(p => !p.IsDeleted)
+                .Where(p => p.Status == PlacanjeStatus.Completed)
+                .Where(p => p.DatumPlacanja >= start && p.DatumPlacanja < endExclusive)
+                .Where(p =>
+                    p.Rezervacija != null
+                    && !p.Rezervacija.IsDeleted
+                    && p.Rezervacija.ZaposlenikId == zaposlenikId)
+                .SumAsync(p => (decimal?)(p.NaplaceniIznos ?? p.Iznos)) ?? 0m;
 
             var ratings = await _context.Recenzije
                 .AsNoTracking()

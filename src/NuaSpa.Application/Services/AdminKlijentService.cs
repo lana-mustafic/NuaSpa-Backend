@@ -12,6 +12,7 @@ using NuaSpa.Application.Interfaces;
 using NuaSpa.Application.SearchObjects;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.Services;
 
@@ -108,15 +109,19 @@ public class AdminKlijentService : IAdminKlijentService
                 x => new VisitAgg(x.UkupnoPosjeta, x.ZadnjaPosjeta),
                 ct);
 
-        var spentMap = await _context.Rezervacije.AsNoTracking()
-            .Where(r => r.IsPlacena && !r.IsOtkazana && ids.Contains(r.KorisnikId))
-            .Join(
-                _context.Usluge.AsNoTracking(),
-                r => r.UslugaId,
-                u => u.Id,
-                (r, u) => new { r.KorisnikId, u.Cijena })
-            .GroupBy(x => x.KorisnikId)
-            .Select(g => new { KorisnikId = g.Key, UkupnoPotroseno = g.Sum(x => x.Cijena) })
+        var spentMap = await _context.Placanja.AsNoTracking()
+            .Where(p => !p.IsDeleted)
+            .Where(p => p.Status == PlacanjeStatus.Completed)
+            .Where(p =>
+                p.Rezervacija != null
+                && !p.Rezervacija.IsDeleted
+                && ids.Contains(p.Rezervacija.KorisnikId))
+            .GroupBy(p => p.Rezervacija!.KorisnikId)
+            .Select(g => new
+            {
+                KorisnikId = g.Key,
+                UkupnoPotroseno = g.Sum(x => x.NaplaceniIznos ?? x.Iznos),
+            })
             .ToDictionaryAsync(x => x.KorisnikId, x => x.UkupnoPotroseno, ct);
 
         return (visitMap, spentMap);
@@ -136,27 +141,46 @@ public class AdminKlijentService : IAdminKlijentService
             UkupnoPosjeta = await _context.Rezervacije.AsNoTracking()
                 .Where(r => !r.IsOtkazana && idsQuery.Contains(r.KorisnikId))
                 .CountAsync(ct),
-            UkupnaPotrosnja = await (
-                from r in _context.Rezervacije.AsNoTracking()
-                join u in _context.Usluge.AsNoTracking() on r.UslugaId equals u.Id
-                where r.IsPlacena && !r.IsOtkazana && idsQuery.Contains(r.KorisnikId)
-                select u.Cijena).SumAsync(ct),
+            UkupnaPotrosnja = await _context.Placanja.AsNoTracking()
+                .Where(p => !p.IsDeleted)
+                .Where(p => p.Status == PlacanjeStatus.Completed)
+                .Where(p =>
+                    p.Rezervacija != null
+                    && !p.Rezervacija.IsDeleted
+                    && idsQuery.Contains(p.Rezervacija.KorisnikId))
+                .SumAsync(p => p.NaplaceniIznos ?? p.Iznos, ct),
         };
 
-        var perClient = await _context.Rezervacije.AsNoTracking()
+        var perClientVisits = await _context.Rezervacije.AsNoTracking()
             .Where(r => !r.IsOtkazana && idsQuery.Contains(r.KorisnikId))
             .GroupBy(r => r.KorisnikId)
+            .Select(g => new { KorisnikId = g.Key, Visits = g.Count() })
+            .ToListAsync(ct);
+
+        var perClientSpent = await _context.Placanja.AsNoTracking()
+            .Where(p => !p.IsDeleted)
+            .Where(p => p.Status == PlacanjeStatus.Completed)
+            .Where(p =>
+                p.Rezervacija != null
+                && !p.Rezervacija.IsDeleted
+                && idsQuery.Contains(p.Rezervacija.KorisnikId))
+            .GroupBy(p => p.Rezervacija!.KorisnikId)
             .Select(g => new
             {
                 KorisnikId = g.Key,
-                Visits = g.Count(),
-                Spent = (
-                    from r in g
-                    join u in _context.Usluge.AsNoTracking() on r.UslugaId equals u.Id
-                    where r.IsPlacena
-                    select u.Cijena).Sum(),
+                Spent = g.Sum(x => x.NaplaceniIznos ?? x.Iznos),
             })
             .ToListAsync(ct);
+
+        var spentByClient = perClientSpent.ToDictionary(x => x.KorisnikId, x => x.Spent);
+        var perClient = perClientVisits
+            .Select(v => new
+            {
+                v.KorisnikId,
+                v.Visits,
+                Spent = spentByClient.GetValueOrDefault(v.KorisnikId),
+            })
+            .ToList();
 
         var vipManualIds = await baseQuery
             .Where(k => k.IsVipKlijent)
