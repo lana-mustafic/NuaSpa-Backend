@@ -28,25 +28,26 @@ namespace NuaSpa.Api.Controllers
         /// </summary>
         [HttpGet("top-usluge")]
         [Produces(MediaTypeNames.Application.Pdf)]
-        public async Task<IActionResult> GetTopUslugeReport()
+        public async Task<IActionResult> GetTopUslugeReport(
+            [FromQuery] DateTime from,
+            [FromQuery] DateTime to)
         {
+            if (!ReportDateRangeValidator.TryValidate(from, to, out var rangeError))
+            {
+                return BadRequest(rangeError);
+            }
+
             try
             {
-                var pdfBytes = await _reportingService.GenerateTopUslugeReport();
-
-                if (pdfBytes == null || pdfBytes.Length == 0)
-                {
-                    return NotFound("Nije moguće generisati izvještaj. Provjerite da li postoje podaci u bazi.");
-                }
-
-                // Vraćamo fajl korisniku. 
-                // "application/pdf" osigurava da ga browser/desktop prepozna kao PDF.
+                var pdfBytes = await _reportingService.GenerateTopUslugeReport(from, to);
                 return File(pdfBytes, MediaTypeNames.Application.Pdf, "Top5Usluga_Izvjestaj.pdf");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Greška pri generisanju PDF izvještaja top-usluge.");
-                return BadRequest("Greška pri generisanju izvještaja. Pokušajte ponovo ili kontaktirajte administratora.");
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "Greška pri generisanju izvještaja. Pokušajte ponovo ili kontaktirajte administratora.");
             }
         }
 
@@ -65,7 +66,8 @@ namespace NuaSpa.Api.Controllers
             [FromQuery] DateTime from,
             [FromQuery] DateTime to)
         {
-            if (to < from) return BadRequest("Neispravan period (to < from).");
+            if (!ReportDateRangeValidator.TryValidate(from, to, out var rangeError))
+                return BadRequest(rangeError);
             var data = await _reportingService.GetRevenueSeriesAsync(from, to);
             return Ok(data);
         }
@@ -77,7 +79,8 @@ namespace NuaSpa.Api.Controllers
             [FromQuery] DateTime to,
             [FromQuery] int take = 8)
         {
-            if (to < from) return BadRequest("Neispravan period (to < from).");
+            if (!ReportDateRangeValidator.TryValidate(from, to, out var rangeError))
+                return BadRequest(rangeError);
             var data = await _reportingService.GetServicePopularityAsync(from, to, take);
             return Ok(data);
         }
@@ -89,7 +92,8 @@ namespace NuaSpa.Api.Controllers
             [FromQuery] DateTime to,
             [FromQuery] int take = 10)
         {
-            if (to < from) return BadRequest("Neispravan period (to < from).");
+            if (!ReportDateRangeValidator.TryValidate(from, to, out var rangeError))
+                return BadRequest(rangeError);
             var data = await _reportingService.GetTopSpendersAsync(from, to, take);
             return Ok(data);
         }
