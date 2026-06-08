@@ -430,7 +430,7 @@ namespace NuaSpa.Application.Services
                 sb.Append(CsvEscape(r.AdminOdgovor ?? "")).AppendLine();
             }
 
-            return (Encoding.UTF8.GetBytes(sb.ToString()), truncated);
+            return (Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray(), truncated);
         }
 
         private static string CsvEscape(string? s)

@@ -82,8 +82,12 @@ namespace NuaSpa.Api.Controllers
             [FromQuery] int? zaposlenikId = null,
             CancellationToken cancellationToken = default)
         {
-            var toExclusive = (to ?? DateTime.Today).Date.AddDays(1);
+            var toExclusive = (to ?? DateTime.UtcNow).Date.AddDays(1);
             var fromDt = (from?.Date) ?? toExclusive.AddDays(-7);
+            if (from.HasValue && to.HasValue && to.Value.Date < from.Value.Date)
+            {
+                return BadRequest("Invalid period (to < from).");
+            }
 
             var dto = await _service.GetAdminDashboardAsync(
                 fromDt,
@@ -112,8 +116,12 @@ namespace NuaSpa.Api.Controllers
             [FromQuery] int? zaposlenikId = null,
             CancellationToken cancellationToken = default)
         {
-            var toExclusive = (to ?? DateTime.Today).Date.AddDays(1);
+            var toExclusive = (to ?? DateTime.UtcNow).Date.AddDays(1);
             var fromDt = (from?.Date) ?? toExclusive.AddDays(-7);
+            if (from.HasValue && to.HasValue && to.Value.Date < from.Value.Date)
+            {
+                return BadRequest("Invalid period (to < from).");
+            }
 
             var (bytes, truncated) = await _service.GetAdminDashboardCsvAsync(
                 fromDt,
