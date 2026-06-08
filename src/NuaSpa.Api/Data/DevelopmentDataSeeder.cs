@@ -26,7 +26,7 @@ public static class DevelopmentDataSeeder
         var userManager = services.GetRequiredService<UserManager<Korisnik>>();
 
         var seedImageUrl = await EnsureSeedImageAsync(env, logger, cancellationToken);
-        await EnsureCatalogReferenceDataAsync(context, seedImageUrl, logger, cancellationToken);
+        await RemoveLegacyBeautyCatalogAsync(context, logger, cancellationToken);
         await SyncTherapistServiceSpecializationsAsync(context, logger, cancellationToken);
 
         if (await context.Usluge.CountAsync(cancellationToken) >= 8)
@@ -139,83 +139,73 @@ public static class DevelopmentDataSeeder
     }
 
     /// <summary>
-    /// Idempotent catalog reference data (runs even when full dev seed is skipped).
+    /// Removes legacy dev-seed "Beauty" catalog data (runs even when full dev seed is skipped).
     /// </summary>
-    private static async Task EnsureCatalogReferenceDataAsync(
+    private static async Task RemoveLegacyBeautyCatalogAsync(
         NuaSpaContext context,
-        string slikaUrl,
         ILogger logger,
         CancellationToken ct)
     {
-        var catBeauty = await EnsureCategoryAsync(
-            context,
-            "Beauty",
-            "Brows, lashes, and makeup treatments.",
-            ct);
-
-        var seedDate = DateTime.UtcNow;
-        var beautyServices = new (string Naziv, int KatId, decimal Cijena, int Trajanje, string Opis)[]
+        const string beautyCategoryName = "Beauty";
+        var legacyServiceNames = new[]
         {
-            ("Brow Lamination", catBeauty.Id, 55m, 45, "Defined, fuller-looking brows."),
-            ("Classic Lash Extensions", catBeauty.Id, 85m, 90, "Natural volume lash set."),
-            ("Event Makeup", catBeauty.Id, 95m, 60, "Professional makeup for events."),
+            "Brow Lamination",
+            "Classic Lash Extensions",
+            "Event Makeup",
         };
 
-        var added = 0;
-        foreach (var (naziv, katId, cijena, trajanje, opis) in beautyServices)
-        {
-            if (await context.Usluge.AnyAsync(u => u.Naziv == naziv && !u.IsDeleted, ct))
-            {
-                continue;
-            }
+        var beautyCategory = await context.KategorijeUsluga
+            .FirstOrDefaultAsync(k => !k.IsDeleted && k.Naziv == beautyCategoryName, ct);
 
-            context.Usluge.Add(new Usluga
-            {
-                Naziv = naziv,
-                KategorijaUslugaId = katId,
-                Cijena = cijena,
-                TrajanjeMinuta = trajanje,
-                Opis = opis,
-                SlikaUrl = slikaUrl,
-                CreatedAt = seedDate,
-                IsDeleted = false,
-            });
-            added++;
+        var servicesQuery = context.Usluge.Where(u => !u.IsDeleted);
+        if (beautyCategory != null)
+        {
+            var beautyId = beautyCategory.Id;
+            servicesQuery = servicesQuery.Where(u =>
+                u.KategorijaUslugaId == beautyId
+                || legacyServiceNames.Contains(u.Naziv));
+        }
+        else
+        {
+            servicesQuery = servicesQuery.Where(u => legacyServiceNames.Contains(u.Naziv));
         }
 
-        if (added > 0)
+        var services = await servicesQuery.ToListAsync(ct);
+        if (services.Count == 0 && beautyCategory == null)
+        {
+            return;
+        }
+
+        var removedServiceIds = services.Select(s => s.Id).ToHashSet();
+        foreach (var service in services)
+        {
+            service.IsDeleted = true;
+        }
+
+        if (beautyCategory != null)
+        {
+            var hasActiveServices = await context.Usluge.AsNoTracking()
+                .AnyAsync(
+                    u => u.KategorijaUslugaId == beautyCategory.Id
+                        && !u.IsDeleted
+                        && !removedServiceIds.Contains(u.Id),
+                    ct);
+            var hasTherapists = await context.Zaposlenici.AsNoTracking()
+                .AnyAsync(z => z.KategorijaUslugaId == beautyCategory.Id && !z.IsDeleted, ct);
+
+            if (!hasActiveServices && !hasTherapists)
+            {
+                beautyCategory.IsDeleted = true;
+            }
+        }
+
+        if (services.Count > 0 || (beautyCategory?.IsDeleted ?? false))
         {
             await context.SaveChangesAsync(ct);
         }
-
         logger.LogInformation(
-            "Dev seed: catalog reference data ensured (Beauty category + {Added} services).",
-            added);
-    }
-
-    private static async Task<KategorijaUsluga> EnsureCategoryAsync(
-        NuaSpaContext context,
-        string naziv,
-        string? opis,
-        CancellationToken ct)
-    {
-        var existing = await context.KategorijeUsluga
-            .FirstOrDefaultAsync(k => !k.IsDeleted && k.Naziv == naziv, ct);
-        if (existing != null)
-        {
-            return existing;
-        }
-
-        var entity = new KategorijaUsluga
-        {
-            Naziv = naziv,
-            Opis = opis,
-            CreatedAt = DateTime.UtcNow,
-            IsDeleted = false,
-        };
-        context.KategorijeUsluga.Add(entity);
-        await context.SaveChangesAsync(ct);
-        return entity;
+            "Dev seed: removed legacy Beauty catalog ({ServiceCount} services soft-deleted).",
+            services.Count);
     }
 
     private static async Task EnsureProstorijeAsync(NuaSpaContext context, CancellationToken ct)
