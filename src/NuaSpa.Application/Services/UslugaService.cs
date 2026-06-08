@@ -54,7 +54,7 @@ namespace NuaSpa.Application.Services
             var entity = await _context.Usluge
                 .AsNoTracking()
                 .Include(u => u.KategorijaUsluga)
-                .FirstOrDefaultAsync(u => u.Id == id);
+                .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
 
             if (entity == null)
             {
