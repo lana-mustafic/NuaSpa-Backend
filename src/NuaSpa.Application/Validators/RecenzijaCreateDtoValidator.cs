@@ -7,6 +7,9 @@ public sealed class RecenzijaCreateDtoValidator : AbstractValidator<RecenzijaCre
 {
     public RecenzijaCreateDtoValidator()
     {
+        RuleFor(x => x.RezervacijaId)
+            .GreaterThan(0).WithMessage("RezervacijaId je obavezan.");
+
         RuleFor(x => x.UslugaId)
             .GreaterThan(0).WithMessage("UslugaId je obavezan.");
 

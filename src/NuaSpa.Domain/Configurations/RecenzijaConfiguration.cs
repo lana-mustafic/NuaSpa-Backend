@@ -30,5 +30,15 @@ public class RecenzijaConfiguration : IEntityTypeConfiguration<Recenzija>
             .HasForeignKey(r => r.ZaposlenikId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(r => r.Rezervacija)
+            .WithMany()
+            .HasForeignKey(r => r.RezervacijaId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(r => r.RezervacijaId)
+            .IsUnique()
+            .HasFilter("[RezervacijaId] IS NOT NULL");
     }
 }

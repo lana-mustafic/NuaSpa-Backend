@@ -227,15 +227,8 @@ namespace NuaSpa.Application.Services
                 .AsNoTracking()
                 .Include(r => r.Usluga)
                 .Include(r => r.Korisnik)
-                .Where(rev =>
-                    !rev.IsDeleted
-                    && (rev.ZaposlenikId == zaposlenikId
-                        || (rev.ZaposlenikId == null && _context.Rezervacije.Any(rez =>
-                            rez.ZaposlenikId == zaposlenikId
-                            && rez.Status == RezervacijaStatus.Completed
-                            && !rez.IsOtkazana
-                            && rez.KorisnikId == rev.KorisnikId
-                            && rez.UslugaId == rev.UslugaId))))
+                .Where(rev => !rev.IsDeleted)
+                .ForTherapist(_context, zaposlenikId)
                 .OrderByDescending(rev => rev.CreatedAt)
                 .Take(take)
                 .Select(rev => new TherapistReviewRowDto
@@ -248,6 +241,7 @@ namespace NuaSpa.Application.Services
                         (string.IsNullOrEmpty(rev.Korisnik.Prezime)
                             ? ""
                             : rev.Korisnik.Prezime.Substring(0, 1) + "."),
+                    AdminOdgovor = rev.AdminOdgovor,
                 })
                 .ToListAsync();
 
@@ -579,15 +573,8 @@ namespace NuaSpa.Application.Services
                 .AsNoTracking()
                 .Include(r => r.Usluga)
                 .Include(r => r.Korisnik)
-                .Where(rev =>
-                    !rev.IsDeleted
-                    && (rev.ZaposlenikId == zaposlenikId
-                        || (rev.ZaposlenikId == null && _context.Rezervacije.Any(rez =>
-                            rez.ZaposlenikId == zaposlenikId
-                            && rez.Status == RezervacijaStatus.Completed
-                            && !rez.IsOtkazana
-                            && rez.KorisnikId == rev.KorisnikId
-                            && rez.UslugaId == rev.UslugaId))))
+                .Where(rev => !rev.IsDeleted)
+                .ForTherapist(_context, zaposlenikId)
                 .OrderByDescending(rev => rev.CreatedAt)
                 .Take(take)
                 .Select(rev => new TherapistReviewRowDto
@@ -600,6 +587,7 @@ namespace NuaSpa.Application.Services
                         (string.IsNullOrEmpty(rev.Korisnik.Prezime)
                             ? ""
                             : rev.Korisnik.Prezime.Substring(0, 1) + "."),
+                    AdminOdgovor = rev.AdminOdgovor,
                 })
                 .ToListAsync();
         }
@@ -632,18 +620,15 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Usluga)
                 .SumAsync(r => (decimal?)r.Usluga.Cijena ?? 0m);
 
-            var reviews = await (
-                from rev in _context.Recenzije.AsNoTracking()
-                where !rev.IsDeleted
-                    && (rev.ZaposlenikId == zaposlenikId
-                        || (rev.ZaposlenikId == null && _context.Rezervacije.Any(rez =>
-                            rez.ZaposlenikId == zaposlenikId
-                            && rez.Status == RezervacijaStatus.Completed
-                            && !rez.IsOtkazana
-                            && rez.KorisnikId == rev.KorisnikId
-                            && rez.UslugaId == rev.UslugaId)))
-                select rev.Ocjena
-            ).ToListAsync();
+            var reviews = await _context.Recenzije
+                .AsNoTracking()
+                .Where(rev =>
+                    !rev.IsDeleted
+                    && rev.CreatedAt >= monthStart
+                    && rev.CreatedAt < monthEnd)
+                .ForTherapist(_context, zaposlenikId)
+                .Select(rev => rev.Ocjena)
+                .ToListAsync();
 
             return new TherapistDashboardDto
             {
@@ -822,13 +807,8 @@ namespace NuaSpa.Application.Services
                 .Where(r =>
                     !r.IsDeleted
                     && r.CreatedAt >= start
-                    && r.CreatedAt < endExclusive
-                    && (r.ZaposlenikId == zaposlenikId
-                        || _context.Rezervacije.Any(rez =>
-                            rez.ZaposlenikId == zaposlenikId
-                            && !rez.IsOtkazana
-                            && rez.KorisnikId == r.KorisnikId
-                            && rez.UslugaId == r.UslugaId)))
+                    && r.CreatedAt < endExclusive)
+                .ForTherapist(_context, zaposlenikId)
                 .Select(r => (double?)r.Ocjena)
                 .ToListAsync();
 

@@ -487,9 +487,7 @@ public static class DevelopmentDataSeeder
         foreach (var rez in pastRez)
         {
             if (await context.Recenzije.AnyAsync(
-                    r => r.KorisnikId == rez.KorisnikId
-                        && r.UslugaId == rez.UslugaId
-                        && r.ZaposlenikId == rez.ZaposlenikId,
+                    r => !r.IsDeleted && r.RezervacijaId == rez.Id,
                     ct))
             {
                 continue;
@@ -497,6 +495,7 @@ public static class DevelopmentDataSeeder
 
             context.Recenzije.Add(new Recenzija
             {
+                RezervacijaId = rez.Id,
                 KorisnikId = rez.KorisnikId,
                 UslugaId = rez.UslugaId,
                 ZaposlenikId = rez.ZaposlenikId,

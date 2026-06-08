@@ -945,6 +945,9 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.Property<int>("Ocjena")
                         .HasColumnType("int");
 
+                    b.Property<int?>("RezervacijaId")
+                        .HasColumnType("int");
+
                     b.Property<int>("UslugaId")
                         .HasColumnType("int");
 
@@ -954,6 +957,10 @@ namespace NuaSpa.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("KorisnikId");
+
+                    b.HasIndex("RezervacijaId")
+                        .IsUnique()
+                        .HasFilter("[RezervacijaId] IS NOT NULL");
 
                     b.HasIndex("UslugaId");
 
@@ -1746,12 +1753,19 @@ namespace NuaSpa.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("NuaSpa.Domain.Entities.Rezervacija", "Rezervacija")
+                        .WithMany()
+                        .HasForeignKey("RezervacijaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("NuaSpa.Domain.Entities.Zaposlenik", "Zaposlenik")
                         .WithMany()
                         .HasForeignKey("ZaposlenikId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Korisnik");
+
+                    b.Navigation("Rezervacija");
 
                     b.Navigation("Usluga");
 

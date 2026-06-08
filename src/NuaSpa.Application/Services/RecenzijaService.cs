@@ -20,6 +20,8 @@ namespace NuaSpa.Application.Services
 {
     public class RecenzijaService : IRecenzijaService
     {
+        private const int CsvExportMaxRows = PaginationConstants.MaxPageSize * 10;
+
         private readonly NuaSpaContext _context;
         private readonly IMapper _mapper;
 
@@ -65,6 +67,49 @@ namespace NuaSpa.Application.Services
             return entity == null ? null : _mapper.Map<RecenzijaDTO>(entity);
         }
 
+        public async Task<IReadOnlyList<ReviewableVisitDto>> GetReviewableVisitsAsync(
+            int korisnikId,
+            int uslugaId,
+            CancellationToken cancellationToken = default)
+        {
+            if (uslugaId <= 0)
+            {
+                return Array.Empty<ReviewableVisitDto>();
+            }
+
+            var reviewedReservationIds = await _context.Recenzije
+                .AsNoTracking()
+                .Where(r => !r.IsDeleted && r.RezervacijaId != null)
+                .Select(r => r.RezervacijaId!.Value)
+                .ToListAsync(cancellationToken);
+
+            var reviewedSet = reviewedReservationIds.ToHashSet();
+
+            var visits = await _context.Rezervacije
+                .AsNoTracking()
+                .Include(r => r.Zaposlenik)
+                .Where(r =>
+                    !r.IsDeleted
+                    && !r.IsOtkazana
+                    && r.KorisnikId == korisnikId
+                    && r.UslugaId == uslugaId
+                    && r.Status == RezervacijaStatus.Completed
+                    && r.ZaposlenikId > 0)
+                .OrderByDescending(r => r.DatumRezervacije)
+                .ToListAsync(cancellationToken);
+
+            return visits
+                .Where(v => !reviewedSet.Contains(v.Id))
+                .Select(v => new ReviewableVisitDto
+                {
+                    RezervacijaId = v.Id,
+                    ZaposlenikId = v.ZaposlenikId,
+                    ZaposlenikIme = (v.Zaposlenik.Ime + " " + v.Zaposlenik.Prezime).Trim(),
+                    DatumRezervacije = v.DatumRezervacije,
+                })
+                .ToList();
+        }
+
         public async Task<RecenzijaDTO> CreateAsync(int korisnikId, RecenzijaCreateDTO dto)
         {
             await ValidateCreateAsync(korisnikId, dto);
@@ -72,6 +117,7 @@ namespace NuaSpa.Application.Services
             var entity = new Recenzija
             {
                 KorisnikId = korisnikId,
+                RezervacijaId = dto.RezervacijaId,
                 UslugaId = dto.UslugaId,
                 ZaposlenikId = dto.ZaposlenikId,
                 Ocjena = dto.Ocjena,
@@ -81,7 +127,15 @@ namespace NuaSpa.Application.Services
             };
 
             _context.Recenzije.Add(entity);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                throw new BusinessRuleException(
+                    "A review for this visit already exists.");
+            }
 
             var created = await _context.Recenzije
                 .AsNoTracking()
@@ -95,6 +149,11 @@ namespace NuaSpa.Application.Services
 
         private async Task ValidateCreateAsync(int korisnikId, RecenzijaCreateDTO dto)
         {
+            if (dto.RezervacijaId <= 0)
+            {
+                throw new BusinessRuleException("Reservation is required.");
+            }
+
             if (dto.ZaposlenikId <= 0)
             {
                 throw new BusinessRuleException("Terapeut je obavezan.");
@@ -120,12 +179,51 @@ namespace NuaSpa.Application.Services
                 throw new BusinessRuleException("Komentar može imati najviše 1000 znakova.");
             }
 
+            var rezervacija = await _context.Rezervacije
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r =>
+                    r.Id == dto.RezervacijaId
+                    && !r.IsDeleted
+                    && !r.IsOtkazana
+                    && r.Status == RezervacijaStatus.Completed);
+
+            if (rezervacija == null)
+            {
+                throw new BusinessRuleException(
+                    "Recenziju je moguće ostaviti tek nakon završenog termina.");
+            }
+
+            if (rezervacija.KorisnikId != korisnikId)
+            {
+                throw new BusinessRuleException("Reservation does not belong to the signed-in client.");
+            }
+
+            if (rezervacija.UslugaId != dto.UslugaId
+                || rezervacija.ZaposlenikId != dto.ZaposlenikId)
+            {
+                throw new BusinessRuleException(
+                    "Review details do not match the selected visit.");
+            }
+
+            var alreadyReviewed = await _context.Recenzije.AsNoTracking().AnyAsync(r =>
+                !r.IsDeleted && r.RezervacijaId == dto.RezervacijaId);
+            if (alreadyReviewed)
+            {
+                throw new BusinessRuleException(
+                    "Već ste ostavili recenziju za ovaj termin.");
+            }
+
             var zaposlenik = await _context.Zaposlenici
                 .AsNoTracking()
-                .FirstOrDefaultAsync(z => z.Id == dto.ZaposlenikId);
+                .FirstOrDefaultAsync(z => z.Id == dto.ZaposlenikId && !z.IsDeleted);
             if (zaposlenik == null)
             {
                 throw new BusinessRuleException("Terapeut ne postoji.");
+            }
+
+            if (zaposlenik.Status != ZaposlenikStatus.Active)
+            {
+                throw new BusinessRuleException("Odabrani terapeut trenutno nije dostupan.");
             }
 
             var usluga = await _context.Usluge
@@ -140,31 +238,6 @@ namespace NuaSpa.Application.Services
             {
                 throw new BusinessRuleException(
                     "Odabrani terapeut ne može izvoditi ovu uslugu.");
-            }
-
-            var alreadyReviewed = await _context.Recenzije.AsNoTracking().AnyAsync(r =>
-                !r.IsDeleted &&
-                r.KorisnikId == korisnikId &&
-                r.UslugaId == dto.UslugaId &&
-                r.ZaposlenikId == dto.ZaposlenikId);
-            if (alreadyReviewed)
-            {
-                throw new BusinessRuleException(
-                    "Već ste ostavili recenziju za ovu uslugu i terapeuta.");
-            }
-
-            var hasCompletedVisit = await _context.Rezervacije.AsNoTracking().AnyAsync(r =>
-                !r.IsDeleted &&
-                !r.IsOtkazana &&
-                r.KorisnikId == korisnikId &&
-                r.UslugaId == dto.UslugaId &&
-                r.ZaposlenikId == dto.ZaposlenikId &&
-                r.Status == RezervacijaStatus.Completed);
-
-            if (!hasCompletedVisit)
-            {
-                throw new BusinessRuleException(
-                    "Recenziju je moguće ostaviti tek nakon završenog termina.");
             }
         }
 
@@ -182,6 +255,7 @@ namespace NuaSpa.Application.Services
         {
             page = Math.Clamp(page, 1, 10_000);
             pageSize = Math.Clamp(pageSize, 1, 50);
+            (minOcjena, maxOcjena) = NormalizeRatingFilters(minOcjena, maxOcjena);
 
             var span = toExclusive - from;
             if (span <= TimeSpan.Zero)
@@ -309,7 +383,7 @@ namespace NuaSpa.Application.Services
             };
         }
 
-        public async Task<byte[]> GetAdminDashboardCsvAsync(
+        public async Task<(byte[] Content, bool Truncated)> GetAdminDashboardCsvAsync(
             DateTime from,
             DateTime toExclusive,
             string? search,
@@ -319,16 +393,27 @@ namespace NuaSpa.Application.Services
             int? zaposlenikId,
             CancellationToken cancellationToken = default)
         {
+            (minOcjena, maxOcjena) = NormalizeRatingFilters(minOcjena, maxOcjena);
+
             var q = BuildAdminReviewQuery(from, toExclusive, search, minOcjena, maxOcjena, uslugaId, zaposlenikId)
                 .OrderByDescending(r => r.CreatedAt);
 
+            var totalMatching = await q.CountAsync(cancellationToken);
+            var truncated = totalMatching > CsvExportMaxRows;
+
             var reviewEntities = await q
-                .Take(PaginationConstants.MaxPageSize * 10)
+                .Take(CsvExportMaxRows)
                 .ToListAsync(cancellationToken);
 
             var rows = await MapAdminReviewRowsAsync(reviewEntities, cancellationToken);
 
             var sb = new StringBuilder();
+            if (truncated)
+            {
+                sb.AppendLine(
+                    $"# Export limited to {CsvExportMaxRows} rows ({totalMatching} matched). Refine filters for a smaller set.");
+            }
+
             sb.AppendLine(
                 "Id,CreatedAt,Ocjena,Korisnik,BrojPosjeta,Usluga,Terapeut,Izvor,Komentar,AdminOdgovor");
             foreach (var r in rows)
@@ -345,13 +430,25 @@ namespace NuaSpa.Application.Services
                 sb.Append(CsvEscape(r.AdminOdgovor ?? "")).AppendLine();
             }
 
-            return Encoding.UTF8.GetBytes(sb.ToString());
+            return (Encoding.UTF8.GetBytes(sb.ToString()), truncated);
         }
 
         private static string CsvEscape(string? s)
         {
             s ??= "";
             return "\"" + s.Replace("\"", "\"\"") + "\"";
+        }
+
+        private static (int? Min, int? Max) NormalizeRatingFilters(int? minOcjena, int? maxOcjena)
+        {
+            if (minOcjena is < 1 or > 5) minOcjena = null;
+            if (maxOcjena is < 1 or > 5) maxOcjena = null;
+            if (minOcjena is int min && maxOcjena is int max && min > max)
+            {
+                (minOcjena, maxOcjena) = (max, min);
+            }
+
+            return (minOcjena, maxOcjena);
         }
 
         private IQueryable<Recenzija> BuildAdminReviewQuery(
@@ -363,6 +460,8 @@ namespace NuaSpa.Application.Services
             int? uslugaId,
             int? zaposlenikId)
         {
+            (minOcjena, maxOcjena) = NormalizeRatingFilters(minOcjena, maxOcjena);
+
             var q = _context.Recenzije
                 .AsNoTracking()
                 .Include(r => r.Korisnik)
@@ -378,14 +477,7 @@ namespace NuaSpa.Application.Services
 
             if (zaposlenikId is { } zid)
             {
-                q = q.Where(rev =>
-                    rev.ZaposlenikId == zid
-                    || (rev.ZaposlenikId == null && _context.Rezervacije.Any(rez =>
-                        rez.ZaposlenikId == zid
-                        && rez.KorisnikId == rev.KorisnikId
-                        && rez.UslugaId == rev.UslugaId
-                        && rez.Status == RezervacijaStatus.Completed
-                        && !rez.IsOtkazana)));
+                q = q.ForTherapist(_context, zid);
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -415,7 +507,7 @@ namespace NuaSpa.Application.Services
                 .Where(r =>
                     korisnikIds.Contains(r.KorisnikId)
                     && !r.IsOtkazana
-                    && r.IsPotvrdjena
+                    && !r.IsDeleted
                     && r.Status == RezervacijaStatus.Completed)
                 .GroupBy(r => new { r.KorisnikId, r.UslugaId })
                 .Select(g => new
@@ -451,7 +543,11 @@ namespace NuaSpa.Application.Services
             {
                 var kIds = needFallback.Select(r => r.KorisnikId).Distinct().ToList();
                 var rezData = await _context.Rezervacije.AsNoTracking()
-                    .Where(r => !r.IsOtkazana && kIds.Contains(r.KorisnikId))
+                    .Where(r =>
+                        !r.IsOtkazana
+                        && !r.IsDeleted
+                        && r.Status == RezervacijaStatus.Completed
+                        && kIds.Contains(r.KorisnikId))
                     .Select(r => new
                     {
                         r.KorisnikId,
@@ -520,13 +616,34 @@ namespace NuaSpa.Application.Services
             if (entity == null) return false;
 
             if (string.IsNullOrWhiteSpace(tekst))
+            {
                 entity.AdminOdgovor = null;
+            }
             else
             {
                 var t = tekst.Trim();
-                entity.AdminOdgovor = t.Length > 2000 ? t[..2000] : t;
+                if (t.Length > 2000)
+                {
+                    throw new BusinessRuleException(
+                        "Salon response can be at most 2000 characters.");
+                }
+
+                entity.AdminOdgovor = t;
             }
 
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        public async Task<bool> SoftDeleteAsync(
+            int recenzijaId,
+            CancellationToken cancellationToken = default)
+        {
+            var entity = await _context.Recenzije
+                .FirstOrDefaultAsync(r => r.Id == recenzijaId && !r.IsDeleted, cancellationToken);
+            if (entity == null) return false;
+
+            entity.IsDeleted = true;
             await _context.SaveChangesAsync(cancellationToken);
             return true;
         }

@@ -10,4 +10,5 @@ public class TherapistReviewRowDto
     public int Ocjena { get; set; }
     public string Komentar { get; set; } = null!;
     public string UslugaNaziv { get; set; } = null!;
+    public string? AdminOdgovor { get; set; }
 }

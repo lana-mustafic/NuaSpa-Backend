@@ -2,6 +2,7 @@ namespace NuaSpa.Application.DTOs
 {
     public class RecenzijaCreateDTO
     {
+        public int RezervacijaId { get; set; }
         public int UslugaId { get; set; }
         public int ZaposlenikId { get; set; }
         public int Ocjena { get; set; }

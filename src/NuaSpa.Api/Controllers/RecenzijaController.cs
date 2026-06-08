@@ -8,7 +8,6 @@ using NuaSpa.Api.Extensions;
 using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
-using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers
 {
@@ -25,6 +24,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<ActionResult<PagedResult<RecenzijaDTO>>> Get(
             [FromQuery] int uslugaId,
             [FromQuery] int page = 1,
@@ -40,6 +40,7 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [AllowAnonymous]
         public async Task<ActionResult<RecenzijaDTO>> GetById(int id)
         {
             var dto = await _service.GetByIdAsync(id);
@@ -49,6 +50,22 @@ namespace NuaSpa.Api.Controllers
             }
 
             return Ok(dto);
+        }
+
+        [HttpGet("reviewable-visits")]
+        [Authorize(Roles = RoleConstants.KlijentAdmin)]
+        public async Task<ActionResult<IReadOnlyList<ReviewableVisitDto>>> GetReviewableVisits(
+            [FromQuery] int uslugaId,
+            CancellationToken cancellationToken = default)
+        {
+            if (uslugaId <= 0)
+            {
+                return BadRequest("Parametar uslugaId je obavezan.");
+            }
+
+            var userId = User.GetNuaSpaUserId();
+            var visits = await _service.GetReviewableVisitsAsync(userId, uslugaId, cancellationToken);
+            return Ok(visits);
         }
 
         [HttpGet("admin-dashboard")]
@@ -85,7 +102,7 @@ namespace NuaSpa.Api.Controllers
 
         [HttpGet("admin-dashboard/csv")]
         [Authorize(Roles = RoleConstants.Admin)]
-        public async Task<FileContentResult> GetAdminDashboardCsv(
+        public async Task<IActionResult> GetAdminDashboardCsv(
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to,
             [FromQuery] string? search = null,
@@ -98,7 +115,7 @@ namespace NuaSpa.Api.Controllers
             var toExclusive = (to ?? DateTime.Today).Date.AddDays(1);
             var fromDt = (from?.Date) ?? toExclusive.AddDays(-7);
 
-            var bytes = await _service.GetAdminDashboardCsvAsync(
+            var (bytes, truncated) = await _service.GetAdminDashboardCsvAsync(
                 fromDt,
                 toExclusive,
                 search,
@@ -108,10 +125,11 @@ namespace NuaSpa.Api.Controllers
                 zaposlenikId,
                 cancellationToken);
 
+            Response.Headers["X-Export-Truncated"] = truncated ? "true" : "false";
             return File(bytes, "text/csv; charset=utf-8", "recenzije.csv");
         }
 
-        [HttpPatch("{id}/admin-odgovor")]
+        [HttpPatch("{id:int}/admin-odgovor")]
         [Authorize(Roles = RoleConstants.Admin)]
         public async Task<IActionResult> PatchAdminOdgovor(
             int id,
@@ -119,6 +137,14 @@ namespace NuaSpa.Api.Controllers
             CancellationToken cancellationToken)
         {
             var ok = await _service.SetAdminOdgovorAsync(id, body?.Tekst, cancellationToken);
+            return ok ? NoContent() : NotFound();
+        }
+
+        [HttpDelete("{id:int}")]
+        [Authorize(Roles = RoleConstants.Admin)]
+        public async Task<IActionResult> SoftDelete(int id, CancellationToken cancellationToken)
+        {
+            var ok = await _service.SoftDeleteAsync(id, cancellationToken);
             return ok ? NoContent() : NotFound();
         }
 

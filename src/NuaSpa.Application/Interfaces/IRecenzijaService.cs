@@ -16,6 +16,11 @@ namespace NuaSpa.Application.Interfaces
 
         Task<RecenzijaDTO?> GetByIdAsync(int id);
 
+        Task<IReadOnlyList<ReviewableVisitDto>> GetReviewableVisitsAsync(
+            int korisnikId,
+            int uslugaId,
+            CancellationToken cancellationToken = default);
+
         Task<RecenzijaDTO> CreateAsync(int korisnikId, RecenzijaCreateDTO dto);
 
         Task<AdminReviewsDashboardDto> GetAdminDashboardAsync(
@@ -30,7 +35,7 @@ namespace NuaSpa.Application.Interfaces
             int? zaposlenikId,
             CancellationToken cancellationToken = default);
 
-        Task<byte[]> GetAdminDashboardCsvAsync(
+        Task<(byte[] Content, bool Truncated)> GetAdminDashboardCsvAsync(
             DateTime from,
             DateTime toExclusive,
             string? search,
@@ -44,6 +49,9 @@ namespace NuaSpa.Application.Interfaces
             int recenzijaId,
             string? tekst,
             CancellationToken cancellationToken = default);
+
+        Task<bool> SoftDeleteAsync(
+            int recenzijaId,
+            CancellationToken cancellationToken = default);
     }
 }
-

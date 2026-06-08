@@ -31,6 +31,11 @@ namespace NuaSpa.Domain.Entities
         public int? ZaposlenikId { get; set; }
         public Zaposlenik? Zaposlenik { get; set; }
 
+        /// <summary>Completed visit this review refers to (one review per reservation).</summary>
+        [ForeignKey("Rezervacija")]
+        public int? RezervacijaId { get; set; }
+        public Rezervacija? Rezervacija { get; set; }
+
         /// <summary>Javni odgovor salona na recenziju (admin).</summary>
         [MaxLength(2000)]
         public string? AdminOdgovor { get; set; }
