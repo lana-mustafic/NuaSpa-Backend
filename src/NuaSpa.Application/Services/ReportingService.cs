@@ -36,17 +36,22 @@ public class ReportingService : IReportingService
 
     private static decimal EffectiveRevenueAmount(Placanje p) => p.NaplaceniIznos ?? p.Iznos;
 
-    public async Task<byte[]> GenerateTopUslugeReport()
+    public async Task<byte[]> GenerateTopUslugeReport(DateTime from, DateTime to)
     {
-        var data = await _context.Rezervacije
-            .AsNoTracking()
-            .GroupBy(r => r.UslugaId)
+        var start = from.Date;
+        var endExclusive = to.Date.AddDays(1);
+
+        var data = await QueryPrihodnaPlacanja(start, endExclusive)
+            .Where(p => p.RezervacijaId != null && p.Rezervacija != null)
+            .GroupBy(p => p.Rezervacija!.UslugaId)
             .Select(g => new
             {
                 UslugaId = g.Key,
-                BrojRezervacija = g.Count(),
+                BrojPlacanja = g.Count(),
+                UkupnaZarada = g.Sum(x => x.NaplaceniIznos ?? x.Iznos),
             })
-            .OrderByDescending(x => x.BrojRezervacija)
+            .OrderByDescending(x => x.UkupnaZarada)
+            .ThenByDescending(x => x.BrojPlacanja)
             .Take(5)
             .Join(
                 _context.Usluge.AsNoTracking(),
@@ -55,12 +60,13 @@ public class ReportingService : IReportingService
                 (g, u) => new TopUslugaDTO
                 {
                     Naziv = u.Naziv,
-                    BrojRezervacija = g.BrojRezervacija,
-                    UkupnaZarada = g.BrojRezervacija * u.Cijena,
+                    BrojRezervacija = g.BrojPlacanja,
+                    UkupnaZarada = g.UkupnaZarada,
                 })
             .ToListAsync();
 
-        // 2. Kreiranje PDF dokumenta
+        var rangeLabel = $"{start:dd.MM.yyyy} – {to.Date:dd.MM.yyyy}";
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
@@ -70,9 +76,13 @@ public class ReportingService : IReportingService
                 page.PageColor(Colors.White);
                 page.DefaultTextStyle(x => x.FontSize(12));
 
-                // HEADER
-                page.Header().Text("NuaSpa - Top 5 Usluga Izvještaj")
-                    .SemiBold().FontSize(20).FontColor(Colors.Blue.Medium);
+                page.Header().Column(col =>
+                {
+                    col.Item().Text("NuaSpa - Top 5 Services Report")
+                        .SemiBold().FontSize(20).FontColor(Colors.Blue.Medium);
+                    col.Item().Text($"Period: {rangeLabel}")
+                        .FontSize(11).FontColor(Colors.Grey.Darken2);
+                });
 
                 // CONTENT
                 page.Content().PaddingVertical(10).Table(table =>
@@ -90,8 +100,8 @@ public class ReportingService : IReportingService
                     {
                         header.Cell().Text("#");
                         header.Cell().Text("Naziv usluge");
-                        header.Cell().Text("Broj rezervacija");
-                        header.Cell().Text("Ukupna zarada");
+                        header.Cell().Text("Payments");
+                        header.Cell().Text("Revenue (KM)");
                     });
 
                     // Podaci
@@ -295,6 +305,7 @@ public class ReportingService : IReportingService
             UslugaId = x.UslugaId,
             Naziv = nameMap.TryGetValue(x.UslugaId, out var n) ? n : "—",
             BrojRezervacija = x.BrojPlacanja,
+            BrojPlacanja = x.BrojPlacanja,
             Prihod = x.Prihod,
         }).ToList();
     }
@@ -336,6 +347,7 @@ public class ReportingService : IReportingService
                 ImePrezime = u == null ? $"#{x.KorisnikId}" : $"{u.Ime} {u.Prezime}",
                 Email = u?.Email,
                 BrojPosjeta = x.BrojPosjeta,
+                BrojPlacanja = x.BrojPosjeta,
                 UkupnoPotroseno = x.Ukupno,
                 ZadnjaPosjeta = x.Zadnja,
             };

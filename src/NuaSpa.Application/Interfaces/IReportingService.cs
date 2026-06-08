@@ -4,7 +4,7 @@ namespace NuaSpa.Application.Interfaces
 {
     public interface IReportingService
     {
-        Task<byte[]> GenerateTopUslugeReport();
+        Task<byte[]> GenerateTopUslugeReport(DateTime from, DateTime to);
 
         Task<AdminKpiDTO> GetAdminKpisAsync(DateTime date);
 
