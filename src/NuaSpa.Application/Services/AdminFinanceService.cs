@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -66,12 +67,19 @@ namespace NuaSpa.Application.Services
             var dtoRows = rowsEntities.Select(p => new AdminFinanceTransactionRowDto
             {
                 PlacanjeId = p.Id,
+                RezervacijaId = p.RezervacijaId,
                 TransakcijskiId = FormatPayId(p.Id, p.DatumPlacanja),
+                StripePaymentIntentId = p.TransakcijskiBroj.StartsWith("pi_", StringComparison.OrdinalIgnoreCase)
+                    ? p.TransakcijskiBroj
+                    : null,
                 KlijentPunoIme = FormatKlijent(p.Rezervacija),
                 UslugaTekst = FormatUslugaTekst(p.Rezervacija),
                 DatumVrijeme = p.DatumPlacanja,
-                Iznos = p.Iznos,
+                DatumZavrsetka = p.DatumZavrsetka,
+                Iznos = EffectiveAmount(p),
+                NaplaceniIznos = p.NaplaceniIznos,
                 MetodaLabel = FormatMethodLabel(p.MetodaPlacanja, p.TransakcijskiBroj),
+                StripeRefundId = p.StripeRefundId,
                 Status = MapStatus(p),
             }).ToList();
 
@@ -95,7 +103,7 @@ namespace NuaSpa.Application.Services
             };
         }
 
-        public async Task<byte[]> GetDashboardCsvAsync(
+        public async Task<AdminFinanceCsvResultDto> GetDashboardCsvAsync(
             DateTime from,
             DateTime toExclusive,
             string? search,
@@ -112,12 +120,21 @@ namespace NuaSpa.Application.Services
                 .OrderByDescending(p => p.DatumPlacanja)
                 .ThenByDescending(p => p.Id);
 
+            const int csvCap = PaginationConstants.MaxPageSize * 10;
+            var totalMatching = await q.CountAsync(cancellationToken);
             var all = await q
-                .Take(PaginationConstants.MaxPageSize * 10)
+                .Take(csvCap)
                 .ToListAsync(cancellationToken);
+            var truncated = totalMatching > csvCap;
 
             var sb = new StringBuilder();
             sb.Append('\uFEFF');
+            if (truncated)
+            {
+                sb.AppendLine(
+                    $"# WARNING: Export limited to {csvCap} of {totalMatching} matching transactions. Narrow filters or date range.");
+            }
+
             sb.AppendLine("Transaction ID;Client;Service;DateTime;Amount;Method;Status");
 
             foreach (var r in all)
@@ -126,14 +143,22 @@ namespace NuaSpa.Application.Services
                 var client = FormatKlijent(r.Rezervacija);
                 var svc = FormatUslugaTekst(r.Rezervacija);
                 var dt = r.DatumPlacanja.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
-                var amt = r.Iznos.ToString("0.##", CultureInfo.InvariantCulture);
+                var amt = EffectiveAmount(r).ToString("0.##", CultureInfo.InvariantCulture);
                 var meth = FormatMethodLabel(r.MetodaPlacanja, r.TransakcijskiBroj);
                 var st = MapStatus(r);
                 sb.AppendLine($"{id};{Csv(client)};{Csv(svc)};{dt};{amt};{Csv(meth)};{st}");
             }
 
-            return Encoding.UTF8.GetBytes(sb.ToString());
+            return new AdminFinanceCsvResultDto
+            {
+                Bytes = Encoding.UTF8.GetBytes(sb.ToString()),
+                Truncated = truncated,
+                ExportedRows = all.Count,
+                TotalMatchingRows = totalMatching,
+            };
         }
+
+        private static decimal EffectiveAmount(Placanje p) => p.NaplaceniIznos ?? p.Iznos;
 
         private static string Csv(string s)
         {
@@ -153,7 +178,8 @@ namespace NuaSpa.Application.Services
         {
             var q = _db.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)
-                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive);
+                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive)
+                .Where(p => p.Rezervacija == null || !p.Rezervacija.IsDeleted);
 
             if (uslugaId.HasValue)
             {
@@ -164,12 +190,15 @@ namespace NuaSpa.Application.Services
             if (!string.IsNullOrEmpty(searchNorm))
             {
                 var t = searchNorm.ToLowerInvariant();
+                var payId = TryParsePayIdFromSearch(searchNorm);
                 q = q.Where(p =>
+                    (payId != null && p.Id == payId.Value) ||
                     (p.TransakcijskiBroj ?? "").ToLower().Contains(t) ||
                     (p.Rezervacija != null &&
                      p.Rezervacija.Korisnik != null &&
                      p.Rezervacija.Usluga != null &&
-                     (p.Rezervacija.Korisnik.Ime.ToLower().Contains(t) ||
+                     ((p.Rezervacija.Korisnik.Ime + " " + p.Rezervacija.Korisnik.Prezime).ToLower().Contains(t) ||
+                      p.Rezervacija.Korisnik.Ime.ToLower().Contains(t) ||
                       p.Rezervacija.Korisnik.Prezime.ToLower().Contains(t) ||
                       p.Rezervacija.Usluga.Naziv.ToLower().Contains(t))));
             }
@@ -178,6 +207,7 @@ namespace NuaSpa.Application.Services
             {
                 "paid" => q.Where(p => p.Status == PlacanjeStatus.Completed),
                 "unpaid" => q.Where(p => p.Status == PlacanjeStatus.Pending),
+                "failed" => q.Where(p => p.Status == PlacanjeStatus.Failed),
                 "refunded" => q.Where(p => p.Status == PlacanjeStatus.Refunded),
                 _ => q,
             };
@@ -238,17 +268,12 @@ namespace NuaSpa.Application.Services
                 .Where(p => p.Status == PlacanjeStatus.Refunded)
                 .SumAsync(p => p.NaplaceniIznos ?? p.Iznos, ct);
 
-            var placeneRez = await _db.Rezervacije.AsNoTracking()
-                .Where(r => !r.IsDeleted)
-                .Where(r => r.IsPlacena && !r.IsOtkazana)
-                .Where(r => r.DatumRezervacije >= from && r.DatumRezervacije < toExclusive)
-                .CountAsync(ct);
+            // Payment-date aligned counts (consistent with transaction table filters).
+            var placeneRez = await placanjaQ
+                .CountAsync(p => p.Status == PlacanjeStatus.Completed, ct);
 
-            var neplaceneRez = await _db.Rezervacije.AsNoTracking()
-                .Where(r => !r.IsDeleted)
-                .Where(r => !r.IsPlacena && !r.IsOtkazana)
-                .Where(r => r.DatumRezervacije >= from && r.DatumRezervacije < toExclusive)
-                .CountAsync(ct);
+            var neplaceneRez = await placanjaQ
+                .CountAsync(p => p.Status == PlacanjeStatus.Pending, ct);
 
             return new KpiSnapshot
             {
@@ -286,14 +311,30 @@ namespace NuaSpa.Application.Services
 
         private static double? PctChange(decimal cur, decimal prev)
         {
-            if (prev == 0) return cur == 0 ? null : 100;
+            if (prev == 0) return cur == 0 ? null : null;
             return (double)((cur - prev) / prev * 100m);
         }
 
         private static double? PctChangeI(int cur, int prev)
         {
-            if (prev == 0) return cur == 0 ? null : 100;
+            if (prev == 0) return cur == 0 ? null : null;
             return (double)(100m * (cur - prev) / prev);
+        }
+
+        private static int? TryParsePayIdFromSearch(string search)
+        {
+            var payMatch = Regex.Match(search, @"#?pay-?\d{4}-?(\d+)", RegexOptions.IgnoreCase);
+            if (payMatch.Success && int.TryParse(payMatch.Groups[1].Value, out var fromPay))
+            {
+                return fromPay;
+            }
+
+            if (int.TryParse(search.Trim().TrimStart('#'), out var numeric))
+            {
+                return numeric;
+            }
+
+            return null;
         }
 
         private async Task<IList<AdminFinanceMethodShareDto>> MethodSharesAsync(
@@ -303,76 +344,56 @@ namespace NuaSpa.Application.Services
         {
             var baseQ = _db.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)
-                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive);
+                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive)
+                .Where(p => p.Status == PlacanjeStatus.Completed)
+                .Where(p => p.Rezervacija == null || !p.Rezervacija.IsDeleted);
 
-            var total = await baseQ.CountAsync(ct);
-            if (total == 0)
+            var completed = await baseQ.ToListAsync(ct);
+            if (completed.Count == 0)
             {
                 return new List<AdminFinanceMethodShareDto>
                 {
-                    new() { Kljuc = "card", Label = "Kartica", Postotak = 0 },
-                    new() { Kljuc = "cash", Label = "Gotovina", Postotak = 0 },
+                    new() { Kljuc = "card", Label = "Card", Postotak = 0 },
+                    new() { Kljuc = "cash", Label = "Cash", Postotak = 0 },
                     new() { Kljuc = "digital", Label = "Digital Wallets", Postotak = 0 },
-                    new() { Kljuc = "other", Label = "Ostalo", Postotak = 0 },
+                    new() { Kljuc = "other", Label = "Other", Postotak = 0 },
                 };
             }
 
-            var card = await baseQ.CountAsync(p =>
-                (p.MetodaPlacanja ?? "").Contains("stripe") ||
-                (p.MetodaPlacanja ?? "").Contains("Stripe") ||
-                (p.MetodaPlacanja ?? "").Contains("visa") ||
-                (p.MetodaPlacanja ?? "").Contains("Visa") ||
-                (p.MetodaPlacanja ?? "").Contains("master") ||
-                (p.MetodaPlacanja ?? "").Contains("Master") ||
-                (p.MetodaPlacanja ?? "").Contains("card") ||
-                (p.MetodaPlacanja ?? "").Contains("Card"), ct);
+            var card = completed.Count(p => BucketMethod(p.MetodaPlacanja) == "card");
+            var cash = completed.Count(p => BucketMethod(p.MetodaPlacanja) == "cash");
+            var digital = completed.Count(p => BucketMethod(p.MetodaPlacanja) == "digital");
+            var other = completed.Count - card - cash - digital;
+            if (other < 0) other = 0;
 
-            var cash = await baseQ.CountAsync(p =>
-                (p.MetodaPlacanja ?? "").Contains("gotovin") ||
-                (p.MetodaPlacanja ?? "").Contains("Gotovin"), ct);
-
-            var digital = await baseQ.CountAsync(p =>
-                (p.MetodaPlacanja ?? "").Contains("apple") ||
-                (p.MetodaPlacanja ?? "").Contains("Apple") ||
-                (p.MetodaPlacanja ?? "").Contains("google") ||
-                (p.MetodaPlacanja ?? "").Contains("Google") ||
-                (p.MetodaPlacanja ?? "").Contains("paypal") ||
-                (p.MetodaPlacanja ?? "").Contains("PayPal"), ct);
-
-            var other = total - card - cash - digital;
-            if (other < 0)
+            var totalD = (double)completed.Count;
+            var shares = new[]
             {
-                other = 0;
+                ("card", "Card", card),
+                ("cash", "Cash", cash),
+                ("digital", "Digital Wallets", digital),
+                ("other", "Other", other),
+            };
+            var rounded = shares
+                .Select(s => (s.Item1, s.Item2, Math.Round(100.0 * s.Item3 / totalD, 1)))
+                .ToList();
+            var drift = 100.0 - rounded.Sum(x => x.Item3);
+            if (Math.Abs(drift) >= 0.1 && rounded.Count > 0)
+            {
+                var idx = rounded.FindIndex(x => x.Item3 > 0);
+                if (idx >= 0)
+                {
+                    var fix = rounded[idx];
+                    rounded[idx] = (fix.Item1, fix.Item2, Math.Round(fix.Item3 + drift, 1));
+                }
             }
 
-            var totalD = (double)total;
-            return new List<AdminFinanceMethodShareDto>
+            return rounded.Select(s => new AdminFinanceMethodShareDto
             {
-                new()
-                {
-                    Kljuc = "card",
-                    Label = "Kartica",
-                    Postotak = Math.Round(100.0 * card / totalD, 1),
-                },
-                new()
-                {
-                    Kljuc = "cash",
-                    Label = "Gotovina",
-                    Postotak = Math.Round(100.0 * cash / totalD, 1),
-                },
-                new()
-                {
-                    Kljuc = "digital",
-                    Label = "Digital Wallets",
-                    Postotak = Math.Round(100.0 * digital / totalD, 1),
-                },
-                new()
-                {
-                    Kljuc = "other",
-                    Label = "Ostalo",
-                    Postotak = Math.Round(100.0 * other / totalD, 1),
-                },
-            };
+                Kljuc = s.Item1,
+                Label = s.Item2,
+                Postotak = s.Item3,
+            }).ToList();
         }
 
         private static string BucketMethod(string? metoda)
@@ -442,17 +463,22 @@ namespace NuaSpa.Application.Services
                 if (st == "refunded")
                 {
                     tip = "refund";
-                    opis = "Refund izvršen";
+                    opis = "Refund processed";
                 }
                 else if (st == "paid")
                 {
                     tip = "payment";
-                    opis = "Plaćanje uspješno";
+                    opis = "Payment received";
+                }
+                else if (st == "failed")
+                {
+                    tip = "failed";
+                    opis = "Payment failed";
                 }
                 else
                 {
                     tip = "pending";
-                    opis = "Plaćanje na čekanju";
+                    opis = "Payment pending";
                 }
 
                 list.Add(new AdminFinanceActivityDto
@@ -460,7 +486,7 @@ namespace NuaSpa.Application.Services
                     Tip = tip,
                     Opis = opis,
                     Klijent = klijent,
-                    Iznos = p.Iznos,
+                    Iznos = EffectiveAmount(p),
                     DatumVrijeme = p.DatumPlacanja,
                 });
             }
@@ -487,6 +513,7 @@ namespace NuaSpa.Application.Services
                 PlacanjeStatus.Refunded => "refunded",
                 PlacanjeStatus.Completed => "paid",
                 PlacanjeStatus.Pending => "unpaid",
+                PlacanjeStatus.Failed => "failed",
                 _ => "unpaid",
             };
         }
@@ -510,15 +537,19 @@ namespace NuaSpa.Application.Services
             var m = (metoda ?? "").ToLowerInvariant();
             if (m.Contains("stripe") || m.Contains("visa") || m.Contains("master") || m.Contains("card"))
             {
-                if (!string.IsNullOrEmpty(transBroj) && transBroj.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
-                    return "Stripe / Card";
-                return "Stripe / Card";
+                return "Card";
             }
 
-            if (m.Contains("gotovin"))
-                return "Gotovina";
+            if (m.Contains("gotovin") || m.Contains("cash"))
+                return "Cash";
             if (m.Contains("apple"))
                 return "Apple Pay";
+            if (m.Contains("google"))
+                return "Google Pay";
+            if (m.Contains("paypal"))
+                return "PayPal";
+            if (m.Contains("spa") || m.Contains("at spa"))
+                return "Pay at spa";
             return string.IsNullOrWhiteSpace(metoda) ? "—" : metoda;
         }
     }

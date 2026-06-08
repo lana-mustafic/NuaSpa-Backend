@@ -18,7 +18,7 @@ namespace NuaSpa.Application.Interfaces
             int? uslugaId,
             CancellationToken cancellationToken = default);
 
-        Task<byte[]> GetDashboardCsvAsync(
+        Task<AdminFinanceCsvResultDto> GetDashboardCsvAsync(
             DateTime from,
             DateTime toExclusive,
             string? search,

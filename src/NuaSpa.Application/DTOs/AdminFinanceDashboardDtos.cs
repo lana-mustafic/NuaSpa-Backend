@@ -36,14 +36,27 @@ public class AdminFinanceKpiDto
 public class AdminFinanceTransactionRowDto
 {
     public int PlacanjeId { get; set; }
+    public int? RezervacijaId { get; set; }
     public string TransakcijskiId { get; set; } = null!;
+    public string? StripePaymentIntentId { get; set; }
     public string KlijentPunoIme { get; set; } = null!;
     public string UslugaTekst { get; set; } = null!;
     public DateTime DatumVrijeme { get; set; }
+    public DateTime? DatumZavrsetka { get; set; }
     public decimal Iznos { get; set; }
+    public decimal? NaplaceniIznos { get; set; }
     public string MetodaLabel { get; set; } = null!;
-    /// <summary>paid | unpaid | refunded</summary>
+    public string? StripeRefundId { get; set; }
+    /// <summary>paid | unpaid | failed | refunded</summary>
     public string Status { get; set; } = null!;
+}
+
+public class AdminFinanceCsvResultDto
+{
+    public byte[] Bytes { get; set; } = Array.Empty<byte>();
+    public bool Truncated { get; set; }
+    public int ExportedRows { get; set; }
+    public int TotalMatchingRows { get; set; }
 }
 
 public class AdminFinanceMethodShareDto

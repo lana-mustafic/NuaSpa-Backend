@@ -29,14 +29,12 @@ public class ReportingService : IReportingService
     {
         return _context.Placanja.AsNoTracking()
             .Where(p => !p.IsDeleted)
+            .Where(p => p.Status == PlacanjeStatus.Completed)
             .Where(p => p.DatumPlacanja >= startInclusive && p.DatumPlacanja < endExclusive)
-            .Where(p =>
-                p.RezervacijaId == null
-                || (p.Rezervacija != null
-                    && !p.Rezervacija.IsDeleted
-                    && p.Rezervacija.IsPlacena
-                    && !p.Rezervacija.IsOtkazana));
+            .Where(p => p.Rezervacija == null || !p.Rezervacija.IsDeleted);
     }
+
+    private static decimal EffectiveRevenueAmount(Placanje p) => p.NaplaceniIznos ?? p.Iznos;
 
     public async Task<byte[]> GenerateTopUslugeReport()
     {
@@ -131,7 +129,8 @@ public class ReportingService : IReportingService
             .CountAsync();
 
         // Prihod iz stvarnih uplata (Placanja), ne iz cijene usluge na rezervaciji.
-        var prihodDanas = await QueryPrihodnaPlacanja(day, next).SumAsync(p => p.Iznos);
+        var prihodDanas = await QueryPrihodnaPlacanja(day, next)
+            .SumAsync(p => p.NaplaceniIznos ?? p.Iznos);
 
         var aktivniTerapeuti = await _context.Zaposlenici
             .AsNoTracking()
@@ -188,19 +187,20 @@ public class ReportingService : IReportingService
                 noviKlijenti = 0;
             }
 
-            prihod = await QueryPrihodnaPlacanja(dayStart, next).SumAsync(p => p.Iznos);
+            prihod = await QueryPrihodnaPlacanja(dayStart, next)
+                .SumAsync(p => p.NaplaceniIznos ?? p.Iznos);
         }
         else if (isZaposlenik)
         {
             prihod = await QueryPrihodnaPlacanja(dayStart, next)
                 .Where(p => p.Rezervacija != null && p.Rezervacija.ZaposlenikId == zaposlenikIdIfTherapist)
-                .SumAsync(p => p.Iznos);
+                .SumAsync(p => p.NaplaceniIznos ?? p.Iznos);
         }
         else if (isKlijent)
         {
             prihod = await QueryPrihodnaPlacanja(dayStart, next)
                 .Where(p => p.Rezervacija != null && p.Rezervacija.KorisnikId == currentUserId)
-                .SumAsync(p => p.Iznos);
+                .SumAsync(p => p.NaplaceniIznos ?? p.Iznos);
         }
 
         return new DesktopHomeOverviewDto
@@ -221,7 +221,7 @@ public class ReportingService : IReportingService
             .Select(g => new
             {
                 Datum = g.Key,
-                Prihod = g.Sum(x => x.Iznos),
+                Prihod = g.Sum(x => x.NaplaceniIznos ?? x.Iznos),
             })
             .ToListAsync();
 
@@ -271,7 +271,7 @@ public class ReportingService : IReportingService
             {
                 UslugaId = g.Key,
                 BrojPlacanja = g.Count(),
-                Prihod = g.Sum(x => x.Iznos),
+                Prihod = g.Sum(x => x.NaplaceniIznos ?? x.Iznos),
             })
             .OrderByDescending(x => x.Prihod)
             .ThenByDescending(x => x.BrojPlacanja)
@@ -310,7 +310,7 @@ public class ReportingService : IReportingService
             {
                 KorisnikId = g.Key,
                 BrojPosjeta = g.Count(),
-                Ukupno = g.Sum(x => x.Iznos),
+                Ukupno = g.Sum(x => x.NaplaceniIznos ?? x.Iznos),
                 Zadnja = g.Max(x => x.DatumPlacanja),
             })
             .OrderByDescending(x => x.Ukupno)
@@ -398,7 +398,7 @@ public class ReportingService : IReportingService
             list.Add(new ActivityFeedItemDto
             {
                 Tip = "payment",
-                Naslov = $"Payment · {p.Iznos:0.##} KM",
+                Naslov = $"Payment · {EffectiveRevenueAmount(p):0.##} KM",
                 Podnaslov = string.IsNullOrWhiteSpace(svc) ? "—" : svc,
                 DatumVrijeme = p.DatumPlacanja,
             });

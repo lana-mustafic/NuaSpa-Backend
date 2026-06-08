@@ -14,6 +14,9 @@ namespace NuaSpa.Api.Controllers
     [Authorize(Roles = RoleConstants.Admin)]
     public class AdminFinanceController : ControllerBase
     {
+        private static readonly string[] AllowedStatuses = { "all", "paid", "unpaid", "failed", "refunded" };
+        private static readonly string[] AllowedMethods = { "all", "card", "cash", "digital" };
+
         private readonly IAdminFinanceService _service;
 
         public AdminFinanceController(IAdminFinanceService service)
@@ -21,7 +24,12 @@ namespace NuaSpa.Api.Controllers
             _service = service;
         }
 
+        /// <summary>
+        /// Admin finance dashboard. Query: status = all|paid|unpaid|failed|refunded; methodCategory = all|card|cash|digital.
+        /// </summary>
         [HttpGet("dashboard")]
+        [ProducesResponseType(typeof(AdminFinanceDashboardDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<AdminFinanceDashboardDto>> GetDashboard(
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to,
@@ -33,8 +41,20 @@ namespace NuaSpa.Api.Controllers
             [FromQuery] int? uslugaId = null,
             CancellationToken cancellationToken = default)
         {
-            var toExclusive = (to?.Date ?? DateTime.Today).AddDays(1);
-            var fromDt = (from?.Date) ?? toExclusive.AddDays(-30);
+            if (!TryNormalizeRange(from, to, out var fromDt, out var toExclusive, out var rangeError))
+            {
+                return BadRequest(rangeError);
+            }
+
+            if (!IsAllowed(status, AllowedStatuses, out var statusError))
+            {
+                return BadRequest(statusError);
+            }
+
+            if (!IsAllowed(methodCategory, AllowedMethods, out var methodError))
+            {
+                return BadRequest(methodError);
+            }
 
             var dto = await _service.GetDashboardAsync(
                 fromDt,
@@ -51,7 +71,9 @@ namespace NuaSpa.Api.Controllers
         }
 
         [HttpGet("dashboard/csv")]
-        public async Task<FileContentResult> GetDashboardCsv(
+        [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetDashboardCsv(
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to,
             [FromQuery] string? search = null,
@@ -60,10 +82,22 @@ namespace NuaSpa.Api.Controllers
             [FromQuery] int? uslugaId = null,
             CancellationToken cancellationToken = default)
         {
-            var toExclusive = (to?.Date ?? DateTime.Today).AddDays(1);
-            var fromDt = (from?.Date) ?? toExclusive.AddDays(-30);
+            if (!TryNormalizeRange(from, to, out var fromDt, out var toExclusive, out var rangeError))
+            {
+                return BadRequest(rangeError);
+            }
 
-            var bytes = await _service.GetDashboardCsvAsync(
+            if (!IsAllowed(status, AllowedStatuses, out var statusError))
+            {
+                return BadRequest(statusError);
+            }
+
+            if (!IsAllowed(methodCategory, AllowedMethods, out var methodError))
+            {
+                return BadRequest(methodError);
+            }
+
+            var result = await _service.GetDashboardCsvAsync(
                 fromDt,
                 toExclusive,
                 search,
@@ -73,7 +107,44 @@ namespace NuaSpa.Api.Controllers
                 cancellationToken);
 
             var fname = $"placanja_{fromDt:yyyyMMdd}_{toExclusive.AddDays(-1):yyyyMMdd}.csv";
-            return File(bytes, "text/csv; charset=utf-8", fname);
+            Response.Headers["X-Export-Truncated"] = result.Truncated ? "true" : "false";
+            Response.Headers["X-Export-Rows"] = result.ExportedRows.ToString();
+            Response.Headers["X-Export-Total"] = result.TotalMatchingRows.ToString();
+            return File(result.Bytes, "text/csv; charset=utf-8", fname);
+        }
+
+        private static bool TryNormalizeRange(
+            DateTime? from,
+            DateTime? to,
+            out DateTime fromDt,
+            out DateTime toExclusive,
+            out string error)
+        {
+            var todayUtc = DateTime.UtcNow.Date;
+            toExclusive = (to?.Date ?? todayUtc).AddDays(1);
+            fromDt = from?.Date ?? toExclusive.AddDays(-30);
+
+            if (fromDt > toExclusive.AddDays(-1))
+            {
+                error = "Invalid date range: 'from' must be on or before 'to'.";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool IsAllowed(string? value, string[] allowed, out string error)
+        {
+            var norm = (value ?? "all").Trim().ToLowerInvariant();
+            if (Array.IndexOf(allowed, norm) < 0)
+            {
+                error = $"Invalid value '{value}'. Allowed: {string.Join(", ", allowed)}.";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
         }
     }
 }
