@@ -311,13 +311,13 @@ namespace NuaSpa.Application.Services
 
         private static double? PctChange(decimal cur, decimal prev)
         {
-            if (prev == 0) return cur == 0 ? null : null;
+            if (prev == 0) return cur == 0 ? null : 100.0;
             return (double)((cur - prev) / prev * 100m);
         }
 
         private static double? PctChangeI(int cur, int prev)
         {
-            if (prev == 0) return cur == 0 ? null : null;
+            if (prev == 0) return cur == 0 ? null : 100.0;
             return (double)(100m * (cur - prev) / prev);
         }
 
