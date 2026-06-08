@@ -255,7 +255,8 @@ namespace NuaSpa.Application.Services
         {
             var placanjaQ = _db.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)
-                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive);
+                .Where(p => p.DatumPlacanja >= from && p.DatumPlacanja < toExclusive)
+                .Where(p => p.Rezervacija == null || !p.Rezervacija.IsDeleted);
 
             var revenue = await placanjaQ
                 .Where(p => p.Status == PlacanjeStatus.Completed)
@@ -264,8 +265,11 @@ namespace NuaSpa.Application.Services
             var paidTx = await placanjaQ
                 .CountAsync(p => p.Status == PlacanjeStatus.Completed, ct);
 
-            var refunds = await placanjaQ
+            var refunds = await _db.Placanja.AsNoTracking()
+                .Where(p => !p.IsDeleted)
                 .Where(p => p.Status == PlacanjeStatus.Refunded)
+                .Where(p => p.RefundedAtUtc != null)
+                .Where(p => p.RefundedAtUtc >= from && p.RefundedAtUtc < toExclusive)
                 .SumAsync(p => p.NaplaceniIznos ?? p.Iznos, ct);
 
             // Payment-date aligned counts (consistent with transaction table filters).
