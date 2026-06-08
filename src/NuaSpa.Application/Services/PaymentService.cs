@@ -202,7 +202,7 @@ public class PaymentService : IPaymentService
             throw new NotFoundException("Nema završenog Stripe plaćanja za refund.");
         }
 
-        return await ExecuteStripeRefundAsync(placanje, ct);
+        return await ExecuteStripeRefundAsync(placanje, userId, ct);
     }
 
     public async Task<RefundPaymentResponseDto?> RefundIfPaidAsync(
@@ -220,7 +220,74 @@ public class PaymentService : IPaymentService
             return BuildRefundResponse(placanje, alreadyRefunded: true);
         }
 
-        return await ExecuteStripeRefundAsync(placanje, ct);
+        return await ExecuteStripeRefundAsync(placanje, refundedByUserId: null, ct);
+    }
+
+    public async Task<RecordCashPaymentResponseDto> RecordCashPaymentAsync(
+        int rezervacijaId,
+        int userId,
+        decimal? iznos,
+        CancellationToken ct)
+    {
+        var rez = await _context.Rezervacije
+            .Include(r => r.Usluga)
+            .FirstOrDefaultAsync(r => r.Id == rezervacijaId && !r.IsDeleted, ct)
+            ?? throw new NotFoundException("Reservation not found.");
+
+        if (rez.IsOtkazana)
+        {
+            throw new BusinessRuleException("Cannot record payment for a cancelled reservation.");
+        }
+
+        var existing = await _context.Placanja
+            .Where(p => p.RezervacijaId == rezervacijaId && !p.IsDeleted)
+            .Where(p => p.Status == PlacanjeStatus.Completed || p.Status == PlacanjeStatus.Pending)
+            .OrderByDescending(p => p.DatumPlacanja)
+            .FirstOrDefaultAsync(ct);
+
+        if (existing != null)
+        {
+            return new RecordCashPaymentResponseDto
+            {
+                PlacanjeId = existing.Id,
+                TransactionId = $"#PAY-{existing.DatumPlacanja.Year}-{existing.Id:D5}",
+                Amount = existing.NaplaceniIznos ?? existing.Iznos,
+                AlreadyRecorded = true,
+            };
+        }
+
+        var amount = iznos ?? rez.Usluga?.Cijena ?? 0m;
+        if (amount <= 0)
+        {
+            throw new BusinessRuleException("Payment amount must be greater than zero.");
+        }
+
+        var now = DateTime.UtcNow;
+        var cashRef = $"cash-{rezervacijaId}-{now:yyyyMMddHHmmss}";
+        var placanje = new Placanje
+        {
+            RezervacijaId = rezervacijaId,
+            Iznos = amount,
+            NaplaceniIznos = amount,
+            DatumPlacanja = now,
+            DatumZavrsetka = now,
+            MetodaPlacanja = "Gotovina",
+            TransakcijskiBroj = cashRef,
+            Status = PlacanjeStatus.Completed,
+            CreatedAt = now,
+            IsDeleted = false,
+        };
+        _context.Placanja.Add(placanje);
+        rez.IsPlacena = true;
+        await _context.SaveChangesAsync(ct);
+
+        return new RecordCashPaymentResponseDto
+        {
+            PlacanjeId = placanje.Id,
+            TransactionId = $"#PAY-{placanje.DatumPlacanja.Year}-{placanje.Id:D5}",
+            Amount = amount,
+            AlreadyRecorded = false,
+        };
     }
 
     private async Task<Placanje?> FindStripePlacanjeForRefundAsync(
@@ -252,6 +319,7 @@ public class PaymentService : IPaymentService
 
     private async Task<RefundPaymentResponseDto> ExecuteStripeRefundAsync(
         Placanje placanje,
+        int? refundedByUserId,
         CancellationToken ct)
     {
         if (placanje.Rezervacija == null)
@@ -291,6 +359,9 @@ public class PaymentService : IPaymentService
         var refundedAmount = FromStripeMinorUnits(refundMinor);
         placanje.Status = PlacanjeStatus.Refunded;
         placanje.StripeRefundId = refund.Id;
+        placanje.NaplaceniIznos = refundedAmount;
+        placanje.RefundedByUserId = refundedByUserId;
+        placanje.RefundedAtUtc = DateTime.UtcNow;
         placanje.Rezervacija.IsPlacena = false;
 
         await _context.SaveChangesAsync(ct);
@@ -393,6 +464,12 @@ public class PaymentService : IPaymentService
                     if (charge.AmountRefunded > 0)
                     {
                         placanje.NaplaceniIznos = FromStripeMinorUnits(charge.AmountRefunded);
+                    }
+
+                    placanje.RefundedAtUtc = DateTime.UtcNow;
+                    if (!string.IsNullOrWhiteSpace(charge.Refunds?.Data?.FirstOrDefault()?.Id))
+                    {
+                        placanje.StripeRefundId = charge.Refunds.Data[0].Id;
                     }
 
                     await _context.SaveChangesAsync(ct);

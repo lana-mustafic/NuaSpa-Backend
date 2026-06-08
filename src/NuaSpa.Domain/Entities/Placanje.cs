@@ -32,6 +32,10 @@ public class Placanje : BaseEntity
     [MaxLength(100)]
     public string? StripeRefundId { get; set; }
 
+    public int? RefundedByUserId { get; set; }
+
+    public DateTime? RefundedAtUtc { get; set; }
+
     public PlacanjeStatus Status { get; set; } = PlacanjeStatus.Pending;
 
     [ForeignKey("Rezervacija")]

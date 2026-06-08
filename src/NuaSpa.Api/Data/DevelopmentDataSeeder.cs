@@ -50,6 +50,7 @@ public static class DevelopmentDataSeeder
         await EnsureProizvodiAsync(context, cancellationToken);
         await EnsureRezervacijeAndRecenzijeAsync(
             context, clients, therapists, servicesList, cancellationToken);
+        await EnsurePlacanjaAsync(context, cancellationToken);
 
         await SyncTherapistServiceSpecializationsAsync(context, logger, cancellationToken);
         logger.LogInformation("Dev seed: test podaci uspješno dodani.");
@@ -519,6 +520,78 @@ public static class DevelopmentDataSeeder
                     IsDeleted = false,
                 });
             }
+        }
+
+        await context.SaveChangesAsync(ct);
+    }
+
+    private static async Task EnsurePlacanjaAsync(NuaSpaContext context, CancellationToken ct)
+    {
+        if (await context.Placanja.CountAsync(p => !p.IsDeleted, ct) >= 6)
+        {
+            return;
+        }
+
+        var rng = new Random(424242);
+        var paidReservations = await context.Rezervacije
+            .Include(r => r.Usluga)
+            .Where(r => !r.IsDeleted && r.IsPlacena && !r.IsOtkazana)
+            .OrderByDescending(r => r.DatumRezervacije)
+            .Take(10)
+            .ToListAsync(ct);
+
+        foreach (var rez in paidReservations)
+        {
+            if (await context.Placanja.AnyAsync(p => !p.IsDeleted && p.RezervacijaId == rez.Id, ct))
+            {
+                continue;
+            }
+
+            var amount = rez.Usluga?.Cijena ?? 80m;
+            var paidAt = rez.DatumRezervacije.AddHours(-1);
+            var isCash = rng.NextDouble() > 0.55;
+            context.Placanja.Add(new Placanje
+            {
+                RezervacijaId = rez.Id,
+                Iznos = amount,
+                NaplaceniIznos = amount,
+                DatumPlacanja = paidAt,
+                DatumZavrsetka = paidAt,
+                MetodaPlacanja = isCash ? "Gotovina" : "Stripe",
+                TransakcijskiBroj = isCash
+                    ? $"cash-{rez.Id}-{paidAt:yyyyMMdd}"
+                    : $"pi_seed_{rez.Id}_{paidAt:yyyyMMdd}",
+                Status = PlacanjeStatus.Completed,
+                CreatedAt = paidAt,
+                IsDeleted = false,
+            });
+        }
+
+        var pending = await context.Rezervacije
+            .Include(r => r.Usluga)
+            .Where(r => !r.IsDeleted && !r.IsPlacena && !r.IsOtkazana && r.DatumRezervacije >= DateTime.UtcNow)
+            .Take(3)
+            .ToListAsync(ct);
+
+        foreach (var rez in pending)
+        {
+            if (await context.Placanja.AnyAsync(p => !p.IsDeleted && p.RezervacijaId == rez.Id, ct))
+            {
+                continue;
+            }
+
+            var amount = rez.Usluga?.Cijena ?? 60m;
+            context.Placanja.Add(new Placanje
+            {
+                RezervacijaId = rez.Id,
+                Iznos = amount,
+                DatumPlacanja = DateTime.UtcNow,
+                MetodaPlacanja = "Stripe",
+                TransakcijskiBroj = $"pi_pending_{rez.Id}",
+                Status = PlacanjeStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false,
+            });
         }
 
         await context.SaveChangesAsync(ct);

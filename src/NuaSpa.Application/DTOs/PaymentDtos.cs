@@ -37,3 +37,17 @@ public class RefundPaymentResponseDto
     public decimal RefundedAmount { get; set; }
     public bool IsRefunded { get; set; }
 }
+
+public class RecordCashPaymentRequestDto
+{
+    public int RezervacijaId { get; set; }
+    public decimal? Iznos { get; set; }
+}
+
+public class RecordCashPaymentResponseDto
+{
+    public int PlacanjeId { get; set; }
+    public string TransactionId { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public bool AlreadyRecorded { get; set; }
+}

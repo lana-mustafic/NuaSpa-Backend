@@ -35,5 +35,11 @@ namespace NuaSpa.Application.Interfaces
             string requestBodyJson,
             string stripeSignatureHeader,
             CancellationToken ct);
+
+        Task<RecordCashPaymentResponseDto> RecordCashPaymentAsync(
+            int rezervacijaId,
+            int userId,
+            decimal? iznos,
+            CancellationToken ct);
     }
 }

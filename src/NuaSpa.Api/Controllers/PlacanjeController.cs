@@ -59,6 +59,21 @@ namespace NuaSpa.Api.Controllers
         }
 
         /// <summary>Refund na osnovu stvarno naplaćenog iznosa (Stripe PaymentIntent).</summary>
+        [HttpPost("record-cash")]
+        [Authorize(Roles = RoleConstants.Admin)]
+        public async Task<ActionResult<RecordCashPaymentResponseDto>> RecordCash(
+            [FromBody] RecordCashPaymentRequestDto request,
+            CancellationToken ct = default)
+        {
+            var userId = User.GetNuaSpaUserId();
+            var dto = await _paymentService.RecordCashPaymentAsync(
+                request.RezervacijaId,
+                userId,
+                request.Iznos,
+                ct);
+            return Ok(dto);
+        }
+
         [HttpPost("refund")]
         [Authorize(Roles = RoleConstants.Admin)]
         public async Task<ActionResult<RefundPaymentResponseDto>> Refund(

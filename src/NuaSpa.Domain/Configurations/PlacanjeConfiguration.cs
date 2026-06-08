@@ -18,6 +18,8 @@ public class PlacanjeConfiguration : IEntityTypeConfiguration<Placanje>
 
         builder.HasIndex(p => p.RezervacijaId);
         builder.HasIndex(p => p.TransakcijskiBroj).IsUnique();
+        builder.HasIndex(p => p.DatumPlacanja);
+        builder.HasIndex(p => new { p.DatumPlacanja, p.Status });
 
         builder.HasOne(p => p.Rezervacija)
             .WithMany()
