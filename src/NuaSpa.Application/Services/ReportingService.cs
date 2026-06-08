@@ -177,7 +177,7 @@ public class ReportingService : IReportingService
             {
                 noviKlijenti = await _context.Users
                     .AsNoTracking()
-                    .Where(u => u.DatumRegistracije >= registracijeOd)
+                    .Where(u => u.DatumRegistracije >= registracijeOd && u.DatumRegistracije < next)
                     .Where(u => _context.UserRoles.Any(
                         ur => ur.UserId == u.Id && ur.RoleId == klijentRoleId.Value))
                     .CountAsync();
