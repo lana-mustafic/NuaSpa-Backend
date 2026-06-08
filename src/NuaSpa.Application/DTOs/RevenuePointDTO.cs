@@ -7,6 +7,9 @@ public class RevenuePointDTO
     /// <summary>Svi termini zakazani za taj dan (bez obrisanih).</summary>
     public int BrojRezervacija { get; set; }
 
+    /// <summary>Broj uspješnih uplata za taj dan (DatumPlacanja).</summary>
+    public int BrojPlacanja { get; set; }
+
     /// <summary>Potvrđeni i nisu otkazani.</summary>
     public int BrojPotvrdjenih { get; set; }
 

@@ -222,6 +222,7 @@ public class ReportingService : IReportingService
             {
                 Datum = g.Key,
                 Prihod = g.Sum(x => x.NaplaceniIznos ?? x.Iznos),
+                BrojPlacanja = g.Count(),
             })
             .ToListAsync();
 
@@ -238,12 +239,12 @@ public class ReportingService : IReportingService
             })
             .ToListAsync();
 
-        var revenueMap = fromDb.ToDictionary(x => x.Datum, x => x.Prihod);
+        var revenueMap = fromDb.ToDictionary(x => x.Datum);
         var bookingMap = bookingsByDay.ToDictionary(x => x.Datum);
         var list = new List<RevenuePointDTO>();
         for (var d = start; d < endExclusive; d = d.AddDays(1))
         {
-            revenueMap.TryGetValue(d, out var prihod);
+            revenueMap.TryGetValue(d, out var dayRevenue);
             bookingMap.TryGetValue(d, out var dayStats);
             list.Add(new RevenuePointDTO
             {
@@ -251,7 +252,8 @@ public class ReportingService : IReportingService
                 BrojRezervacija = dayStats?.Count ?? 0,
                 BrojPotvrdjenih = dayStats?.Potvrdjeni ?? 0,
                 BrojOtkazanih = dayStats?.Otkazani ?? 0,
-                Prihod = prihod,
+                BrojPlacanja = dayRevenue?.BrojPlacanja ?? 0,
+                Prihod = dayRevenue?.Prihod ?? 0,
             });
         }
 
