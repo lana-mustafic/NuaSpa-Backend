@@ -13,5 +13,6 @@ public interface INotificationPublisher
         string otkazaoUloga,
         CancellationToken cancellationToken = default);
     Task PublishTherapistInviteAsync(TherapistInviteEmailMessage message, CancellationToken cancellationToken = default);
+    Task PublishPasswordResetAsync(PasswordResetEmailMessage message, CancellationToken cancellationToken = default);
     Task PublishUslugaKreiranaAsync(UslugaDTO usluga, string? adminEmail = null, CancellationToken cancellationToken = default);
 }

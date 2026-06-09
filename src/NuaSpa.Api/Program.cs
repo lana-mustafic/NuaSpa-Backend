@@ -148,6 +148,8 @@ if (string.IsNullOrWhiteSpace(jwtSettings.Key) || jwtSettings.Key.Length < 32)
 }
 
 builder.Services.AddSingleton(jwtSettings);
+builder.Services.Configure<PasswordResetOptions>(
+    builder.Configuration.GetSection(PasswordResetOptions.SectionName));
 
 var stripeSettings = new StripeSettings();
 builder.Configuration.GetSection("Stripe").Bind(stripeSettings);

@@ -4,10 +4,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NuaSpa.Application.Common;
+using NuaSpa.Application.Configuration;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
+using NuaSpa.Application.Interfaces.Messaging;
+using NuaSpa.Application.Messaging.Messages;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using NuaSpa.Domain.Enums;
@@ -17,11 +21,15 @@ namespace NuaSpa.Application.Services;
 public class AuthService : IAuthService
 {
     private const string InvalidCredentialsMessage = "Invalid username or password.";
+    private const string PasswordResetAcknowledgement =
+        "If an account exists with that email, you will receive password reset instructions shortly.";
 
     private readonly UserManager<Korisnik> _userManager;
     private readonly ITokenService _tokenService;
     private readonly ITokenRevocationService _tokenRevocationService;
     private readonly ITherapistAccountService _therapistAccountService;
+    private readonly INotificationPublisher _notificationPublisher;
+    private readonly PasswordResetOptions _passwordResetOptions;
     private readonly NuaSpaContext _context;
 
     public AuthService(
@@ -29,12 +37,16 @@ public class AuthService : IAuthService
         ITokenService tokenService,
         ITokenRevocationService tokenRevocationService,
         ITherapistAccountService therapistAccountService,
+        INotificationPublisher notificationPublisher,
+        IOptions<PasswordResetOptions> passwordResetOptions,
         NuaSpaContext context)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _tokenRevocationService = tokenRevocationService;
         _therapistAccountService = therapistAccountService;
+        _notificationPublisher = notificationPublisher;
+        _passwordResetOptions = passwordResetOptions.Value;
         _context = context;
     }
 
@@ -217,6 +229,109 @@ public class AuthService : IAuthService
             Token = issued.Token,
             Expiration = issued.ExpiresAtUtc.ToLocalTime(),
         };
+    }
+
+    public async Task<ForgotPasswordResponseDto> RequestPasswordResetAsync(
+        ForgotPasswordRequestDto dto,
+        bool includeDevResetUrl,
+        CancellationToken ct)
+    {
+        var response = new ForgotPasswordResponseDto
+        {
+            Message = PasswordResetAcknowledgement,
+        };
+
+        var email = dto.Email.Trim();
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null || !user.Status || !await _userManager.HasPasswordAsync(user))
+        {
+            return response;
+        }
+
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var expiresAtUtc = DateTime.UtcNow.AddHours(_passwordResetOptions.TokenLifespanHours);
+        var resetUrl = BuildPasswordResetUrl(email, resetToken);
+        var displayName = $"{user.Ime} {user.Prezime}".Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            displayName = user.UserName ?? email;
+        }
+
+        try
+        {
+            await _notificationPublisher.PublishPasswordResetAsync(
+                new PasswordResetEmailMessage
+                {
+                    ToEmail = email,
+                    DisplayName = displayName,
+                    ResetUrl = resetUrl,
+                    ExpiresAtUtc = expiresAtUtc,
+                },
+                ct);
+        }
+        catch
+        {
+            // Do not reveal whether the account exists.
+            return response;
+        }
+
+        if (includeDevResetUrl)
+        {
+            response.DevResetUrl = resetUrl;
+        }
+
+        return response;
+    }
+
+    public async Task<ResetPasswordResponseDto> ResetPasswordAsync(
+        ResetPasswordRequestDto dto,
+        CancellationToken ct)
+    {
+        if (dto.Password != dto.ConfirmPassword)
+        {
+            throw new BusinessRuleException("Passwords do not match.");
+        }
+
+        var email = dto.Email.Trim();
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null)
+        {
+            throw new BusinessRuleException("Invalid or expired reset link. Request a new password reset.");
+        }
+
+        if (!user.Status)
+        {
+            throw new BusinessRuleException("Account is deactivated. Contact your spa administrator.");
+        }
+
+        var result = await _userManager.ResetPasswordAsync(user, dto.Token, dto.Password);
+        if (!result.Succeeded)
+        {
+            throw new BusinessRuleException(
+                "Invalid or expired reset link. Request a new password reset.");
+        }
+
+        await _userManager.ResetAccessFailedCountAsync(user);
+        user.LockoutEnabled = true;
+        await _userManager.UpdateAsync(user);
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var issued = _tokenService.CreateToken(user, roles);
+
+        return new ResetPasswordResponseDto
+        {
+            Message = "Password reset successfully. Signing you in…",
+            Token = issued.Token,
+            Username = user.UserName ?? string.Empty,
+            Expiration = issued.ExpiresAtUtc.ToLocalTime(),
+        };
+    }
+
+    private string BuildPasswordResetUrl(string email, string token)
+    {
+        var baseUrl = _passwordResetOptions.BaseUrl.Trim();
+        var separator = baseUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        return $"{baseUrl}{separator}email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
     }
 
     private async Task EnsureLockoutEnabledAsync(Korisnik user)

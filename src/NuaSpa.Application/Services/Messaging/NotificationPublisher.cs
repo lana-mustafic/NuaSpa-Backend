@@ -73,6 +73,13 @@ public sealed class NotificationPublisher : INotificationPublisher
         return _publisher.PublishAsync(NuaSpaMessageTypes.TherapistInvite, message, cancellationToken);
     }
 
+    public Task PublishPasswordResetAsync(
+        PasswordResetEmailMessage message,
+        CancellationToken cancellationToken = default)
+    {
+        return _publisher.PublishAsync(NuaSpaMessageTypes.PasswordReset, message, cancellationToken);
+    }
+
     public Task PublishUslugaKreiranaAsync(
         UslugaDTO usluga,
         string? adminEmail,

@@ -6,6 +6,7 @@ public static class NuaSpaMessageTypes
     public const string RezervacijaPotvrda = "rezervacija.potvrda";
     public const string RezervacijaOtkazana = "rezervacija.otkazana";
     public const string TherapistInvite = "therapist.invite";
+    public const string PasswordReset = "account.password_reset";
     public const string UslugaKreirana = "usluga.kreirana";
     public const string SendEmail = "email.send";
 }

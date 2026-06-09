@@ -34,6 +34,9 @@ public sealed class NotificationMessageDispatcher
             case NuaSpaMessageTypes.TherapistInvite:
                 await HandleTherapistInviteAsync(envelope.PayloadJson, cancellationToken);
                 break;
+            case NuaSpaMessageTypes.PasswordReset:
+                await HandlePasswordResetAsync(envelope.PayloadJson, cancellationToken);
+                break;
             case NuaSpaMessageTypes.UslugaKreirana:
                 await HandleUslugaKreiranaAsync(envelope.PayloadJson, cancellationToken);
                 break;
@@ -125,6 +128,28 @@ public sealed class NotificationMessageDispatcher
             "NuaSpa — aktivacija terapeutskog računa",
             html,
             $"Aktivirajte račun: {m.InviteUrl}",
+            ct);
+    }
+
+    private async Task HandlePasswordResetAsync(string json, CancellationToken ct)
+    {
+        var m = JsonSerializer.Deserialize<PasswordResetEmailMessage>(json)
+            ?? throw new InvalidOperationException("Neispravan PasswordResetEmailMessage payload.");
+
+        var html = $"""
+            <h2>NuaSpa — reset your password</h2>
+            <p>Hello {System.Net.WebUtility.HtmlEncode(m.DisplayName)},</p>
+            <p>We received a request to reset your NuaSpa account password.</p>
+            <p><a href="{System.Net.WebUtility.HtmlEncode(m.ResetUrl)}">Reset password</a></p>
+            <p>This link expires on {m.ExpiresAtUtc:dd.MM.yyyy HH:mm} UTC.</p>
+            <p>If you did not request this, you can ignore this email.</p>
+            """;
+
+        await _emailSender.SendAsync(
+            m.ToEmail,
+            "NuaSpa — password reset",
+            html,
+            $"Reset your password: {m.ResetUrl}",
             ct);
     }
 

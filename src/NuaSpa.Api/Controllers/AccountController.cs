@@ -14,13 +14,16 @@ public class AccountController : ControllerBase
 {
     private readonly ITherapistAccountService _therapistAccountService;
     private readonly IAuthService _authService;
+    private readonly IWebHostEnvironment _environment;
 
     public AccountController(
         ITherapistAccountService therapistAccountService,
-        IAuthService authService)
+        IAuthService authService,
+        IWebHostEnvironment environment)
     {
         _therapistAccountService = therapistAccountService;
         _authService = authService;
+        _environment = environment;
     }
 
     [AllowAnonymous]
@@ -45,6 +48,27 @@ public class AccountController : ControllerBase
         [FromBody] AcceptTherapistInviteDto dto)
     {
         var response = await _authService.AcceptInviteAsync(dto, HttpContext.RequestAborted);
+        return Ok(response);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    public async Task<ActionResult<ForgotPasswordResponseDto>> ForgotPassword(
+        [FromBody] ForgotPasswordRequestDto dto)
+    {
+        var response = await _authService.RequestPasswordResetAsync(
+            dto,
+            includeDevResetUrl: _environment.IsDevelopment(),
+            HttpContext.RequestAborted);
+        return Ok(response);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    public async Task<ActionResult<ResetPasswordResponseDto>> ResetPassword(
+        [FromBody] ResetPasswordRequestDto dto)
+    {
+        var response = await _authService.ResetPasswordAsync(dto, HttpContext.RequestAborted);
         return Ok(response);
     }
 

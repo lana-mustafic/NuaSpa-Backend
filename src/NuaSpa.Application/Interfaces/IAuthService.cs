@@ -16,6 +16,13 @@ namespace NuaSpa.Application.Interfaces
             DateTime? revokeTokenExpiresUtc,
             CancellationToken ct);
         Task LogoutAsync(string jti, DateTime expiresAtUtc, CancellationToken ct);
+        Task<ForgotPasswordResponseDto> RequestPasswordResetAsync(
+            ForgotPasswordRequestDto dto,
+            bool includeDevResetUrl,
+            CancellationToken ct);
+        Task<ResetPasswordResponseDto> ResetPasswordAsync(
+            ResetPasswordRequestDto dto,
+            CancellationToken ct);
     }
 }
 
