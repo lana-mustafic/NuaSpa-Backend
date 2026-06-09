@@ -37,6 +37,7 @@ namespace NuaSpa.Domain
         public DbSet<Prostorija> Prostorije { get; set; } = null!;
         public DbSet<Oprema> Oprema { get; set; } = null!;
         public DbSet<RevokedJwt> RevokedJwts { get; set; } = null!;
+        public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
