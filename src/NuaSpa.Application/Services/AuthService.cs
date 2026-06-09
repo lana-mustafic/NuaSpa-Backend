@@ -89,6 +89,31 @@ public class AuthService : IAuthService
         };
     }
 
+    public async Task<AccountProfileDto> GetMeAsync(int userId, CancellationToken ct)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            throw new NotFoundException("Korisnik nije pronađen.");
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var hasPassword = await _userManager.HasPasswordAsync(user);
+
+        return new AccountProfileDto
+        {
+            UserId = user.Id,
+            UserName = user.UserName ?? string.Empty,
+            Email = user.Email,
+            FirstName = user.Ime,
+            LastName = user.Prezime,
+            Roles = roles.ToList(),
+            IsActive = user.Status,
+            HasPassword = hasPassword,
+            ZaposlenikId = user.ZaposlenikId,
+        };
+    }
+
     public async Task LogoutAsync(string jti, DateTime expiresAtUtc, CancellationToken ct)
     {
         await _tokenRevocationService.RevokeAsync(jti, expiresAtUtc, ct);
@@ -112,7 +137,12 @@ public class AuthService : IAuthService
         return message;
     }
 
-    public async Task ChangePasswordAsync(int userId, ChangePasswordDto dto, CancellationToken ct)
+    public async Task<ChangePasswordResponseDto> ChangePasswordAsync(
+        int userId,
+        ChangePasswordDto dto,
+        string? revokeTokenJti,
+        DateTime? revokeTokenExpiresUtc,
+        CancellationToken ct)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null)
@@ -139,6 +169,24 @@ public class AuthService : IAuthService
             throw new BusinessRuleException(
                 string.Join("; ", result.Errors.Select(e => e.Description)));
         }
+
+        if (!string.IsNullOrWhiteSpace(revokeTokenJti) && revokeTokenExpiresUtc.HasValue)
+        {
+            await _tokenRevocationService.RevokeAsync(
+                revokeTokenJti,
+                revokeTokenExpiresUtc.Value,
+                ct);
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var issued = _tokenService.CreateToken(user, roles);
+
+        return new ChangePasswordResponseDto
+        {
+            Message = "Password changed successfully.",
+            Token = issued.Token,
+            Expiration = issued.ExpiresAtUtc.ToLocalTime(),
+        };
     }
 }
 

@@ -48,6 +48,15 @@ public class AccountController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<AccountProfileDto>> GetMe()
+    {
+        var userId = User.GetNuaSpaUserId();
+        var profile = await _authService.GetMeAsync(userId, HttpContext.RequestAborted);
+        return Ok(profile);
+    }
+
+    [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
@@ -74,10 +83,24 @@ public class AccountController : ControllerBase
 
     [Authorize]
     [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    public async Task<ActionResult<ChangePasswordResponseDto>> ChangePassword(
+        [FromBody] ChangePasswordDto dto)
     {
         var userId = User.GetNuaSpaUserId();
-        await _authService.ChangePasswordAsync(userId, dto, HttpContext.RequestAborted);
-        return Ok(new { message = "Lozinka je uspješno promijenjena." });
+        var jti = User.FindFirstValue(JwtRegisteredClaimNames.Jti);
+        DateTime? expiresAtUtc = null;
+        var expClaim = User.FindFirstValue(JwtRegisteredClaimNames.Exp);
+        if (long.TryParse(expClaim, out var unixExp))
+        {
+            expiresAtUtc = DateTimeOffset.FromUnixTimeSeconds(unixExp).UtcDateTime;
+        }
+
+        var result = await _authService.ChangePasswordAsync(
+            userId,
+            dto,
+            jti,
+            expiresAtUtc,
+            HttpContext.RequestAborted);
+        return Ok(result);
     }
 }
