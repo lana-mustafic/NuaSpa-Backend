@@ -594,23 +594,79 @@ namespace NuaSpa.Application.Services
 
         public async Task<TherapistDashboardDto?> GetDashboardAsync(int zaposlenikId, DateTime? day = null)
         {
-            var exists = await _context.Zaposlenici.AsNoTracking()
-                .AnyAsync(z => z.Id == zaposlenikId);
-            if (!exists) return null;
+            var therapist = await _context.Zaposlenici.AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (therapist == null) return null;
 
             var d = (day ?? DateTime.UtcNow).Date;
+            var dayStart = d;
+            var dayEnd = d.AddDays(1);
+            var weekEnd = d.AddDays(7);
             var monthStart = new DateTime(d.Year, d.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var monthEnd = monthStart.AddMonths(1);
 
-            var baseQuery = _context.Rezervacije.AsNoTracking()
+            var activeQuery = _context.Rezervacije.AsNoTracking()
+                .Include(r => r.Usluga)
+                .Include(r => r.Korisnik)
+                .Include(r => r.Prostorija)
                 .Where(r => r.ZaposlenikId == zaposlenikId && !r.IsOtkazana);
 
-            var todayCount = await baseQuery.CountAsync(r => r.DatumRezervacije.Date == d);
-            var upcomingCount = await baseQuery.CountAsync(r => r.DatumRezervacije.Date > d);
-            var completedMonth = await baseQuery.CountAsync(r =>
-                r.DatumRezervacije >= monthStart
-                && r.DatumRezervacije < monthEnd
-                && r.IsPotvrdjena);
+            var todaySchedule = await activeQuery
+                .Where(r => r.DatumRezervacije >= dayStart && r.DatumRezervacije < dayEnd)
+                .OrderBy(r => r.DatumRezervacije)
+                .Select(r => new TherapistDashboardAppointmentRowDto
+                {
+                    Id = r.Id,
+                    DatumRezervacije = r.DatumRezervacije,
+                    Status = r.Status.ToString(),
+                    IsPotvrdjena = r.IsPotvrdjena,
+                    IsOtkazana = r.IsOtkazana,
+                    KorisnikIme = r.Korisnik == null
+                        ? null
+                        : (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Trim(),
+                    UslugaNaziv = r.Usluga.Naziv,
+                    UslugaTrajanjeMinuta = r.Usluga.TrajanjeMinuta,
+                    NapomenaZaTerapeuta = r.Korisnik != null
+                        ? r.Korisnik.NapomenaZaTerapeuta
+                        : null,
+                    ProstorijaNaziv = r.Prostorija != null ? r.Prostorija.Naziv : null,
+                })
+                .ToListAsync();
+
+            var upcomingSchedule = await activeQuery
+                .Where(r => r.DatumRezervacije >= dayEnd && r.DatumRezervacije < weekEnd)
+                .OrderBy(r => r.DatumRezervacije)
+                .Take(4)
+                .Select(r => new TherapistDashboardAppointmentRowDto
+                {
+                    Id = r.Id,
+                    DatumRezervacije = r.DatumRezervacije,
+                    Status = r.Status.ToString(),
+                    IsPotvrdjena = r.IsPotvrdjena,
+                    IsOtkazana = r.IsOtkazana,
+                    KorisnikIme = r.Korisnik == null
+                        ? null
+                        : (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Trim(),
+                    UslugaNaziv = r.Usluga.Naziv,
+                    UslugaTrajanjeMinuta = r.Usluga.TrajanjeMinuta,
+                    NapomenaZaTerapeuta = r.Korisnik != null
+                        ? r.Korisnik.NapomenaZaTerapeuta
+                        : null,
+                    ProstorijaNaziv = r.Prostorija != null ? r.Prostorija.Naziv : null,
+                })
+                .ToListAsync();
+
+            var upcomingCount = await activeQuery.CountAsync(r =>
+                r.DatumRezervacije >= dayEnd && r.DatumRezervacije < weekEnd);
+
+            var completedMonth = await _context.Rezervacije.AsNoTracking()
+                .Where(r =>
+                    r.ZaposlenikId == zaposlenikId
+                    && !r.IsOtkazana
+                    && r.Status == RezervacijaStatus.Completed
+                    && r.DatumRezervacije >= monthStart
+                    && r.DatumRezervacije < monthEnd)
+                .CountAsync();
 
             var revenueMonth = await _context.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)
@@ -622,26 +678,52 @@ namespace NuaSpa.Application.Services
                     && p.Rezervacija.ZaposlenikId == zaposlenikId)
                 .SumAsync(p => (decimal?)(p.NaplaceniIznos ?? p.Iznos)) ?? 0m;
 
-            var reviews = await _context.Recenzije
+            var reviewRatings = await _context.Recenzije
                 .AsNoTracking()
-                .Where(rev =>
-                    !rev.IsDeleted
-                    && rev.CreatedAt >= monthStart
-                    && rev.CreatedAt < monthEnd)
+                .Where(rev => !rev.IsDeleted)
                 .ForTherapist(_context, zaposlenikId)
                 .Select(rev => rev.Ocjena)
                 .ToListAsync();
 
+            var latestReview = await _context.Recenzije
+                .AsNoTracking()
+                .Include(r => r.Usluga)
+                .Include(r => r.Korisnik)
+                .Where(rev => !rev.IsDeleted)
+                .ForTherapist(_context, zaposlenikId)
+                .OrderByDescending(rev => rev.CreatedAt)
+                .Select(rev => new TherapistReviewRowDto
+                {
+                    CreatedAt = rev.CreatedAt,
+                    Ocjena = rev.Ocjena,
+                    Komentar = rev.Komentar,
+                    UslugaNaziv = rev.Usluga.Naziv,
+                    KorisnikIme = rev.Korisnik.Ime + " " +
+                        (string.IsNullOrEmpty(rev.Korisnik.Prezime)
+                            ? ""
+                            : rev.Korisnik.Prezime.Substring(0, 1) + "."),
+                    AdminOdgovor = rev.AdminOdgovor,
+                })
+                .FirstOrDefaultAsync();
+
+            var therapistIme = string.IsNullOrWhiteSpace(therapist.Ime)
+                ? "Therapist"
+                : therapist.Ime.Trim();
+
             return new TherapistDashboardDto
             {
-                TodayAppointments = todayCount,
+                TherapistIme = therapistIme,
+                TodayAppointments = todaySchedule.Count,
                 UpcomingAppointments = upcomingCount,
                 CompletedThisMonth = completedMonth,
-                ProsjecnaOcjena = reviews.Count == 0
+                ProsjecnaOcjena = reviewRatings.Count == 0
                     ? 0
-                    : Math.Round(reviews.Average(x => (double)x), 2),
-                ReviewCount = reviews.Count,
+                    : Math.Round(reviewRatings.Average(x => (double)x), 2),
+                ReviewCount = reviewRatings.Count,
                 RevenueThisMonth = revenueMonth,
+                TodaySchedule = todaySchedule,
+                UpcomingSchedule = upcomingSchedule,
+                LatestReview = latestReview,
             };
         }
 
