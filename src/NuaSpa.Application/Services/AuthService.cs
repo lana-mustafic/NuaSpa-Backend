@@ -16,6 +16,8 @@ namespace NuaSpa.Application.Services;
 
 public class AuthService : IAuthService
 {
+    private const string InvalidCredentialsMessage = "Invalid username or password.";
+
     private readonly UserManager<Korisnik> _userManager;
     private readonly ITokenService _tokenService;
     private readonly ITokenRevocationService _tokenRevocationService;
@@ -43,7 +45,7 @@ public class AuthService : IAuthService
 
         if (user == null)
         {
-            throw new UnauthorizedException("Neispravno korisničko ime ili lozinka.");
+            throw new UnauthorizedException(InvalidCredentialsMessage);
         }
 
         if (!user.Status)
@@ -60,7 +62,7 @@ public class AuthService : IAuthService
         var result = await _userManager.CheckPasswordAsync(user, loginRequest.Password);
         if (!result)
         {
-            throw new UnauthorizedException("Neispravno korisničko ime ili lozinka.");
+            throw new UnauthorizedException(InvalidCredentialsMessage);
         }
 
         // Ako je user terapeut, dodatna provjera statusa terapeuta.
