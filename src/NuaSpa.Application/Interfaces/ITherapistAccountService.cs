@@ -11,7 +11,7 @@ public interface ITherapistAccountService
         int? createdByKorisnikId,
         string inviteBaseUrl);
     Task<ValidateInviteTokenDto> ValidateInviteTokenAsync(string token);
-    Task<(bool Success, string Message)> AcceptInviteAsync(
+    Task<(bool Success, string Message, int? ActivatedUserId)> AcceptInviteAsync(
         string token,
         string password);
 }

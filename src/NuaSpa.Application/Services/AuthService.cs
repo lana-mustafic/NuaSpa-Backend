@@ -132,7 +132,7 @@ public class AuthService : IAuthService
         await _tokenRevocationService.RevokeAsync(jti, expiresAtUtc, ct);
     }
 
-    public async Task<string> AcceptInviteAsync(
+    public async Task<AcceptInviteResponseDto> AcceptInviteAsync(
         AcceptTherapistInviteDto dto,
         CancellationToken ct)
     {
@@ -141,13 +141,30 @@ public class AuthService : IAuthService
             throw new BusinessRuleException("Passwords do not match.");
         }
 
-        var (success, message) = await _therapistAccountService.AcceptInviteAsync(dto.Token, dto.Password);
-        if (!success)
+        var (success, message, userId) = await _therapistAccountService.AcceptInviteAsync(
+            dto.Token,
+            dto.Password);
+        if (!success || userId is not int activatedUserId)
         {
             throw new BusinessRuleException(message);
         }
 
-        return message;
+        var user = await _userManager.FindByIdAsync(activatedUserId.ToString());
+        if (user == null)
+        {
+            throw new NotFoundException("User account not found after activation.");
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var issued = _tokenService.CreateToken(user, roles);
+
+        return new AcceptInviteResponseDto
+        {
+            Message = message,
+            Token = issued.Token,
+            Username = user.UserName ?? string.Empty,
+            Expiration = issued.ExpiresAtUtc.ToLocalTime(),
+        };
     }
 
     public async Task<ChangePasswordResponseDto> ChangePasswordAsync(

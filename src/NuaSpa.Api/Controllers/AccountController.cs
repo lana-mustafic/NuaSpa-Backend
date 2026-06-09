@@ -41,10 +41,11 @@ public class AccountController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("accept-invite")]
-    public async Task<IActionResult> AcceptInvite([FromBody] AcceptTherapistInviteDto dto)
+    public async Task<ActionResult<AcceptInviteResponseDto>> AcceptInvite(
+        [FromBody] AcceptTherapistInviteDto dto)
     {
-        var message = await _authService.AcceptInviteAsync(dto, HttpContext.RequestAborted);
-        return Ok(new { message });
+        var response = await _authService.AcceptInviteAsync(dto, HttpContext.RequestAborted);
+        return Ok(response);
     }
 
     [Authorize]

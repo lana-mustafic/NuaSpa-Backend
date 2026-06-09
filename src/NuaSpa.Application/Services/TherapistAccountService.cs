@@ -211,30 +211,30 @@ public class TherapistAccountService : ITherapistAccountService
         };
     }
 
-    public async Task<(bool Success, string Message)> AcceptInviteAsync(
+    public async Task<(bool Success, string Message, int? ActivatedUserId)> AcceptInviteAsync(
         string token,
         string password)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
-            return (false, "Invitation token is required.");
+            return (false, "Invitation token is required.", null);
         }
 
         if (password.Length < MinPasswordLength)
         {
-            return (false, $"Password must be at least {MinPasswordLength} characters.");
+            return (false, $"Password must be at least {MinPasswordLength} characters.", null);
         }
 
         var invite = await FindValidInviteAsync(token, tracked: true);
         if (invite == null)
         {
-            return (false, "This invitation link is invalid or has expired.");
+            return (false, "This invitation link is invalid or has expired.", null);
         }
 
         var user = await _userManager.FindByIdAsync(invite.KorisnikId.ToString());
         if (user == null)
         {
-            return (false, "User account not found.");
+            return (false, "User account not found.", null);
         }
 
         IdentityResult result;
@@ -250,18 +250,19 @@ public class TherapistAccountService : ITherapistAccountService
 
         if (!result.Succeeded)
         {
-            return (false, string.Join("; ", result.Errors.Select(e => e.Description)));
+            return (false, string.Join("; ", result.Errors.Select(e => e.Description)), null);
         }
 
         user.Status = true;
         user.EmailConfirmed = true;
         user.ZaposlenikId = invite.ZaposlenikId;
+        user.LockoutEnabled = true;
         await _userManager.UpdateAsync(user);
 
         invite.AcceptedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        return (true, "Account activated. You can now sign in to the therapist portal.");
+        return (true, "Account activated. Signing you in…", user.Id);
     }
 
     private async Task<Korisnik?> CreateTherapistUserAsync(Zaposlenik z, string email)
