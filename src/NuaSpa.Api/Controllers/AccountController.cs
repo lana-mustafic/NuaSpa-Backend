@@ -35,6 +35,14 @@ public class AccountController : ControllerBase
     }
 
     [AllowAnonymous]
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponse>> Refresh([FromBody] RefreshTokenRequestDto dto)
+    {
+        var res = await _authService.RefreshAsync(dto, HttpContext.RequestAborted);
+        return Ok(res);
+    }
+
+    [AllowAnonymous]
     [HttpGet("validate-invite")]
     public async Task<ActionResult<ValidateInviteTokenDto>> ValidateInvite([FromQuery] string token)
     {
@@ -83,7 +91,7 @@ public class AccountController : ControllerBase
 
     [Authorize]
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout([FromBody] LogoutRequestDto? dto)
     {
         var jti = User.FindFirstValue(JwtRegisteredClaimNames.Jti);
         if (string.IsNullOrWhiteSpace(jti))
@@ -102,7 +110,11 @@ public class AccountController : ControllerBase
             expiresAtUtc = DateTime.UtcNow.AddHours(1);
         }
 
-        await _authService.LogoutAsync(jti, expiresAtUtc, HttpContext.RequestAborted);
+        await _authService.LogoutAsync(
+            jti,
+            expiresAtUtc,
+            dto?.RefreshToken,
+            HttpContext.RequestAborted);
         return Ok(new { message = "Uspješno ste se odjavili." });
     }
 

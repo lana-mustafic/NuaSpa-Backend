@@ -29,6 +29,7 @@ public class AuthService : IAuthService
     private readonly ITokenRevocationService _tokenRevocationService;
     private readonly ITherapistAccountService _therapistAccountService;
     private readonly INotificationPublisher _notificationPublisher;
+    private readonly IRefreshTokenService _refreshTokenService;
     private readonly PasswordResetOptions _passwordResetOptions;
     private readonly NuaSpaContext _context;
 
@@ -38,6 +39,7 @@ public class AuthService : IAuthService
         ITokenRevocationService tokenRevocationService,
         ITherapistAccountService therapistAccountService,
         INotificationPublisher notificationPublisher,
+        IRefreshTokenService refreshTokenService,
         IOptions<PasswordResetOptions> passwordResetOptions,
         NuaSpaContext context)
     {
@@ -46,6 +48,7 @@ public class AuthService : IAuthService
         _tokenRevocationService = tokenRevocationService;
         _therapistAccountService = therapistAccountService;
         _notificationPublisher = notificationPublisher;
+        _refreshTokenService = refreshTokenService;
         _passwordResetOptions = passwordResetOptions.Value;
         _context = context;
     }
@@ -104,13 +107,38 @@ public class AuthService : IAuthService
         }
 
         var roles = await _userManager.GetRolesAsync(user);
+        return await CreateSessionAsync(user, roles, ct);
+    }
+
+    public async Task<AuthResponse> RefreshAsync(RefreshTokenRequestDto dto, CancellationToken ct)
+    {
+        var rotation = await _refreshTokenService.RotateAsync(dto.RefreshToken, ct);
+        if (rotation.ReuseDetected)
+        {
+            throw new UnauthorizedException("Session reuse detected. Please sign in again.");
+        }
+
+        if (!rotation.Success || rotation.UserId is not int userId || rotation.RefreshToken is null)
+        {
+            throw new UnauthorizedException("Session expired. Please sign in again.");
+        }
+
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null || !user.Status)
+        {
+            throw new UnauthorizedException("Session expired. Please sign in again.");
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
         var issued = _tokenService.CreateToken(user, roles);
 
         return new AuthResponse
         {
             Token = issued.Token,
-            Username = user.UserName!,
+            RefreshToken = rotation.RefreshToken.Token,
+            Username = user.UserName ?? string.Empty,
             Expiration = issued.ExpiresAtUtc.ToLocalTime(),
+            RefreshExpiration = rotation.RefreshToken.ExpiresAtUtc.ToLocalTime(),
         };
     }
 
@@ -139,9 +167,14 @@ public class AuthService : IAuthService
         };
     }
 
-    public async Task LogoutAsync(string jti, DateTime expiresAtUtc, CancellationToken ct)
+    public async Task LogoutAsync(
+        string jti,
+        DateTime expiresAtUtc,
+        string? refreshToken,
+        CancellationToken ct)
     {
         await _tokenRevocationService.RevokeAsync(jti, expiresAtUtc, ct);
+        await _refreshTokenService.RevokeByPlainTokenAsync(refreshToken, ct);
     }
 
     public async Task<AcceptInviteResponseDto> AcceptInviteAsync(
@@ -168,14 +201,16 @@ public class AuthService : IAuthService
         }
 
         var roles = await _userManager.GetRolesAsync(user);
-        var issued = _tokenService.CreateToken(user, roles);
+        var session = await CreateSessionAsync(user, roles, ct);
 
         return new AcceptInviteResponseDto
         {
             Message = message,
-            Token = issued.Token,
-            Username = user.UserName ?? string.Empty,
-            Expiration = issued.ExpiresAtUtc.ToLocalTime(),
+            Token = session.Token,
+            RefreshToken = session.RefreshToken,
+            Username = session.Username,
+            Expiration = session.Expiration,
+            RefreshExpiration = session.RefreshExpiration,
         };
     }
 
@@ -220,14 +255,18 @@ public class AuthService : IAuthService
                 ct);
         }
 
+        await _refreshTokenService.RevokeAllForUserAsync(user.Id, ct);
+
         var roles = await _userManager.GetRolesAsync(user);
-        var issued = _tokenService.CreateToken(user, roles);
+        var session = await CreateSessionAsync(user, roles, ct);
 
         return new ChangePasswordResponseDto
         {
             Message = "Password changed successfully.",
-            Token = issued.Token,
-            Expiration = issued.ExpiresAtUtc.ToLocalTime(),
+            Token = session.Token,
+            RefreshToken = session.RefreshToken,
+            Expiration = session.Expiration,
+            RefreshExpiration = session.RefreshExpiration,
         };
     }
 
@@ -315,15 +354,37 @@ public class AuthService : IAuthService
         user.LockoutEnabled = true;
         await _userManager.UpdateAsync(user);
 
+        await _refreshTokenService.RevokeAllForUserAsync(user.Id, ct);
+
         var roles = await _userManager.GetRolesAsync(user);
-        var issued = _tokenService.CreateToken(user, roles);
+        var session = await CreateSessionAsync(user, roles, ct);
 
         return new ResetPasswordResponseDto
         {
             Message = "Password reset successfully. Signing you in…",
+            Token = session.Token,
+            RefreshToken = session.RefreshToken,
+            Username = session.Username,
+            Expiration = session.Expiration,
+            RefreshExpiration = session.RefreshExpiration,
+        };
+    }
+
+    private async Task<AuthResponse> CreateSessionAsync(
+        Korisnik user,
+        IList<string> roles,
+        CancellationToken ct)
+    {
+        var issued = _tokenService.CreateToken(user, roles);
+        var refresh = await _refreshTokenService.IssueAsync(user.Id, familyId: null, ct);
+
+        return new AuthResponse
+        {
             Token = issued.Token,
+            RefreshToken = refresh.Token,
             Username = user.UserName ?? string.Empty,
             Expiration = issued.ExpiresAtUtc.ToLocalTime(),
+            RefreshExpiration = refresh.ExpiresAtUtc.ToLocalTime(),
         };
     }
 
