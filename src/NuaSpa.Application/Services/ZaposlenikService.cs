@@ -727,6 +727,173 @@ namespace NuaSpa.Application.Services
             };
         }
 
+        public async Task<TherapistAppointmentsListDto?> GetMyAppointmentsAsync(
+            int zaposlenikId,
+            string tab,
+            DateTime? day,
+            string? search,
+            string statusFilter,
+            int page,
+            int pageSize)
+        {
+            var therapist = await _context.Zaposlenici.AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (therapist == null) return null;
+
+            (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+            var refDay = (day ?? DateTime.UtcNow).Date;
+            var dayStart = refDay;
+            var dayEnd = refDay.AddDays(1);
+            var now = DateTime.UtcNow;
+
+            var baseQuery = _context.Rezervacije.AsNoTracking()
+                .Where(r => r.ZaposlenikId == zaposlenikId);
+
+            var upcomingCount = await baseQuery.CountAsync(r =>
+                !r.IsOtkazana && r.DatumRezervacije >= dayEnd);
+            var todayCount = await baseQuery.CountAsync(r =>
+                !r.IsOtkazana
+                && r.DatumRezervacije >= dayStart
+                && r.DatumRezervacije < dayEnd);
+            var completedCount = await baseQuery.CountAsync(r =>
+                !r.IsOtkazana && r.Status == RezervacijaStatus.Completed);
+            var cancelledCount = await baseQuery.CountAsync(r => r.IsOtkazana);
+
+            var itemsQuery = baseQuery.AsQueryable();
+
+            var tabNorm = (tab ?? "upcoming").Trim().ToLowerInvariant();
+            switch (tabNorm)
+            {
+                case "today":
+                    itemsQuery = itemsQuery.Where(r =>
+                        !r.IsOtkazana
+                        && r.DatumRezervacije >= dayStart
+                        && r.DatumRezervacije < dayEnd);
+                    break;
+                case "completed":
+                    itemsQuery = itemsQuery.Where(r =>
+                        !r.IsOtkazana && r.Status == RezervacijaStatus.Completed);
+                    break;
+                case "cancelled":
+                    itemsQuery = itemsQuery.Where(r => r.IsOtkazana);
+                    break;
+                default:
+                    itemsQuery = itemsQuery.Where(r =>
+                        !r.IsOtkazana && r.DatumRezervacije >= dayEnd);
+                    break;
+            }
+
+            var statusNorm = (statusFilter ?? "all").Trim().ToLowerInvariant();
+            if (statusNorm == "confirmed")
+            {
+                itemsQuery = itemsQuery.Where(r => r.IsPotvrdjena && !r.IsOtkazana);
+            }
+            else if (statusNorm == "pending")
+            {
+                itemsQuery = itemsQuery.Where(r => !r.IsPotvrdjena && !r.IsOtkazana);
+            }
+            else if (statusNorm == "cancelled")
+            {
+                itemsQuery = itemsQuery.Where(r => r.IsOtkazana);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = $"%{search.Trim()}%";
+                itemsQuery = itemsQuery.Where(r =>
+                    EF.Functions.Like(
+                        (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Trim(), term)
+                    || EF.Functions.Like(r.Usluga.Naziv, term));
+            }
+
+            var total = await itemsQuery.CountAsync();
+            var rows = await itemsQuery
+                .OrderBy(r => r.DatumRezervacije)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(MapTherapistAppointmentRow)
+                .ToListAsync();
+
+            await ApplyPremiumFlagsForAppointmentRowsAsync(rows).ConfigureAwait(false);
+
+            var next = await baseQuery
+                .Where(r => !r.IsOtkazana && r.DatumRezervacije >= now)
+                .OrderBy(r => r.DatumRezervacije)
+                .Select(MapTherapistAppointmentRow)
+                .FirstOrDefaultAsync();
+
+            if (next != null)
+            {
+                await ApplyPremiumFlagsForAppointmentRowsAsync(
+                    new List<TherapistAppointmentRowDto> { next }).ConfigureAwait(false);
+            }
+
+            return new TherapistAppointmentsListDto
+            {
+                UpcomingCount = upcomingCount,
+                TodayCount = todayCount,
+                CompletedCount = completedCount,
+                CancelledCount = cancelledCount,
+                NextAppointment = next,
+                Ukupno = total,
+                Stranica = page,
+                VelicinaStranice = pageSize,
+                Items = rows,
+            };
+        }
+
+        private static readonly System.Linq.Expressions.Expression<
+            Func<Rezervacija, TherapistAppointmentRowDto>> MapTherapistAppointmentRow = r =>
+            new TherapistAppointmentRowDto
+            {
+                Id = r.Id,
+                DatumRezervacije = r.DatumRezervacije,
+                Status = r.Status.ToString(),
+                IsPotvrdjena = r.IsPotvrdjena,
+                IsPlacena = r.IsPlacena,
+                IsOtkazana = r.IsOtkazana,
+                RazlogOtkaza = r.RazlogOtkaza,
+                OtkazanaAt = r.OtkazanaAt,
+                IsVip = r.IsVip,
+                KorisnikId = r.KorisnikId,
+                KorisnikIme = r.Korisnik == null
+                    ? null
+                    : (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Trim(),
+                KorisnikTelefon = r.Korisnik != null ? r.Korisnik.PhoneNumber : null,
+                KorisnikEmail = r.Korisnik != null ? r.Korisnik.Email : null,
+                NapomenaZaTerapeuta = r.Korisnik != null
+                    ? r.Korisnik.NapomenaZaTerapeuta
+                    : null,
+                UslugaNaziv = r.Usluga.Naziv,
+                UslugaId = r.UslugaId,
+                UslugaTrajanjeMinuta = r.SnimakTrajanjeMinuta > 0
+                    ? r.SnimakTrajanjeMinuta
+                    : r.Usluga.TrajanjeMinuta,
+                UslugaCijena = r.SnimakCijena > 0 ? r.SnimakCijena : r.Usluga.Cijena,
+                ProstorijaNaziv = r.Prostorija != null ? r.Prostorija.Naziv : null,
+            };
+
+        private async Task ApplyPremiumFlagsForAppointmentRowsAsync(
+            List<TherapistAppointmentRowDto> rows)
+        {
+            if (rows.Count == 0) return;
+
+            var ids = rows.Select(d => d.KorisnikId).Distinct().ToList();
+            var premiumIds = await _context.Rezervacije
+                .AsNoTracking()
+                .Where(r => ids.Contains(r.KorisnikId) && r.IsPlacena && !r.IsOtkazana)
+                .GroupBy(r => r.KorisnikId)
+                .Where(g => g.Count() >= 3)
+                .Select(g => g.Key)
+                .ToListAsync();
+
+            var set = premiumIds.ToHashSet();
+            foreach (var row in rows)
+            {
+                row.PremiumKlijent = set.Contains(row.KorisnikId);
+            }
+        }
+
         private async Task<string> ResolveLokacijaPrikazAsync(Zaposlenik z)
         {
             if (!string.IsNullOrWhiteSpace(z.Lokacija))

@@ -43,6 +43,15 @@ namespace NuaSpa.Application.Interfaces
 
         Task<TherapistDashboardDto?> GetDashboardAsync(int zaposlenikId, DateTime? day = null);
 
+        Task<TherapistAppointmentsListDto?> GetMyAppointmentsAsync(
+            int zaposlenikId,
+            string tab,
+            DateTime? day,
+            string? search,
+            string statusFilter,
+            int page,
+            int pageSize);
+
         Task<IReadOnlyList<TherapistReviewRowDto>> GetMyReviewsAsync(
             int zaposlenikId,
             int maxReviews = 30);

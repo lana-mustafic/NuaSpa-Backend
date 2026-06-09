@@ -176,6 +176,29 @@ namespace NuaSpa.Api.Controllers
             return Ok(dto);
         }
 
+        [HttpGet("me/appointments")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
+        public async Task<ActionResult<TherapistAppointmentsListDto>> GetMyAppointments(
+            [FromQuery] TherapistAppointmentsSearchObject search)
+        {
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
+
+            var (page, pageSize) = PaginationHelper.FromSearch(search);
+            var dto = await _zaposlenikService.GetMyAppointmentsAsync(
+                id,
+                search?.Tab ?? "upcoming",
+                search?.Day,
+                search?.Search,
+                search?.StatusFilter ?? "all",
+                page,
+                pageSize);
+            if (dto == null) return NotFound();
+            return Ok(dto);
+        }
+
         [HttpGet("me/reviews")]
         [Authorize(Roles = RoleConstants.Zaposlenik)]
         public async Task<ActionResult<IReadOnlyList<TherapistReviewRowDto>>> GetMyReviews(
