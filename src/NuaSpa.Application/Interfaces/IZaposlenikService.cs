@@ -52,6 +52,11 @@ namespace NuaSpa.Application.Interfaces
             int page,
             int pageSize);
 
+        Task<TherapistScheduleDto?> GetMyScheduleAsync(
+            int zaposlenikId,
+            DateTime? day,
+            DateTime? calendarMonth);
+
         Task<IReadOnlyList<TherapistReviewRowDto>> GetMyReviewsAsync(
             int zaposlenikId,
             int maxReviews = 30);

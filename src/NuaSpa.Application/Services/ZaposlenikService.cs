@@ -30,8 +30,14 @@ namespace NuaSpa.Application.Services
             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
         };
 
-        public ZaposlenikService(NuaSpaContext context, IMapper mapper) : base(context, mapper)
+        private readonly IRezervacijaService _rezervacijaService;
+
+        public ZaposlenikService(
+            NuaSpaContext context,
+            IMapper mapper,
+            IRezervacijaService rezervacijaService) : base(context, mapper)
         {
+            _rezervacijaService = rezervacijaService;
         }
 
         public override async Task<PagedResult<ZaposlenikDTO>> Get(ZaposlenikSearchObject? search = null)
@@ -839,6 +845,99 @@ namespace NuaSpa.Application.Services
                 Stranica = page,
                 VelicinaStranice = pageSize,
                 Items = rows,
+            };
+        }
+
+        public async Task<TherapistScheduleDto?> GetMyScheduleAsync(
+            int zaposlenikId,
+            DateTime? day,
+            DateTime? calendarMonth)
+        {
+            var therapist = await _context.Zaposlenici.AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (therapist == null) return null;
+
+            var refDay = (day ?? DateTime.UtcNow).Date;
+            var dayStart = refDay;
+            var dayEnd = refDay.AddDays(1);
+            var now = DateTime.UtcNow;
+
+            var cal = (calendarMonth ?? refDay).Date;
+            var monthStart = new DateTime(cal.Year, cal.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var monthEnd = monthStart.AddMonths(1);
+
+            var dayRows = await _context.Rezervacije.AsNoTracking()
+                .Where(r =>
+                    r.ZaposlenikId == zaposlenikId
+                    && r.DatumRezervacije >= dayStart
+                    && r.DatumRezervacije < dayEnd)
+                .OrderBy(r => r.DatumRezervacije)
+                .Select(MapTherapistAppointmentRow)
+                .ToListAsync();
+
+            await ApplyPremiumFlagsForAppointmentRowsAsync(dayRows).ConfigureAwait(false);
+
+            var markerDays = await _context.Rezervacije.AsNoTracking()
+                .Where(r =>
+                    r.ZaposlenikId == zaposlenikId
+                    && r.DatumRezervacije >= monthStart
+                    && r.DatumRezervacije < monthEnd)
+                .Select(r => r.DatumRezervacije.Day)
+                .Distinct()
+                .OrderBy(d => d)
+                .ToListAsync();
+
+            var next = await _context.Rezervacije.AsNoTracking()
+                .Where(r =>
+                    r.ZaposlenikId == zaposlenikId
+                    && !r.IsOtkazana
+                    && r.DatumRezervacije >= now)
+                .OrderBy(r => r.DatumRezervacije)
+                .Select(MapTherapistAppointmentRow)
+                .FirstOrDefaultAsync();
+
+            if (next != null)
+            {
+                await ApplyPremiumFlagsForAppointmentRowsAsync(
+                    new List<TherapistAppointmentRowDto> { next }).ConfigureAwait(false);
+            }
+
+            var active = dayRows.Where(r => !r.IsOtkazana).ToList();
+            var overview = new TherapistScheduleDayOverviewDto
+            {
+                Total = active.Count,
+                Confirmed = active.Count(r => r.IsPotvrdjena),
+                Pending = active.Count(r => !r.IsPotvrdjena),
+                HoursBooked = active.Sum(r => r.UslugaTrajanjeMinuta) / 60.0,
+            };
+
+            TherapistScheduleAvailabilitySummaryDto? availability = null;
+            var dayAvailability = await _rezervacijaService
+                .GetTherapistDayAvailabilityAsync(zaposlenikId, refDay)
+                .ConfigureAwait(false);
+            if (dayAvailability != null)
+            {
+                availability = new TherapistScheduleAvailabilitySummaryDto
+                {
+                    WorkingHoursLabel = dayAvailability.WorkingHoursLabel,
+                    AvailableSlotCount = dayAvailability.AvailableSlots.Count,
+                    IsSpaClosed = dayAvailability.IsSpaClosed,
+                    IsTherapistUnavailable = dayAvailability.IsTherapistUnavailable,
+                    Load = dayAvailability.Load,
+                    AvailableSlots = dayAvailability.AvailableSlots.ToList(),
+                };
+            }
+
+            return new TherapistScheduleDto
+            {
+                Day = refDay,
+                CalendarYear = monthStart.Year,
+                CalendarMonth = monthStart.Month,
+                Overview = overview,
+                MonthMarkerDays = markerDays,
+                NextAppointment = next,
+                Items = dayRows,
+                Availability = availability,
             };
         }
 
