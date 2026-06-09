@@ -277,6 +277,7 @@ public class TherapistAccountService : ITherapistAccountService
             Prezime = z.Prezime.Trim(),
             GradId = 1,
             Status = true,
+            LockoutEnabled = true,
             DatumRegistracije = DateTime.UtcNow,
             ZaposlenikId = z.Id,
         };

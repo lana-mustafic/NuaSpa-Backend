@@ -48,6 +48,14 @@ public class AuthService : IAuthService
             throw new UnauthorizedException(InvalidCredentialsMessage);
         }
 
+        await EnsureLockoutEnabledAsync(user);
+
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            throw new UnauthorizedException(
+                "Account is temporarily locked due to too many failed sign-in attempts. Try again later or contact your administrator.");
+        }
+
         if (!user.Status)
         {
             throw new UnauthorizedException("Account is deactivated. Contact your spa administrator.");
@@ -62,8 +70,11 @@ public class AuthService : IAuthService
         var result = await _userManager.CheckPasswordAsync(user, loginRequest.Password);
         if (!result)
         {
+            await _userManager.AccessFailedAsync(user);
             throw new UnauthorizedException(InvalidCredentialsMessage);
         }
+
+        await _userManager.ResetAccessFailedCountAsync(user);
 
         // Ako je user terapeut, dodatna provjera statusa terapeuta.
         if (await _userManager.IsInRoleAsync(user, RoleConstants.Zaposlenik) && user.ZaposlenikId is > 0)
@@ -189,6 +200,17 @@ public class AuthService : IAuthService
             Token = issued.Token,
             Expiration = issued.ExpiresAtUtc.ToLocalTime(),
         };
+    }
+
+    private async Task EnsureLockoutEnabledAsync(Korisnik user)
+    {
+        if (user.LockoutEnabled)
+        {
+            return;
+        }
+
+        user.LockoutEnabled = true;
+        await _userManager.UpdateAsync(user);
     }
 }
 
