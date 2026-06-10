@@ -60,9 +60,12 @@ namespace NuaSpa.Application.Interfaces
             DateTime? day,
             DateTime? calendarMonth);
 
-        Task<IReadOnlyList<TherapistReviewRowDto>> GetMyReviewsAsync(
+        Task<PagedResult<TherapistReviewRowDto>> GetMyReviewsPagedAsync(
             int zaposlenikId,
-            int maxReviews = 30);
+            int page = 1,
+            int pageSize = 20);
+
+        Task<TherapistMyReviewsSummaryDto> GetMyReviewsSummaryAsync(int zaposlenikId);
 
         Task DeleteAsync(int id);
     }

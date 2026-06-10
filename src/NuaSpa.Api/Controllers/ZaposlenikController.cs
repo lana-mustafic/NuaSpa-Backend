@@ -232,15 +232,28 @@ namespace NuaSpa.Api.Controllers
 
         [HttpGet("me/reviews")]
         [Authorize(Roles = RoleConstants.Zaposlenik)]
-        public async Task<ActionResult<IReadOnlyList<TherapistReviewRowDto>>> GetMyReviews(
-            [FromQuery] int maxReviews = 30)
+        public async Task<ActionResult<PagedResult<TherapistReviewRowDto>>> GetMyReviews(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
             if (!User.TryGetNuaSpaZaposlenikId(out var id))
             {
                 return Forbid();
             }
-            var list = await _zaposlenikService.GetMyReviewsAsync(id, maxReviews);
-            return Ok(list);
+            var pageResult = await _zaposlenikService.GetMyReviewsPagedAsync(id, page, pageSize);
+            return Ok(pageResult);
+        }
+
+        [HttpGet("me/reviews/summary")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
+        public async Task<ActionResult<TherapistMyReviewsSummaryDto>> GetMyReviewsSummary()
+        {
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
+            var summary = await _zaposlenikService.GetMyReviewsSummaryAsync(id);
+            return Ok(summary);
         }
 
         [HttpGet("{id}/kpi")]

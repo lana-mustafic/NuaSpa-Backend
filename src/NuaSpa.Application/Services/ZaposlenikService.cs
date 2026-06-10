@@ -239,6 +239,7 @@ namespace NuaSpa.Application.Services
                 .Take(take)
                 .Select(rev => new TherapistReviewRowDto
                 {
+                    Id = rev.Id,
                     CreatedAt = rev.CreatedAt,
                     Ocjena = rev.Ocjena,
                     Komentar = rev.Komentar,
@@ -593,21 +594,22 @@ namespace NuaSpa.Application.Services
             return MapToDto(entity);
         }
 
-        public async Task<IReadOnlyList<TherapistReviewRowDto>> GetMyReviewsAsync(
+        public async Task<PagedResult<TherapistReviewRowDto>> GetMyReviewsPagedAsync(
             int zaposlenikId,
-            int maxReviews = 30)
+            int page = 1,
+            int pageSize = 20)
         {
-            var take = Math.Clamp(maxReviews, 1, 50);
-            return await _context.Recenzije
-                .AsNoTracking()
-                .Include(r => r.Usluga)
-                .Include(r => r.Korisnik)
-                .Where(rev => !rev.IsDeleted)
-                .ForTherapist(_context, zaposlenikId)
-                .OrderByDescending(rev => rev.CreatedAt)
-                .Take(take)
+            (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
+            var query = TherapistReviewQuery(zaposlenikId)
+                .OrderByDescending(rev => rev.CreatedAt);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(rev => new TherapistReviewRowDto
                 {
+                    Id = rev.Id,
                     CreatedAt = rev.CreatedAt,
                     Ocjena = rev.Ocjena,
                     Komentar = rev.Komentar,
@@ -619,7 +621,65 @@ namespace NuaSpa.Application.Services
                     AdminOdgovor = rev.AdminOdgovor,
                 })
                 .ToListAsync();
+
+            return new PagedResult<TherapistReviewRowDto>
+            {
+                Ukupno = total,
+                Stranica = page,
+                VelicinaStranice = pageSize,
+                Items = items,
+            };
         }
+
+        public async Task<TherapistMyReviewsSummaryDto> GetMyReviewsSummaryAsync(int zaposlenikId)
+        {
+            var query = TherapistReviewQuery(zaposlenikId);
+            var total = await query.CountAsync();
+            if (total == 0)
+            {
+                return new TherapistMyReviewsSummaryDto();
+            }
+
+            var average = await query.AverageAsync(rev => (double)rev.Ocjena);
+
+            var topService = await query
+                .GroupBy(rev => rev.Usluga.Naziv)
+                .Select(g => new { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .FirstOrDefaultAsync();
+
+            var latest = await query
+                .OrderByDescending(rev => rev.CreatedAt)
+                .Select(rev => new TherapistReviewRowDto
+                {
+                    Id = rev.Id,
+                    CreatedAt = rev.CreatedAt,
+                    Ocjena = rev.Ocjena,
+                    Komentar = rev.Komentar,
+                    UslugaNaziv = rev.Usluga.Naziv,
+                    KorisnikIme = rev.Korisnik.Ime + " " +
+                        (string.IsNullOrEmpty(rev.Korisnik.Prezime)
+                            ? ""
+                            : rev.Korisnik.Prezime.Substring(0, 1) + "."),
+                    AdminOdgovor = rev.AdminOdgovor,
+                })
+                .FirstOrDefaultAsync();
+
+            return new TherapistMyReviewsSummaryDto
+            {
+                TotalCount = total,
+                AverageRating = Math.Round(average, 2),
+                MostReviewedServiceName = topService?.Name,
+                LatestReview = latest,
+            };
+        }
+
+        private IQueryable<Recenzija> TherapistReviewQuery(int zaposlenikId) =>
+            _context.Recenzije
+                .AsNoTracking()
+                .Where(rev => !rev.IsDeleted)
+                .ForTherapist(_context, zaposlenikId);
 
         public async Task<TherapistDashboardDto?> GetDashboardAsync(int zaposlenikId, DateTime? day = null)
         {
@@ -723,6 +783,7 @@ namespace NuaSpa.Application.Services
                 .OrderByDescending(rev => rev.CreatedAt)
                 .Select(rev => new TherapistReviewRowDto
                 {
+                    Id = rev.Id,
                     CreatedAt = rev.CreatedAt,
                     Ocjena = rev.Ocjena,
                     Komentar = rev.Komentar,
