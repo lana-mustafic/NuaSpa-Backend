@@ -150,6 +150,19 @@ namespace NuaSpa.Api.Controllers
             return Ok(dto);
         }
 
+        [HttpGet("me/services")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
+        public async Task<ActionResult<IReadOnlyList<UslugaDTO>>> GetMyServices()
+        {
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
+
+            var list = await _zaposlenikService.GetMyServicesAsync(id);
+            return Ok(list);
+        }
+
         [HttpPatch("me")]
         [Authorize(Roles = RoleConstants.Zaposlenik)]
         public async Task<ActionResult<ZaposlenikDTO>> UpdateMe([FromBody] TherapistSelfProfileUpdateDto body)

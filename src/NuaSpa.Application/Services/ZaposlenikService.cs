@@ -466,6 +466,29 @@ namespace NuaSpa.Application.Services
             return entity == null ? null : MapToDto(entity);
         }
 
+        public async Task<IReadOnlyList<UslugaDTO>> GetMyServicesAsync(int zaposlenikId)
+        {
+            var therapist = await _context.Zaposlenici
+                .AsNoTracking()
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (therapist == null)
+            {
+                return Array.Empty<UslugaDTO>();
+            }
+
+            var usluge = await _context.Usluge
+                .AsNoTracking()
+                .Include(u => u.KategorijaUsluga)
+                .Where(u => !u.IsDeleted)
+                .OrderBy(u => u.Naziv)
+                .ToListAsync();
+
+            return usluge
+                .Where(u => TherapistServiceEligibility.Matches(u, therapist, requireActive: false))
+                .Select(u => _mapper.Map<UslugaDTO>(u))
+                .ToList();
+        }
+
         public async Task<TherapistAdminRosterDto> GetAdminRosterAsync(
             DateTime? kpiFrom = null,
             DateTime? kpiTo = null,

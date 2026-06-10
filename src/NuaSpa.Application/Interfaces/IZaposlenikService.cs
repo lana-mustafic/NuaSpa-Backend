@@ -39,6 +39,9 @@ namespace NuaSpa.Application.Interfaces
 
         Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId);
 
+        /// <summary>Services the therapist is certified to perform (category + specialization).</summary>
+        Task<IReadOnlyList<UslugaDTO>> GetMyServicesAsync(int zaposlenikId);
+
         Task<ZaposlenikDTO?> UpdateMeAsync(int zaposlenikId, TherapistSelfProfileUpdateDto dto);
 
         Task<TherapistDashboardDto?> GetDashboardAsync(int zaposlenikId, DateTime? day = null);
