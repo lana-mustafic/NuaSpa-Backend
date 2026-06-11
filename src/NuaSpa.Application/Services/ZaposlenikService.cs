@@ -530,6 +530,33 @@ namespace NuaSpa.Application.Services
                     && !r.IsOtkazana
                     && r.Status == RezervacijaStatus.Completed);
 
+            var reviewQuery = TherapistReviewQuery(zaposlenikId)
+                .Where(rev => rev.UslugaId == uslugaId);
+            var myReviewCount = await reviewQuery.CountAsync();
+            double? myAverageRating = null;
+            if (myReviewCount > 0)
+            {
+                myAverageRating = Math.Round(
+                    await reviewQuery.AverageAsync(rev => (double)rev.Ocjena),
+                    2);
+            }
+
+            var refDay = DateTime.UtcNow.Date;
+            string? workingHoursLabel = null;
+            var availableSlotCount = 0;
+            var isTherapistUnavailable = false;
+            var isSpaClosed = false;
+            var dayAvailability = await _rezervacijaService
+                .GetTherapistDayAvailabilityAsync(zaposlenikId, refDay)
+                .ConfigureAwait(false);
+            if (dayAvailability != null)
+            {
+                workingHoursLabel = dayAvailability.WorkingHoursLabel;
+                availableSlotCount = dayAvailability.AvailableSlots.Count;
+                isTherapistUnavailable = dayAvailability.IsTherapistUnavailable;
+                isSpaClosed = dayAvailability.IsSpaClosed;
+            }
+
             return new TherapistServiceDetailDto
             {
                 Service = _mapper.Map<UslugaDTO>(usluga),
@@ -537,6 +564,12 @@ namespace NuaSpa.Application.Services
                 IsAuthorized = isEligible,
                 EmploymentStatus = therapist.Status,
                 CompletedBookingsCount = completedBookings,
+                MyReviewCount = myReviewCount,
+                MyAverageRating = myAverageRating,
+                ScheduleWorkingHoursLabel = workingHoursLabel,
+                AvailableSlotCountToday = availableSlotCount,
+                IsTherapistUnavailableToday = isTherapistUnavailable,
+                IsSpaClosedToday = isSpaClosed,
             };
         }
 

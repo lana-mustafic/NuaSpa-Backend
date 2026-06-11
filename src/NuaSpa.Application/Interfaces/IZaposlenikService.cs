@@ -66,9 +66,12 @@ namespace NuaSpa.Application.Interfaces
         Task<PagedResult<TherapistReviewRowDto>> GetMyReviewsPagedAsync(
             int zaposlenikId,
             int page = 1,
-            int pageSize = 20);
+            int pageSize = 20,
+            int? uslugaId = null);
 
-        Task<TherapistMyReviewsSummaryDto> GetMyReviewsSummaryAsync(int zaposlenikId);
+        Task<TherapistMyReviewsSummaryDto> GetMyReviewsSummaryAsync(
+            int zaposlenikId,
+            int? uslugaId = null);
 
         Task DeleteAsync(int id);
     }
