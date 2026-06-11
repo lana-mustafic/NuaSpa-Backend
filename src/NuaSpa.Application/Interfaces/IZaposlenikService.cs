@@ -56,7 +56,8 @@ namespace NuaSpa.Application.Interfaces
             string? search,
             string statusFilter,
             int page,
-            int pageSize);
+            int pageSize,
+            int? uslugaId = null);
 
         Task<TherapistScheduleDto?> GetMyScheduleAsync(
             int zaposlenikId,

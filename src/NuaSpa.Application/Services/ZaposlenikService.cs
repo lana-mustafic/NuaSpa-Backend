@@ -919,7 +919,8 @@ namespace NuaSpa.Application.Services
             string? search,
             string statusFilter,
             int page,
-            int pageSize)
+            int pageSize,
+            int? uslugaId = null)
         {
             var therapist = await _context.Zaposlenici.AsNoTracking()
                 .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
@@ -933,6 +934,11 @@ namespace NuaSpa.Application.Services
 
             var baseQuery = _context.Rezervacije.AsNoTracking()
                 .Where(r => r.ZaposlenikId == zaposlenikId);
+
+            if (uslugaId is > 0)
+            {
+                baseQuery = baseQuery.Where(r => r.UslugaId == uslugaId);
+            }
 
             var upcomingCount = await baseQuery.CountAsync(r =>
                 !r.IsOtkazana && r.DatumRezervacije >= dayEnd);

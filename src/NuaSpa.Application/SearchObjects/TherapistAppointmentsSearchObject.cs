@@ -13,6 +13,8 @@ public class TherapistAppointmentsSearchObject : IPagedSearch
 
     public string? Search { get; set; }
 
+    public int? UslugaId { get; set; }
+
     /// <summary>all | confirmed | pending | cancelled</summary>
     public string StatusFilter { get; set; } = "all";
 
