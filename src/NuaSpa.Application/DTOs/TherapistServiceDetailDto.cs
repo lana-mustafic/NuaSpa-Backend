@@ -16,4 +16,17 @@ public class TherapistServiceDetailDto
 
     /// <summary>Completed appointments performed by this therapist for this service.</summary>
     public int CompletedBookingsCount { get; set; }
+
+    public int MyReviewCount { get; set; }
+
+    public double? MyAverageRating { get; set; }
+
+    /// <summary>Calendar availability for today (distinct from employment status).</summary>
+    public string? ScheduleWorkingHoursLabel { get; set; }
+
+    public int AvailableSlotCountToday { get; set; }
+
+    public bool IsTherapistUnavailableToday { get; set; }
+
+    public bool IsSpaClosedToday { get; set; }
 }
