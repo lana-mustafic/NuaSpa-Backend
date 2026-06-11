@@ -163,6 +163,24 @@ namespace NuaSpa.Api.Controllers
             return Ok(list);
         }
 
+        [HttpGet("me/services/{uslugaId:int}")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
+        public async Task<ActionResult<TherapistServiceDetailDto>> GetMyServiceDetail(int uslugaId)
+        {
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
+
+            var detail = await _zaposlenikService.GetMyServiceDetailAsync(id, uslugaId);
+            if (detail == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(detail);
+        }
+
         [HttpPatch("me")]
         [Authorize(Roles = RoleConstants.Zaposlenik)]
         public async Task<ActionResult<ZaposlenikDTO>> UpdateMe([FromBody] TherapistSelfProfileUpdateDto body)
