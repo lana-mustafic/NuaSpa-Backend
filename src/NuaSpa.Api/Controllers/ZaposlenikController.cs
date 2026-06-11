@@ -178,6 +178,11 @@ namespace NuaSpa.Api.Controllers
                 return NotFound();
             }
 
+            if (!detail.IsAuthorized)
+            {
+                return Forbid();
+            }
+
             return Ok(detail);
         }
 
@@ -225,7 +230,8 @@ namespace NuaSpa.Api.Controllers
                 search?.Search,
                 search?.StatusFilter ?? "all",
                 page,
-                pageSize);
+                pageSize,
+                search?.UslugaId);
             if (dto == null) return NotFound();
             return Ok(dto);
         }
