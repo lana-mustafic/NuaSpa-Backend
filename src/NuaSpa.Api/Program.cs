@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
@@ -91,7 +91,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Unesite JWT token u formatu: Bearer {vaš_token}"
+        Description = "Unesite JWT token u formatu: Bearer {va�_token}"
     };
 
     c.AddSecurityDefinition("Bearer", securityScheme);
@@ -248,7 +248,7 @@ var serviceTypes = applicationAssembly.GetTypes()
 
 foreach (var serviceType in serviceTypes)
 {
-    // Ovo će naći IUslugaService za UslugaService
+    // Ovo ce naci IUslugaService za UslugaService
     var interfaceType = serviceType.GetInterface($"I{serviceType.Name}");
     if (interfaceType != null)
     {
@@ -286,13 +286,13 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Došlo je do greške prilikom migracije baze podataka.");
+        logger.LogError(ex, "Do�lo je do gre�ke prilikom migracije baze podataka.");
         throw;
     }
 }
 
 // --- DEV SEED LOGIN KORISNIKA (dummy hash iz migracija ne radi za login) ---
-// U Development okruženju osiguraj radne test kredencijale:
+// U Development okru�enju osiguraj radne test kredencijale:
 // - admin / Admin123!
 // - lana  / Lana123!
 if (app.Environment.IsDevelopment())
@@ -304,7 +304,7 @@ if (app.Environment.IsDevelopment())
         var userManager = services.GetRequiredService<UserManager<Korisnik>>();
         var roleManager = services.GetRequiredService<RoleManager<Uloga>>();
 
-        // Uloge bi trebale već postojati iz seed-a, ali osiguraj ih za svaki slučaj.
+        // Uloge bi trebale vec postojati iz seed-a, ali osiguraj ih za svaki slucaj.
         var rolesToEnsure = new[] { RoleConstants.Admin, RoleConstants.Klijent, RoleConstants.Zaposlenik };
         foreach (var roleName in rolesToEnsure)
         {
@@ -345,7 +345,7 @@ if (app.Environment.IsDevelopment())
                 }
             }
 
-            // Force-set lozinke na poznatu vrijednost (radi čak i ako je seed ubacio dummy hash).
+            // Force-set lozinke na poznatu vrijednost (radi cak i ako je seed ubacio dummy hash).
             var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
             var reset = await userManager.ResetPasswordAsync(user, resetToken, password);
             if (!reset.Succeeded)
@@ -454,10 +454,12 @@ var webRootPath = app.Environment.WebRootPath
     ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "usluge"));
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "obavijesti"));
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "terapeuti"));
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads", "terapeuti"));
 
 app.UseAuthentication();
 
-// Javne slike usluga — mora biti prije UseAuthorization (FallbackPolicy inače vraća 401).
+// Javne slike usluga � mora biti prije UseAuthorization (FallbackPolicy inace vraca 401).
 var uslugeUploadRoot = Path.Combine(webRootPath, "uploads", "usluge");
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -486,3 +488,4 @@ app.MapHub<NuaSpa.Api.Hubs.NotificationsHub>("/hubs/notifications");
 app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();
+

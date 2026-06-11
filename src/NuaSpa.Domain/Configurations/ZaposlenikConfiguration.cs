@@ -19,6 +19,7 @@ public class ZaposlenikConfiguration : IEntityTypeConfiguration<Zaposlenik>
         builder.Property(z => z.Obrazovanje).HasMaxLength(1000);
         builder.Property(z => z.Lokacija).HasMaxLength(120);
         builder.Property(z => z.Bio).HasMaxLength(2000);
+        builder.Property(z => z.SlikaUrl).HasMaxLength(500);
 
         builder.HasOne(z => z.KategorijaUsluga)
             .WithMany()
@@ -27,4 +28,5 @@ public class ZaposlenikConfiguration : IEntityTypeConfiguration<Zaposlenik>
             .OnDelete(DeleteBehavior.SetNull);
     }
 }
+
 

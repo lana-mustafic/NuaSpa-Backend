@@ -39,6 +39,8 @@ namespace NuaSpa.Application.Interfaces
 
         Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId);
 
+        Task<TherapistMyProfileDto?> GetMyProfileAsync(int zaposlenikId);
+
         /// <summary>Services the therapist is certified to perform (category + specialization).</summary>
         Task<IReadOnlyList<UslugaDTO>> GetMyServicesAsync(int zaposlenikId);
 
@@ -46,6 +48,8 @@ namespace NuaSpa.Application.Interfaces
         Task<TherapistServiceDetailDto?> GetMyServiceDetailAsync(int zaposlenikId, int uslugaId);
 
         Task<ZaposlenikDTO?> UpdateMeAsync(int zaposlenikId, TherapistSelfProfileUpdateDto dto);
+
+        Task<ZaposlenikDTO?> UpdateMyAvatarUrlAsync(int zaposlenikId, string? slikaUrl);
 
         Task<TherapistDashboardDto?> GetDashboardAsync(int zaposlenikId, DateTime? day = null);
 

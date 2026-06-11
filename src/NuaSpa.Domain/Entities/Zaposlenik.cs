@@ -45,6 +45,10 @@ namespace NuaSpa.Domain.Entities
         [MaxLength(2000)]
         public string? Bio { get; set; }
 
+        /// <summary>Relative or absolute URL to profile photo.</summary>
+        [MaxLength(500)]
+        public string? SlikaUrl { get; set; }
+
         [Required]
         public DateTime DatumZaposlenja { get; set; }
 
@@ -52,3 +56,4 @@ namespace NuaSpa.Domain.Entities
         public ZaposlenikStatus Status { get; set; } = ZaposlenikStatus.Active;
     }
 }
+

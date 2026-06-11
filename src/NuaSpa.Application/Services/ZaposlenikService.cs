@@ -350,6 +350,7 @@ namespace NuaSpa.Application.Services
             entity.Jezici = NormalizeOptional(dto.Jezici, 200);
             entity.Obrazovanje = NormalizeOptional(dto.Obrazovanje, 1000);
             entity.Bio = NormalizeOptional(dto.Bio, 2000);
+            entity.SlikaUrl = NormalizeOptional(dto.SlikaUrl, 500);
             entity.Lokacija = NormalizeOptional(dto.Lokacija, 120);
             entity.Telefon = string.IsNullOrWhiteSpace(dto.Telefon)
                 ? null
@@ -380,6 +381,7 @@ namespace NuaSpa.Application.Services
                 Jezici = z.Jezici,
                 Obrazovanje = z.Obrazovanje,
                 Bio = z.Bio,
+                SlikaUrl = z.SlikaUrl,
                 Lokacija = z.Lokacija,
                 DatumZaposlenja = z.DatumZaposlenja,
                 Status = z.Status,
@@ -469,6 +471,73 @@ namespace NuaSpa.Application.Services
             return entity == null ? null : MapToDto(entity);
         }
 
+        public async Task<TherapistMyProfileDto?> GetMyProfileAsync(int zaposlenikId)
+        {
+            var entity = await _context.Zaposlenici
+                .AsNoTracking()
+                .Include(z => z.KategorijaUsluga)
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (entity == null)
+            {
+                return null;
+            }
+
+            var linkedUser = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(k => k.ZaposlenikId == zaposlenikId);
+
+            var now = DateTime.UtcNow;
+            var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var monthEnd = monthStart.AddMonths(1);
+
+            var reservationBase = _context.Rezervacije.AsNoTracking()
+                .Where(r => r.ZaposlenikId == zaposlenikId);
+
+            var allTimeCompleted = await reservationBase.CountAsync(r =>
+                !r.IsOtkazana && r.Status == RezervacijaStatus.Completed);
+
+            var completedMonth = await reservationBase.CountAsync(r =>
+                !r.IsOtkazana
+                && r.Status == RezervacijaStatus.Completed
+                && r.DatumRezervacije >= monthStart
+                && r.DatumRezervacije < monthEnd);
+
+            var reviewQuery = TherapistReviewQuery(zaposlenikId);
+            var reviewCount = await reviewQuery.CountAsync();
+            var averageRating = reviewCount == 0
+                ? 0.0
+                : Math.Round(await reviewQuery.AverageAsync(rev => (double)rev.Ocjena), 2);
+
+            var eligibleCount = await CountEligibleServicesAsync(entity);
+
+            var next = await reservationBase
+                .Where(r => !r.IsOtkazana && r.DatumRezervacije >= now)
+                .OrderBy(r => r.DatumRezervacije)
+                .Select(r => new TherapistProfileNextAppointmentDto
+                {
+                    Id = r.Id,
+                    DatumRezervacije = r.DatumRezervacije,
+                    UslugaNaziv = r.Usluga.Naziv,
+                    KorisnikIme = r.Korisnik == null
+                        ? null
+                        : (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Trim(),
+                })
+                .FirstOrDefaultAsync();
+
+            return new TherapistMyProfileDto
+            {
+                Profile = MapToDto(entity),
+                LoginEmail = linkedUser?.Email,
+                AccountLinkedAt = linkedUser?.DatumRegistracije,
+                EligibleServicesCount = eligibleCount,
+                AverageRating = averageRating,
+                ReviewCount = reviewCount,
+                AllTimeCompletedSessions = allTimeCompleted,
+                CompletedSessionsThisMonth = completedMonth,
+                NextAppointment = next,
+            };
+        }
+
         public async Task<IReadOnlyList<UslugaDTO>> GetMyServicesAsync(int zaposlenikId)
         {
             var therapist = await _context.Zaposlenici
@@ -479,17 +548,58 @@ namespace NuaSpa.Application.Services
                 return Array.Empty<UslugaDTO>();
             }
 
+            if (therapist.KategorijaUslugaId is not int katId || katId <= 0)
+            {
+                return Array.Empty<UslugaDTO>();
+            }
+
+            var specNames = TherapistServiceEligibility.ParseSpecNames(therapist.Specijalizacija);
+            if (specNames.Count == 0)
+            {
+                return Array.Empty<UslugaDTO>();
+            }
+
+            var specLookup = new HashSet<string>(
+                specNames.Select(n => n.ToLowerInvariant()),
+                StringComparer.OrdinalIgnoreCase);
+
             var usluge = await _context.Usluge
                 .AsNoTracking()
                 .Include(u => u.KategorijaUsluga)
-                .Where(u => !u.IsDeleted)
+                .Where(u => !u.IsDeleted && u.KategorijaUslugaId == katId)
                 .OrderBy(u => u.Naziv)
                 .ToListAsync();
 
             return usluge
-                .Where(u => TherapistServiceEligibility.Matches(u, therapist, requireActive: false))
+                .Where(u => specLookup.Contains(u.Naziv.Trim()))
                 .Select(u => _mapper.Map<UslugaDTO>(u))
                 .ToList();
+        }
+
+        private async Task<int> CountEligibleServicesAsync(Zaposlenik therapist)
+        {
+            if (therapist.KategorijaUslugaId is not int katId || katId <= 0)
+            {
+                return 0;
+            }
+
+            var specNames = TherapistServiceEligibility.ParseSpecNames(therapist.Specijalizacija);
+            if (specNames.Count == 0)
+            {
+                return 0;
+            }
+
+            var specLookup = new HashSet<string>(
+                specNames.Select(n => n.ToLowerInvariant()),
+                StringComparer.OrdinalIgnoreCase);
+
+            var names = await _context.Usluge
+                .AsNoTracking()
+                .Where(u => !u.IsDeleted && u.KategorijaUslugaId == katId)
+                .Select(u => u.Naziv)
+                .ToListAsync();
+
+            return names.Count(n => specLookup.Contains(n.Trim()));
         }
 
         public async Task<TherapistServiceDetailDto?> GetMyServiceDetailAsync(
@@ -676,6 +786,21 @@ namespace NuaSpa.Application.Services
             entity.Jezici = NormalizeOptional(dto.Jezici, 200);
             entity.Bio = NormalizeOptional(dto.Bio, 2000);
 
+            await _context.SaveChangesAsync();
+            return MapToDto(entity);
+        }
+
+        public async Task<ZaposlenikDTO?> UpdateMyAvatarUrlAsync(int zaposlenikId, string? slikaUrl)
+        {
+            var entity = await _context.Zaposlenici
+                .Include(z => z.KategorijaUsluga)
+                .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
+            if (entity == null)
+            {
+                return null;
+            }
+
+            entity.SlikaUrl = NormalizeOptional(slikaUrl, 500);
             await _context.SaveChangesAsync();
             return MapToDto(entity);
         }

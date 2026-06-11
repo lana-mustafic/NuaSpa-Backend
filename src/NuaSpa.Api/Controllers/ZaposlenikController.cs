@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using NuaSpa.Api.Extensions;
 using NuaSpa.Application.DTOs;
@@ -14,10 +15,14 @@ namespace NuaSpa.Api.Controllers
     public class ZaposlenikController : BaseController<ZaposlenikDTO, ZaposlenikSearchObject>
     {
         private readonly IZaposlenikService _zaposlenikService;
+        private readonly IWebHostEnvironment _env;
 
-    public ZaposlenikController(IZaposlenikService service) : base(service)
+    public ZaposlenikController(
+            IZaposlenikService service,
+            IWebHostEnvironment env) : base(service)
         {
             _zaposlenikService = service;
+            _env = env;
         }
 
         [HttpGet]
@@ -146,7 +151,36 @@ namespace NuaSpa.Api.Controllers
                 return Forbid();
             }
             var dto = await _zaposlenikService.GetMeAsync(id);
-            if (dto == null || dto.Id == 0) return NotFound();
+            if (dto == null || dto.Id == 0)
+            {
+                return NotFound(new
+                {
+                    message =
+                        "Therapist profile not found. Contact your spa administrator to link your account.",
+                });
+            }
+            return Ok(dto);
+        }
+
+        [HttpGet("me/profile")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
+        public async Task<ActionResult<TherapistMyProfileDto>> GetMyProfile()
+        {
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
+
+            var dto = await _zaposlenikService.GetMyProfileAsync(id);
+            if (dto == null)
+            {
+                return NotFound(new
+                {
+                    message =
+                        "Therapist profile not found. Contact your spa administrator to link your account.",
+                });
+            }
+
             return Ok(dto);
         }
 
@@ -197,6 +231,63 @@ namespace NuaSpa.Api.Controllers
             var updated = await _zaposlenikService.UpdateMeAsync(id, body);
             if (updated == null) return NotFound();
             return Ok(updated);
+        }
+
+        /// <summary>Upload therapist profile photo; updates SlikaUrl on the staff record.</summary>
+        [HttpPost("me/avatar")]
+        [Authorize(Roles = RoleConstants.Zaposlenik)]
+        [RequestSizeLimit(4_000_000)]
+        public async Task<ActionResult<object>> UploadMyAvatar(
+            IFormFile? file,
+            CancellationToken cancellationToken = default)
+        {
+            if (!User.TryGetNuaSpaZaposlenikId(out var id))
+            {
+                return Forbid();
+            }
+
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { message = "No file selected." });
+            }
+
+            if (file.Length > 4_000_000)
+            {
+                return BadRequest(new { message = "File is too large (max 4 MB)." });
+            }
+
+            await using var readStream = file.OpenReadStream();
+            if (!UploadImageValidator.TryValidate(
+                    file.FileName,
+                    file.ContentType,
+                    readStream,
+                    out var validationError))
+            {
+                return BadRequest(new { message = validationError });
+            }
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+            var dir = Path.Combine(webRoot, "uploads", "terapeuti");
+            Directory.CreateDirectory(dir);
+
+            var safeName = $"{id}_{Guid.NewGuid():N}{ext}";
+            var physical = Path.Combine(dir, safeName);
+
+            readStream.Position = 0;
+            await using (var outStream = System.IO.File.Create(physical))
+            {
+                await readStream.CopyToAsync(outStream, cancellationToken);
+            }
+
+            var url = $"/api/files/terapeuti/{safeName}";
+            var updated = await _zaposlenikService.UpdateMyAvatarUrlAsync(id, url);
+            if (updated == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(new { url, profile = updated });
         }
 
         [HttpGet("me/dashboard")]
@@ -306,3 +397,5 @@ namespace NuaSpa.Api.Controllers
         }
     }
 }
+
+
