@@ -13,4 +13,7 @@ public class TherapistServiceDetailDto
     public bool IsAuthorized { get; set; }
 
     public ZaposlenikStatus EmploymentStatus { get; set; } = ZaposlenikStatus.Active;
+
+    /// <summary>Completed appointments performed by this therapist for this service.</summary>
+    public int CompletedBookingsCount { get; set; }
 }

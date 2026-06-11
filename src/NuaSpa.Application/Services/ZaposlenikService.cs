@@ -521,12 +521,22 @@ namespace NuaSpa.Application.Services
                 therapist,
                 requireActive: false);
 
+            var completedBookings = await _context.Rezervacije
+                .AsNoTracking()
+                .CountAsync(r =>
+                    r.ZaposlenikId == zaposlenikId
+                    && r.UslugaId == uslugaId
+                    && !r.IsDeleted
+                    && !r.IsOtkazana
+                    && r.Status == RezervacijaStatus.Completed);
+
             return new TherapistServiceDetailDto
             {
                 Service = _mapper.Map<UslugaDTO>(usluga),
                 IsCertified = isEligible,
                 IsAuthorized = isEligible,
                 EmploymentStatus = therapist.Status,
+                CompletedBookingsCount = completedBookings,
             };
         }
 
@@ -637,11 +647,17 @@ namespace NuaSpa.Application.Services
         public async Task<PagedResult<TherapistReviewRowDto>> GetMyReviewsPagedAsync(
             int zaposlenikId,
             int page = 1,
-            int pageSize = 20)
+            int pageSize = 20,
+            int? uslugaId = null)
         {
             (page, pageSize) = PaginationHelper.Normalize(page, pageSize);
-            var query = TherapistReviewQuery(zaposlenikId)
-                .OrderByDescending(rev => rev.CreatedAt);
+            var query = TherapistReviewQuery(zaposlenikId);
+            if (uslugaId is > 0)
+            {
+                query = query.Where(rev => rev.UslugaId == uslugaId);
+            }
+
+            query = query.OrderByDescending(rev => rev.CreatedAt);
 
             var total = await query.CountAsync();
             var items = await query
@@ -671,9 +687,15 @@ namespace NuaSpa.Application.Services
             };
         }
 
-        public async Task<TherapistMyReviewsSummaryDto> GetMyReviewsSummaryAsync(int zaposlenikId)
+        public async Task<TherapistMyReviewsSummaryDto> GetMyReviewsSummaryAsync(
+            int zaposlenikId,
+            int? uslugaId = null)
         {
             var query = TherapistReviewQuery(zaposlenikId);
+            if (uslugaId is > 0)
+            {
+                query = query.Where(rev => rev.UslugaId == uslugaId);
+            }
             var total = await query.CountAsync();
             if (total == 0)
             {
