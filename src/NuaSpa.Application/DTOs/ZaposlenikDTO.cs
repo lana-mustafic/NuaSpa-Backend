@@ -1,4 +1,4 @@
-﻿using NuaSpa.Domain.Enums;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.DTOs;
 
@@ -15,6 +15,7 @@ public class ZaposlenikDTO
     public string? Jezici { get; set; }
     public string? Obrazovanje { get; set; }
     public string? Lokacija { get; set; }
+    public string? Bio { get; set; }
     public DateTime DatumZaposlenja { get; set; }
     public ZaposlenikStatus Status { get; set; } = ZaposlenikStatus.Active;
 }

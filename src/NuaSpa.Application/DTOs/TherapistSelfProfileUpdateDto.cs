@@ -5,4 +5,6 @@ public class TherapistSelfProfileUpdateDto
 {
     public string? Telefon { get; set; }
     public string? Jezici { get; set; }
+    public string? Bio { get; set; }
 }
+

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
@@ -27,7 +27,7 @@ namespace NuaSpa.Domain.Entities
         [MaxLength(120)]
         public string? Email { get; set; }
 
-        /// <summary>Primarna kategorija usluga za koju je terapeut predviđen.</summary>
+        /// <summary>Primarna kategorija usluga za koju je terapeut predviden.</summary>
         public int? KategorijaUslugaId { get; set; }
 
         public virtual KategorijaUsluga? KategorijaUsluga { get; set; }
@@ -40,6 +40,10 @@ namespace NuaSpa.Domain.Entities
 
         [MaxLength(120)]
         public string? Lokacija { get; set; }
+
+        /// <summary>Short therapist bio shown on profile (self-service editable).</summary>
+        [MaxLength(2000)]
+        public string? Bio { get; set; }
 
         [Required]
         public DateTime DatumZaposlenja { get; set; }

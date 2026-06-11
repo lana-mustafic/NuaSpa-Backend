@@ -349,6 +349,7 @@ namespace NuaSpa.Application.Services
                 : null;
             entity.Jezici = NormalizeOptional(dto.Jezici, 200);
             entity.Obrazovanje = NormalizeOptional(dto.Obrazovanje, 1000);
+            entity.Bio = NormalizeOptional(dto.Bio, 2000);
             entity.Lokacija = NormalizeOptional(dto.Lokacija, 120);
             entity.Telefon = string.IsNullOrWhiteSpace(dto.Telefon)
                 ? null
@@ -378,6 +379,7 @@ namespace NuaSpa.Application.Services
                 KategorijaUslugaNaziv = z.KategorijaUsluga?.Naziv,
                 Jezici = z.Jezici,
                 Obrazovanje = z.Obrazovanje,
+                Bio = z.Bio,
                 Lokacija = z.Lokacija,
                 DatumZaposlenja = z.DatumZaposlenja,
                 Status = z.Status,
@@ -672,6 +674,7 @@ namespace NuaSpa.Application.Services
                 ? null
                 : dto.Telefon.Trim();
             entity.Jezici = NormalizeOptional(dto.Jezici, 200);
+            entity.Bio = NormalizeOptional(dto.Bio, 2000);
 
             await _context.SaveChangesAsync();
             return MapToDto(entity);
@@ -1445,3 +1448,4 @@ namespace NuaSpa.Application.Services
         private sealed record DayAppointment(DateTime Start, int DurationMinutes);
     }
 }
+
