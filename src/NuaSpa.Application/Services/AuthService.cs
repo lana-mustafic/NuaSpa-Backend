@@ -153,7 +153,7 @@ public class AuthService : IAuthService
         var roles = await _userManager.GetRolesAsync(user);
         var hasPassword = await _userManager.HasPasswordAsync(user);
 
-        return new AccountProfileDto
+        var dto = new AccountProfileDto
         {
             UserId = user.Id,
             UserName = user.UserName ?? string.Empty,
@@ -165,6 +165,47 @@ public class AuthService : IAuthService
             HasPassword = hasPassword,
             ZaposlenikId = user.ZaposlenikId,
         };
+
+        var korisnik = await _context.Users.AsNoTracking()
+            .Include(k => k.Grad)
+            .FirstOrDefaultAsync(k => k.Id == userId, ct);
+
+        if (korisnik != null)
+        {
+            dto.Phone = korisnik.PhoneNumber;
+            dto.CityName = korisnik.Grad?.Naziv;
+            dto.MemberSince = korisnik.DatumRegistracije;
+
+            if (roles.Contains(RoleConstants.Klijent))
+            {
+                var visitStats = await _context.Rezervacije.AsNoTracking()
+                    .Where(r => !r.IsOtkazana && r.KorisnikId == userId)
+                    .GroupBy(_ => 1)
+                    .Select(g => new
+                    {
+                        Count = g.Count(),
+                        Last = g.Max(x => x.DatumRezervacije),
+                    })
+                    .FirstOrDefaultAsync(ct);
+
+                var totalSpent = await _context.Placanja.AsNoTracking()
+                    .Where(p => !p.IsDeleted)
+                    .Where(p => p.Status == PlacanjeStatus.Completed)
+                    .Where(p =>
+                        p.Rezervacija != null
+                        && !p.Rezervacija.IsDeleted
+                        && p.Rezervacija.KorisnikId == userId)
+                    .SumAsync(p => p.NaplaceniIznos ?? p.Iznos, ct);
+
+                var visits = visitStats?.Count ?? 0;
+                dto.TotalVisits = visits;
+                dto.TotalSpent = totalSpent;
+                dto.LastVisit = visitStats?.Last;
+                dto.IsVip = korisnik.IsVipKlijent || visits >= 10 || totalSpent >= 600m;
+            }
+        }
+
+        return dto;
     }
 
     public async Task LogoutAsync(
