@@ -153,7 +153,7 @@ namespace NuaSpa.Application.Services
                 .FirstOrDefaultAsync(u => u.Id == dto.UslugaId && !u.IsDeleted);
             if (usluga == null)
             {
-                throw new BusinessRuleException("Usluga nije pronađena.");
+                throw new BusinessRuleException("Service not found.");
             }
 
             var durationMinutes = RezervacijaPricing.ResolveDurationMinutes(usluga.TrajanjeMinuta);
@@ -180,7 +180,7 @@ namespace NuaSpa.Application.Services
                         x.IsAktivna &&
                         x.SpaCentarId == DefaultSpaCentarId);
                 if (prostorija == null)
-                    throw new BusinessRuleException("Prostorija nije dostupna.");
+                    throw new BusinessRuleException("Room is not available.");
 
                 await ValidateRoomOverlapAsync(
                     dto.ProstorijaId.Value,
@@ -321,7 +321,7 @@ namespace NuaSpa.Application.Services
                         x.Id == dto.ProstorijaId.Value &&
                         x.IsAktivna &&
                         x.SpaCentarId == DefaultSpaCentarId);
-                if (prostorija == null) throw new BusinessRuleException("Prostorija nije dostupna.");
+                if (prostorija == null) throw new BusinessRuleException("Room is not available.");
 
                 await ValidateRoomOverlapAsync(
                     dto.ProstorijaId.Value,
@@ -617,25 +617,25 @@ namespace NuaSpa.Application.Services
                 .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
             if (therapist == null)
             {
-                throw new BusinessRuleException("Terapeut nije pronađen.");
+                throw new BusinessRuleException("Therapist not found.");
             }
 
             if (therapist.Status != ZaposlenikStatus.Active)
             {
-                throw new BusinessRuleException("Terapeut nije dostupan za rezervacije.");
+                throw new BusinessRuleException("Therapist is not available for bookings.");
             }
 
             var usluga = await _context.Usluge.AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == uslugaId && !u.IsDeleted);
             if (usluga == null)
             {
-                throw new BusinessRuleException("Usluga nije pronađena.");
+                throw new BusinessRuleException("Service not found.");
             }
 
             if (!TherapistServiceEligibility.Matches(usluga, therapist))
             {
                 throw new BusinessRuleException(
-                    "Odabrani terapeut ne može izvoditi ovu uslugu.");
+                    "The selected therapist cannot perform this service.");
             }
 
             var duration = RezervacijaPricing.ResolveDurationMinutes(durationMinutes);
@@ -658,7 +658,7 @@ namespace NuaSpa.Application.Services
                 if (c.DatumRezervacije < end && cEnd > start)
                 {
                     throw new BusinessRuleException(
-                        "Terapeut je već zauzet u odabranom terminu.");
+                        "The therapist is already booked at the selected time.");
                 }
             }
         }
@@ -771,7 +771,7 @@ namespace NuaSpa.Application.Services
             if (duplicate)
             {
                 throw new BusinessRuleException(
-                    "Već postoji aktivna rezervacija za istog klijenta, terapeuta i termin.");
+                    "An active booking already exists for this client, therapist, and time.");
             }
         }
 
@@ -792,7 +792,7 @@ namespace NuaSpa.Application.Services
 
             if (hasOverlap)
             {
-                throw new BusinessRuleException("Prostorija je već zauzeta u odabranom terminu.");
+                throw new BusinessRuleException("The room is already booked at the selected time.");
             }
         }
 
@@ -811,7 +811,7 @@ namespace NuaSpa.Application.Services
 
             if (opremaInDb.Count != opremaIds.Count)
             {
-                throw new BusinessRuleException("Dio opreme nije dostupan.");
+                throw new BusinessRuleException("Some equipment is not available.");
             }
 
             var end = start.AddMinutes(durationMinutes);
@@ -844,7 +844,7 @@ namespace NuaSpa.Application.Services
                 var already = reservedMap.TryGetValue(item.OpremaId, out var v) ? v : 0;
                 if (already + item.Kolicina > total)
                 {
-                    throw new BusinessRuleException("Nema dovoljno opreme za odabrani termin.");
+                    throw new BusinessRuleException("Not enough equipment for the selected time.");
                 }
             }
         }

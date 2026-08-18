@@ -18,7 +18,7 @@ public static class RezervacijaPricing
         if (duration > MaxDurationMinutes)
         {
             throw new BusinessRuleException(
-                $"Trajanje usluge ({duration} min) prelazi maksimalno dozvoljeno ({MaxDurationMinutes} min).");
+                $"Service duration ({duration} min) exceeds the maximum allowed ({MaxDurationMinutes} min).");
         }
 
         return duration;
@@ -29,7 +29,7 @@ public static class RezervacijaPricing
         var amount = snapshotPrice is > 0 ? snapshotPrice.Value : catalogPrice;
         if (amount < 0)
         {
-            throw new BusinessRuleException("Cijena rezervacije ne može biti negativna.");
+            throw new BusinessRuleException("Booking price cannot be negative.");
         }
 
         return decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
@@ -49,7 +49,7 @@ public static class RezervacijaPricing
     {
         if (isClosed)
         {
-            throw new BusinessRuleException("Spa centar je zatvoren za odabrani dan.");
+            throw new BusinessRuleException("The spa is closed on the selected day.");
         }
 
         var startMin = slotStart.Hour * 60 + slotStart.Minute;
@@ -57,13 +57,13 @@ public static class RezervacijaPricing
 
         if (startMin < openMin)
         {
-            throw new BusinessRuleException("Termin počinje prije radnog vremena spa centra.");
+            throw new BusinessRuleException("The appointment starts before the spa opens.");
         }
 
         if (endMin > closeMin)
         {
             throw new BusinessRuleException(
-                "Cijeli termin (uključujući trajanje usluge) mora stati unutar radnog vremena spa centra.");
+                "The full appointment (including service duration) must fit within spa working hours.");
         }
     }
 }

@@ -524,7 +524,7 @@ public class PaymentService : IPaymentService
 
         if (rezervacija.Status != RezervacijaStatus.Confirmed)
         {
-            throw new BusinessRuleException("Plaćanje je moguće samo za potvrđenu rezervaciju.");
+            throw new BusinessRuleException("Online payment is only available for confirmed reservations.");
         }
     }
 
