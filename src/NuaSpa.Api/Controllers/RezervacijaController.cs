@@ -37,17 +37,22 @@ namespace NuaSpa.Api.Controllers
         [Authorize(Roles = RoleConstants.KlijentAdmin)]
         public async Task<ActionResult<RezervacijaDTO>> Create([FromBody] RezervacijaCreateDTO dto)
         {
-            if (!User.IsInRole(RoleConstants.Admin) &&
-                dto.KorisnikId.HasValue &&
-                dto.KorisnikId.Value != User.GetNuaSpaUserId())
+            int korisnikId;
+            var isAdminBooking = User.IsInRole(RoleConstants.Admin);
+            if (isAdminBooking)
             {
-                return Forbid();
+                if (!dto.KorisnikId.HasValue || dto.KorisnikId.Value <= 0)
+                {
+                    return BadRequest(new { message = "Select a client." });
+                }
+
+                korisnikId = dto.KorisnikId.Value;
+            }
+            else
+            {
+                korisnikId = User.GetNuaSpaUserId();
             }
 
-            var korisnikId = User.IsInRole(RoleConstants.Admin) && dto.KorisnikId.HasValue
-                ? dto.KorisnikId.Value
-                : User.GetNuaSpaUserId();
-            var isAdminBooking = User.IsInRole(RoleConstants.Admin);
             var created = await _rezervacijaService.CreateAsync(korisnikId, dto, isAdminBooking);
             try
             {
