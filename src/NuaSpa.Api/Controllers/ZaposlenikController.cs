@@ -47,7 +47,7 @@ namespace NuaSpa.Api.Controllers
 
         /// <summary>Override base route so literal paths like <c>me</c> are not parsed as numeric ids.</summary>
         [HttpGet("{id:int}")]
-        public new async Task<ActionResult<ZaposlenikDTO>> GetById(int id)
+        public override async Task<ActionResult<ZaposlenikDTO>> GetById(int id)
         {
             var dto = await _zaposlenikService.GetById(id);
             if (dto == null || dto.Id == 0)
