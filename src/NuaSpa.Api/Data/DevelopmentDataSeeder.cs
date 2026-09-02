@@ -28,6 +28,7 @@ public static class DevelopmentDataSeeder
         var seedImageUrl = await EnsureSeedImageAsync(env, logger, cancellationToken);
         await RemoveLegacyBeautyCatalogAsync(context, logger, cancellationToken);
         await SyncTherapistServiceSpecializationsAsync(context, logger, cancellationToken);
+        await AlignReservationLegacyFlagsAsync(context, cancellationToken);
 
         if (await context.Usluge.CountAsync(cancellationToken) >= 8)
         {
@@ -460,12 +461,11 @@ public static class DevelopmentDataSeeder
                     ProstorijaId = prostorija?.Id,
                     DatumRezervacije = datum,
                     Status = isPast ? RezervacijaStatus.Completed : RezervacijaStatus.Pending,
-                    IsPotvrdjena = true,
                     IsPlacena = isPast && rng.NextDouble() > 0.3,
-                    IsOtkazana = false,
                     CreatedAt = now,
                     IsDeleted = false,
                 };
+                rez.SyncLegacyFlagsFromStatus();
                 context.Rezervacije.Add(rez);
             }
 
@@ -535,7 +535,7 @@ public static class DevelopmentDataSeeder
         var rng = new Random(424242);
         var paidReservations = await context.Rezervacije
             .Include(r => r.Usluga)
-            .Where(r => !r.IsDeleted && r.IsPlacena && !r.IsOtkazana)
+            .Where(r => !r.IsDeleted && r.IsPlacena && r.Status != RezervacijaStatus.Cancelled)
             .OrderByDescending(r => r.DatumRezervacije)
             .Take(10)
             .ToListAsync(ct);
@@ -569,7 +569,7 @@ public static class DevelopmentDataSeeder
 
         var pending = await context.Rezervacije
             .Include(r => r.Usluga)
-            .Where(r => !r.IsDeleted && !r.IsPlacena && !r.IsOtkazana && r.DatumRezervacije >= DateTime.UtcNow)
+            .Where(r => !r.IsDeleted && !r.IsPlacena && r.Status != RezervacijaStatus.Cancelled && r.DatumRezervacije >= DateTime.UtcNow)
             .Take(3)
             .ToListAsync(ct);
 
@@ -595,5 +595,38 @@ public static class DevelopmentDataSeeder
         }
 
         await context.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Repairs existing rows where legacy booleans drifted from <see cref="RezervacijaStatus"/>.
+    /// </summary>
+    private static async Task AlignReservationLegacyFlagsAsync(
+        NuaSpaContext context,
+        CancellationToken ct)
+    {
+        await context.Rezervacije
+            .Where(r =>
+                r.Status == RezervacijaStatus.Pending
+                && (r.IsPotvrdjena || r.IsOtkazana))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.IsPotvrdjena, false)
+                .SetProperty(r => r.IsOtkazana, false), ct);
+
+        await context.Rezervacije
+            .Where(r =>
+                (r.Status == RezervacijaStatus.Confirmed
+                    || r.Status == RezervacijaStatus.Completed)
+                && (!r.IsPotvrdjena || r.IsOtkazana))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.IsPotvrdjena, true)
+                .SetProperty(r => r.IsOtkazana, false), ct);
+
+        await context.Rezervacije
+            .Where(r =>
+                r.Status == RezervacijaStatus.Cancelled
+                && (r.IsPotvrdjena || !r.IsOtkazana))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.IsPotvrdjena, false)
+                .SetProperty(r => r.IsOtkazana, true), ct);
     }
 }
