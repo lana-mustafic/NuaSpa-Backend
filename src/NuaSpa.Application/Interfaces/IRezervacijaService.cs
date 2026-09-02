@@ -44,6 +44,12 @@ namespace NuaSpa.Application.Interfaces
 
         Task<bool> CompleteAsync(int rezervacijaId, int actorUserId, bool allowBeforeEnd = false);
 
+        Task<bool> CompleteForZaposlenikAsync(
+            int rezervacijaId,
+            int zaposlenikId,
+            int actorUserId,
+            bool allowBeforeEnd = false);
+
         Task<List<DateTime>> GetAvailableSlotsAsync(
             int zaposlenikId,
             DateTime date,

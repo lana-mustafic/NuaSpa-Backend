@@ -158,16 +158,20 @@ namespace NuaSpa.Application.Services
 
             var durationMinutes = RezervacijaPricing.ResolveDurationMinutes(usluga.TrajanjeMinuta);
             var chargeAmount = RezervacijaPricing.ResolveChargeAmount(usluga.Cijena);
+            var startUtc = BookingClock.ToUtc(dto.DatumRezervacije);
 
-            var hours = await GetWorkingHoursAsync(dto.DatumRezervacije);
+            BookingClock.EnsureStartNotInPast(startUtc);
+
+            var hours = await GetWorkingHoursAsync(startUtc);
             RezervacijaPricing.ValidateFitsWorkingHours(
-                dto.DatumRezervacije,
+                startUtc,
                 durationMinutes,
                 hours.IsClosed,
                 hours.OpenMin,
                 hours.CloseMin);
 
-            await EnsureNoDuplicateAsync(korisnikId, dto.ZaposlenikId, dto.DatumRezervacije, null);
+            await EnsureNoDuplicateAsync(korisnikId, dto.ZaposlenikId, startUtc, null);
+            await EnsureClientSlotFreeAsync(korisnikId, startUtc, durationMinutes, null);
 
             // Validate selected room (optional) + equipment availability for the slot.
             Prostorija? prostorija = null;
@@ -184,7 +188,7 @@ namespace NuaSpa.Application.Services
 
                 await ValidateRoomOverlapAsync(
                     dto.ProstorijaId.Value,
-                    dto.DatumRezervacije,
+                    startUtc,
                     durationMinutes,
                     excludeRezervacijaId: null);
             }
@@ -199,7 +203,7 @@ namespace NuaSpa.Application.Services
             {
                 await ValidateEquipmentAvailabilityAsync(
                     opremaItems,
-                    dto.DatumRezervacije,
+                    startUtc,
                     durationMinutes,
                     excludeRezervacijaId: null);
             }
@@ -207,7 +211,7 @@ namespace NuaSpa.Application.Services
             await ValidateTherapistAndSlotAsync(
                 dto.ZaposlenikId,
                 dto.UslugaId,
-                dto.DatumRezervacije,
+                startUtc,
                 durationMinutes);
 
             var entity = new Rezervacija
@@ -215,7 +219,7 @@ namespace NuaSpa.Application.Services
                 KorisnikId = korisnikId,
                 UslugaId = dto.UslugaId,
                 ZaposlenikId = dto.ZaposlenikId,
-                DatumRezervacije = dto.DatumRezervacije,
+                DatumRezervacije = startUtc,
                 Status = RezervacijaStatus.Pending,
                 IsPotvrdjena = false,
                 IsPlacena = false,
@@ -295,21 +299,25 @@ namespace NuaSpa.Application.Services
             var durationMinutes = RezervacijaPricing.ResolveDurationMinutes(
                 await GetServiceDurationMinutesAsync(dto.UslugaId),
                 entity.SnimakTrajanjeMinuta);
+            var startUtc = BookingClock.ToUtc(dto.DatumRezervacije);
 
-            var hours = await GetWorkingHoursAsync(dto.DatumRezervacije);
+            BookingClock.EnsureStartNotInPast(startUtc);
+
+            var hours = await GetWorkingHoursAsync(startUtc);
             RezervacijaPricing.ValidateFitsWorkingHours(
-                dto.DatumRezervacije,
+                startUtc,
                 durationMinutes,
                 hours.IsClosed,
                 hours.OpenMin,
                 hours.CloseMin);
 
-            await EnsureNoDuplicateAsync(entity.KorisnikId, dto.ZaposlenikId, dto.DatumRezervacije, entity.Id);
+            await EnsureNoDuplicateAsync(entity.KorisnikId, dto.ZaposlenikId, startUtc, entity.Id);
+            await EnsureClientSlotFreeAsync(entity.KorisnikId, startUtc, durationMinutes, entity.Id);
 
             await ValidateTherapistAndSlotAsync(
                 dto.ZaposlenikId,
                 dto.UslugaId,
-                dto.DatumRezervacije,
+                startUtc,
                 durationMinutes,
                 entity.Id);
 
@@ -325,7 +333,7 @@ namespace NuaSpa.Application.Services
 
                 await ValidateRoomOverlapAsync(
                     dto.ProstorijaId.Value,
-                    dto.DatumRezervacije,
+                    startUtc,
                     durationMinutes,
                     entity.Id);
             }
@@ -340,15 +348,29 @@ namespace NuaSpa.Application.Services
             {
                 await ValidateEquipmentAvailabilityAsync(
                     opremaItems,
-                    dto.DatumRezervacije,
+                    startUtc,
                     durationMinutes,
                     entity.Id);
             }
 
             var previousUslugaId = entity.UslugaId;
+            var isMaterialChange =
+                BookingClock.ToUtc(entity.DatumRezervacije) != startUtc
+                || entity.ZaposlenikId != dto.ZaposlenikId
+                || dto.UslugaId != previousUslugaId
+                || entity.ProstorijaId != dto.ProstorijaId
+                || entity.IsVip != dto.IsVip
+                || HasEquipmentChanged(entity, opremaItems);
+
+            if (isMaterialChange)
+            {
+                await _paymentService.InvalidatePendingIntentsAsync(
+                    entity.Id,
+                    CancellationToken.None);
+            }
 
             // Apply changes
-            entity.DatumRezervacije = dto.DatumRezervacije;
+            entity.DatumRezervacije = startUtc;
             entity.ZaposlenikId = dto.ZaposlenikId;
             entity.UslugaId = dto.UslugaId;
             entity.ProstorijaId = dto.ProstorijaId;
@@ -441,7 +463,7 @@ namespace NuaSpa.Application.Services
             var duration = RezervacijaPricing.ResolveDurationMinutes(
                 entity.SnimakTrajanjeMinuta,
                 entity.SnimakTrajanjeMinuta);
-            var end = entity.DatumRezervacije.AddMinutes(duration);
+            var end = BookingClock.ToUtc(entity.DatumRezervacije).AddMinutes(duration);
             if (!allowBeforeEnd && DateTime.UtcNow < end)
             {
                 throw new BusinessRuleException("Rezervacija se može završiti tek nakon isteka termina.");
@@ -456,6 +478,19 @@ namespace NuaSpa.Application.Services
             await SafeNotifyAsync(() =>
                 _notifikacije.NotifyRezervacijaZavrsenaAsync(entity, CancellationToken.None));
             return true;
+        }
+
+        public async Task<bool> CompleteForZaposlenikAsync(
+            int rezervacijaId,
+            int zaposlenikId,
+            int actorUserId,
+            bool allowBeforeEnd = false)
+        {
+            var entity = await _context.Rezervacije.FirstOrDefaultAsync(r => r.Id == rezervacijaId);
+            if (entity == null) return false;
+            if (entity.ZaposlenikId != zaposlenikId) return false;
+
+            return await CompleteAsync(rezervacijaId, actorUserId, allowBeforeEnd);
         }
 
         public async Task<bool> SetIsVipAsync(int rezervacijaId, bool isVip)
@@ -495,7 +530,13 @@ namespace NuaSpa.Application.Services
                 slotMinutes = await GetServiceDurationMinutesAsync(uslugaId.Value);
             }
 
-            var day = date.Date;
+            var nowUtc = DateTime.UtcNow;
+            var day = BookingClock.UtcDate(date);
+            if (day < nowUtc.Date)
+            {
+                return new List<DateTime>();
+            }
+
             var hours = await GetWorkingHoursAsync(day);
             if (hours.IsClosed) return new List<DateTime>();
 
@@ -515,6 +556,11 @@ namespace NuaSpa.Application.Services
             var slots = new List<DateTime>();
             for (var t = start; t.AddMinutes(slotMinutes) <= end; t = t.AddMinutes(slotMinutes))
             {
+                if (BookingClock.ToUtc(t) <= nowUtc)
+                {
+                    continue;
+                }
+
                 var slotEnd = t.AddMinutes(slotMinutes);
                 var overlaps = taken.Any(b =>
                 {
@@ -540,7 +586,7 @@ namespace NuaSpa.Application.Services
                 .FirstOrDefaultAsync(z => z.Id == zaposlenikId);
             if (therapist == null) return null;
 
-            var day = date.Date;
+            var day = BookingClock.UtcDate(date);
             var hours = await GetWorkingHoursAsync(day);
             var isTherapistUnavailable = therapist.Status != ZaposlenikStatus.Active;
 
@@ -713,6 +759,29 @@ namespace NuaSpa.Application.Services
             RecordTransition(entity, RezervacijaStatus.Confirmed, actorUserId, "Rezervacija potvrđena.");
         }
 
+        private static bool HasEquipmentChanged(Rezervacija entity, List<RezervacijaOpremaItemDTO> opremaItems)
+        {
+            var current = (entity.RezervacijaOprema ?? [])
+                .Where(x => x.OpremaId > 0 && x.Kolicina > 0)
+                .GroupBy(x => x.OpremaId)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.Kolicina));
+
+            if (current.Count != opremaItems.Count)
+            {
+                return true;
+            }
+
+            foreach (var item in opremaItems)
+            {
+                if (!current.TryGetValue(item.OpremaId, out var qty) || qty != item.Kolicina)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void RecordTransition(
             Rezervacija entity,
             RezervacijaStatus toStatus,
@@ -761,10 +830,11 @@ namespace NuaSpa.Application.Services
             DateTime datum,
             int? excludeRezervacijaId)
         {
+            var startUtc = BookingClock.ToUtc(datum);
             var duplicate = await _context.Rezervacije.AsNoTracking().AnyAsync(r =>
                 r.KorisnikId == korisnikId &&
                 r.ZaposlenikId == zaposlenikId &&
-                r.DatumRezervacije == datum &&
+                r.DatumRezervacije == startUtc &&
                 r.Status != RezervacijaStatus.Cancelled &&
                 (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value));
 
@@ -772,6 +842,30 @@ namespace NuaSpa.Application.Services
             {
                 throw new BusinessRuleException(
                     "An active booking already exists for this client, therapist, and time.");
+            }
+        }
+
+        private async Task EnsureClientSlotFreeAsync(
+            int korisnikId,
+            DateTime start,
+            int durationMinutes,
+            int? excludeRezervacijaId)
+        {
+            var utcStart = BookingClock.ToUtc(start);
+            var utcEnd = utcStart.AddMinutes(durationMinutes);
+            var hasOverlap = await _context.Rezervacije.AsNoTracking()
+                .AnyAsync(r =>
+                    r.KorisnikId == korisnikId &&
+                    r.Status != RezervacijaStatus.Cancelled &&
+                    (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value) &&
+                    r.DatumRezervacije < utcEnd &&
+                    r.DatumRezervacije.AddMinutes(
+                        r.SnimakTrajanjeMinuta > 0 ? r.SnimakTrajanjeMinuta : 60) > utcStart);
+
+            if (hasOverlap)
+            {
+                throw new BusinessRuleException(
+                    "The client already has a booking in this time range.");
             }
         }
 
@@ -877,6 +971,8 @@ namespace NuaSpa.Application.Services
                 return new RezervacijaCancelResultDto { Otkazana = false };
             }
 
+            RezervacijaStateMachine.EnsureTransition(entity.Status, RezervacijaStatus.Cancelled);
+
             RefundPaymentResponseDto? refund = null;
             if (entity.IsPlacena)
             {
@@ -888,6 +984,10 @@ namespace NuaSpa.Application.Services
                     entity.IsPlacena = false;
                 }
             }
+
+            await _paymentService.InvalidatePendingIntentsAsync(
+                rezervacijaId,
+                CancellationToken.None);
 
             if (entity.Status == RezervacijaStatus.Cancelled)
             {

@@ -26,6 +26,15 @@ public class PaymentService : IPaymentService
         "processing",
     };
 
+    private static readonly HashSet<string> CancelableIntentStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "requires_payment_method",
+        "requires_confirmation",
+        "requires_action",
+        "requires_capture",
+        "processing",
+    };
+
     private readonly NuaSpaContext _context;
     private readonly StripeSettings _stripe;
     private readonly ISistemskaNotifikacijaService _notifikacije;
@@ -90,7 +99,8 @@ public class PaymentService : IPaymentService
                 throw new BusinessRuleException("Rezervacija je već plaćena.");
             }
 
-            if (ReusableIntentStatuses.Contains(existingIntent.Status))
+            if (ReusableIntentStatuses.Contains(existingIntent.Status)
+                && IntentMatchesExpectedCharge(existingIntent, amountMinor))
             {
                 return new CreatePaymentIntentResponseDto
                 {
@@ -101,6 +111,7 @@ public class PaymentService : IPaymentService
                 };
             }
 
+            await TryCancelStripeIntentAsync(existing.TransakcijskiBroj, existingIntent, ct);
             existing.Status = PlacanjeStatus.Failed;
         }
 
@@ -180,6 +191,8 @@ public class PaymentService : IPaymentService
             throw new BusinessRuleException("Plaćanje je refundirano.");
         }
 
+        EnsureReservationConfirmedForPayment(placanje.Rezervacija);
+
         var intentService = new PaymentIntentService();
         var intent = await intentService.GetAsync(paymentIntentId, cancellationToken: ct);
 
@@ -221,6 +234,58 @@ public class PaymentService : IPaymentService
         }
 
         return await ExecuteStripeRefundAsync(placanje, refundedByUserId: null, ct);
+    }
+
+    public async Task InvalidatePendingIntentsAsync(int rezervacijaId, CancellationToken ct)
+    {
+        var pending = await _context.Placanja
+            .Where(p =>
+                p.RezervacijaId == rezervacijaId
+                && !p.IsDeleted
+                && p.Status == PlacanjeStatus.Pending)
+            .ToListAsync(ct);
+
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var placanje in pending)
+        {
+            if (!IsStripePayment(placanje) || string.IsNullOrWhiteSpace(placanje.TransakcijskiBroj))
+            {
+                placanje.Status = PlacanjeStatus.Failed;
+                continue;
+            }
+
+            try
+            {
+                EnsureStripeSecretConfigured();
+                StripeConfiguration.ApiKey = _stripe.SecretKey;
+
+                var intentService = new PaymentIntentService();
+                var intent = await intentService.GetAsync(placanje.TransakcijskiBroj, cancellationToken: ct);
+
+                if (string.Equals(intent.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                await TryCancelStripeIntentAsync(placanje.TransakcijskiBroj, intent, ct);
+            }
+            catch (StripeException)
+            {
+                // Lokalni Pending se ipak gasi da se intent ne može reuse-ati.
+            }
+            catch (BusinessRuleException)
+            {
+                // Stripe nije konfigurisan — i dalje gasi lokalni Pending.
+            }
+
+            placanje.Status = PlacanjeStatus.Failed;
+        }
+
+        await _context.SaveChangesAsync(ct);
     }
 
     public async Task<RecordCashPaymentResponseDto> RecordCashPaymentAsync(
@@ -438,12 +503,21 @@ public class PaymentService : IPaymentService
             if (intent != null)
             {
                 var placanje = await _context.Placanja
-                    .Include(p => p.Rezervacija)
+                    .Include(p => p.Rezervacija!)
+                        .ThenInclude(r => r.Usluga)
                     .FirstOrDefaultAsync(p => p.TransakcijskiBroj == intent.Id, ct);
 
                 if (placanje?.Rezervacija != null)
                 {
-                    await FinalizePaymentAsync(placanje, intent, ct);
+                    try
+                    {
+                        await FinalizePaymentAsync(placanje, intent, ct);
+                    }
+                    catch (BusinessRuleException)
+                    {
+                        // Rezervacija više nije potvrđena ili iznos/valuta ne odgovaraju snapshotu.
+                        // Ne označavamo plaćanje niti rezervaciju kao plaćene.
+                    }
                 }
             }
         }
@@ -517,6 +591,11 @@ public class PaymentService : IPaymentService
             throw new BusinessRuleException("Rezervacija je već plaćena.");
         }
 
+        EnsureReservationConfirmedForPayment(rezervacija);
+    }
+
+    private static void EnsureReservationConfirmedForPayment(Rezervacija rezervacija)
+    {
         if (rezervacija.Status == RezervacijaStatus.Cancelled)
         {
             throw new BusinessRuleException("Otkazana rezervacija se ne može platiti.");
@@ -526,6 +605,97 @@ public class PaymentService : IPaymentService
         {
             throw new BusinessRuleException("Online payment is only available for confirmed reservations.");
         }
+    }
+
+    private async Task EnsurePaymentMatchesReservationAsync(
+        Rezervacija rezervacija,
+        PaymentIntent intent,
+        CancellationToken ct)
+    {
+        EnsureReservationConfirmedForPayment(rezervacija);
+        await EnsureUslugaLoadedAsync(rezervacija, ct);
+
+        var expectedAmount = RezervacijaPricing.ResolveChargeAmount(
+            rezervacija.Usluga.Cijena,
+            rezervacija.SnimakCijena);
+        var expectedMinor = RezervacijaPricing.ToStripeMinorUnits(expectedAmount);
+        var chargedMinor = intent.AmountReceived > 0 ? intent.AmountReceived : intent.Amount;
+
+        if (intent.Amount != expectedMinor || chargedMinor != expectedMinor)
+        {
+            throw new BusinessRuleException("Naplaćeni iznos ne odgovara trenutnoj rezervaciji.");
+        }
+
+        if (!string.Equals(intent.Currency, _stripe.Currency, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BusinessRuleException("Valuta plaćanja ne odgovara trenutnoj rezervaciji.");
+        }
+    }
+
+    private bool IntentMatchesExpectedCharge(PaymentIntent intent, long expectedMinor)
+    {
+        return intent.Amount == expectedMinor
+            && string.Equals(intent.Currency, _stripe.Currency, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task EnsureUslugaLoadedAsync(Rezervacija rezervacija, CancellationToken ct)
+    {
+        var uslugaRef = _context.Entry(rezervacija).Reference(r => r.Usluga);
+        if (!uslugaRef.IsLoaded || rezervacija.Usluga == null)
+        {
+            await uslugaRef.LoadAsync(ct);
+        }
+
+        if (rezervacija.Usluga == null)
+        {
+            throw new BusinessRuleException("Usluga rezervacije nije pronađena.");
+        }
+    }
+
+    private async Task TryCancelStripeIntentAsync(
+        string paymentIntentId,
+        PaymentIntent? knownIntent,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(paymentIntentId))
+        {
+            return;
+        }
+
+        try
+        {
+            var intent = knownIntent;
+            var intentService = new PaymentIntentService();
+            if (intent == null)
+            {
+                EnsureStripeSecretConfigured();
+                StripeConfiguration.ApiKey = _stripe.SecretKey;
+                intent = await intentService.GetAsync(paymentIntentId, cancellationToken: ct);
+            }
+
+            if (!CancelableIntentStatuses.Contains(intent.Status))
+            {
+                return;
+            }
+
+            EnsureStripeSecretConfigured();
+            StripeConfiguration.ApiKey = _stripe.SecretKey;
+            await intentService.CancelAsync(paymentIntentId, cancellationToken: ct);
+        }
+        catch (StripeException)
+        {
+            // Intent je možda već otkazan ili u statusu koji se ne može cancel-ati.
+        }
+        catch (BusinessRuleException)
+        {
+            // Stripe nije konfigurisan.
+        }
+    }
+
+    private static bool IsStripePayment(Placanje placanje)
+    {
+        return (placanje.MetodaPlacanja ?? "").Contains("stripe", StringComparison.OrdinalIgnoreCase)
+            || (placanje.TransakcijskiBroj ?? "").StartsWith("pi_", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<ConfirmPaymentResponseDto> FinalizePaymentAsync(
@@ -545,6 +715,8 @@ public class PaymentService : IPaymentService
         {
             return BuildConfirmResponse(placanje, alreadyCompleted: true);
         }
+
+        await EnsurePaymentMatchesReservationAsync(rezervacija, intent, ct);
 
         var wasAlreadyCompleted = placanje.Status == PlacanjeStatus.Completed;
         var chargedMinor = intent.AmountReceived > 0 ? intent.AmountReceived : intent.Amount;

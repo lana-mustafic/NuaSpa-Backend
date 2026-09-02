@@ -31,6 +31,12 @@ namespace NuaSpa.Application.Interfaces
             int rezervacijaId,
             CancellationToken ct);
 
+        /// <summary>
+        /// Poništava Pending Stripe PaymentIntent-e da se ne mogu ponovo iskoristiti
+        /// nakon otkaza ili izmjene rezervacije. Ne dira succeeded/completed plaćanja.
+        /// </summary>
+        Task InvalidatePendingIntentsAsync(int rezervacijaId, CancellationToken ct);
+
         Task HandleStripeWebhookAsync(
             string requestBodyJson,
             string stripeSignatureHeader,
