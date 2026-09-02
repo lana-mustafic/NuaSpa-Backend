@@ -201,11 +201,30 @@ namespace NuaSpa.Api.Controllers
         {
             try
             {
-                var ok = await _rezervacijaService.CompleteAsync(
-                    id,
-                    User.GetNuaSpaUserId(),
-                    allowBeforeEnd: User.IsInRole(RoleConstants.Admin));
-                if (!ok) return NotFound("Rezervacija nije pronađena.");
+                bool ok;
+                var actorUserId = User.GetNuaSpaUserId();
+                if (User.IsInRole(RoleConstants.Admin))
+                {
+                    ok = await _rezervacijaService.CompleteAsync(
+                        id,
+                        actorUserId,
+                        allowBeforeEnd: true);
+                }
+                else
+                {
+                    if (!User.TryGetNuaSpaZaposlenikId(out var zaposlenikId))
+                    {
+                        return Forbid();
+                    }
+
+                    ok = await _rezervacijaService.CompleteForZaposlenikAsync(
+                        id,
+                        zaposlenikId,
+                        actorUserId,
+                        allowBeforeEnd: false);
+                }
+
+                if (!ok) return NotFound("Rezervacija nije pronađena (ili nemate pristup).");
                 return Ok();
             }
             catch (BusinessRuleException ex)
