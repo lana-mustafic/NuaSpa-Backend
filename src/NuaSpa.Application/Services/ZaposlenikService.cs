@@ -31,13 +31,16 @@ namespace NuaSpa.Application.Services
         };
 
         private readonly IRezervacijaService _rezervacijaService;
+        private readonly ISessionEligibilityService _sessionEligibility;
 
         public ZaposlenikService(
             NuaSpaContext context,
             IMapper mapper,
-            IRezervacijaService rezervacijaService) : base(context, mapper)
+            IRezervacijaService rezervacijaService,
+            ISessionEligibilityService sessionEligibility) : base(context, mapper)
         {
             _rezervacijaService = rezervacijaService;
+            _sessionEligibility = sessionEligibility;
         }
 
         public override async Task<PagedResult<ZaposlenikDTO>> Get(ZaposlenikSearchObject? search = null)
@@ -178,6 +181,14 @@ namespace NuaSpa.Application.Services
             ApplyDtoFields(entity, dto);
 
             await _context.SaveChangesAsync();
+
+            if (entity.Status != ZaposlenikStatus.Active)
+            {
+                await _sessionEligibility.CloseTherapistSessionsAsync(
+                    entity.Id,
+                    unlinkAccount: false);
+            }
+
             return MapToDto(entity);
         }
 
@@ -1503,12 +1514,9 @@ namespace NuaSpa.Application.Services
 
             try
             {
-                // Otpovezuje korisnike od terapeuta (zadrži korisnike).
-                await _context.Users
-                    .Where(k => k.ZaposlenikId == id)
-                    .ExecuteUpdateAsync(s => s.SetProperty(
-                        k => k.ZaposlenikId,
-                        (int?)null));
+                await _sessionEligibility.CloseTherapistSessionsAsync(
+                    id,
+                    unlinkAccount: true);
 
                 _context.Zaposlenici.Remove(entity);
                 await _context.SaveChangesAsync();

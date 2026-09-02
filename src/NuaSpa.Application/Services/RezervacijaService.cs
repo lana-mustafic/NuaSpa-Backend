@@ -12,6 +12,7 @@ using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
 using NuaSpa.Domain.Enums;
 using NuaSpa.Application.Services.Booking;
+using NuaSpa.Domain.Common;
 
 namespace NuaSpa.Application.Services
 {
@@ -149,6 +150,15 @@ namespace NuaSpa.Application.Services
 
         public async Task<RezervacijaDTO> CreateAsync(int korisnikId, RezervacijaCreateDTO dto, bool isAdminBooking = false)
         {
+            if (isAdminBooking)
+            {
+                await EnsureBookableClientAsync(korisnikId);
+            }
+            else
+            {
+                StripClientInternalFields(dto);
+            }
+
             var usluga = await _context.Usluge.AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == dto.UslugaId && !u.IsDeleted);
             if (usluga == null)
@@ -284,6 +294,45 @@ namespace NuaSpa.Application.Services
                 _notifikacije.NotifyRezervacijaKreiranaAsync(created, CancellationToken.None));
 
             return await MapSingleAndEnrichAsync(created);
+        }
+
+        private static void StripClientInternalFields(RezervacijaCreateDTO dto)
+        {
+            dto.KorisnikId = null;
+            dto.ProstorijaId = null;
+            dto.Oprema = null;
+            dto.IsVip = false;
+        }
+
+        private async Task EnsureBookableClientAsync(int korisnikId)
+        {
+            var user = await _context.Users.AsNoTracking()
+                .FirstOrDefaultAsync(k => k.Id == korisnikId);
+            if (user == null)
+            {
+                throw new BusinessRuleException("Client not found.");
+            }
+
+            if (!user.Status)
+            {
+                throw new BusinessRuleException("This client account is deactivated.");
+            }
+
+            var klijentRoleId = await _context.Roles.AsNoTracking()
+                .Where(r => r.NormalizedName == RoleNames.KlijentNormalized)
+                .Select(r => (int?)r.Id)
+                .FirstOrDefaultAsync();
+            if (klijentRoleId is null)
+            {
+                throw new BusinessRuleException("Client role not found in the database.");
+            }
+
+            var isClient = await _context.UserRoles.AsNoTracking()
+                .AnyAsync(ur => ur.UserId == korisnikId && ur.RoleId == klijentRoleId.Value);
+            if (!isClient)
+            {
+                throw new BusinessRuleException("The selected user is not a client.");
+            }
         }
 
         public async Task<RezervacijaDTO?> EditAsync(int rezervacijaId, RezervacijaEditDTO dto)

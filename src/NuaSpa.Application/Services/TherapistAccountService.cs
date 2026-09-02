@@ -7,6 +7,7 @@ using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 
 namespace NuaSpa.Application.Services;
 
@@ -78,6 +79,11 @@ public class TherapistAccountService : ITherapistAccountService
         if (z == null)
         {
             return Fail("Therapist profile not found.");
+        }
+
+        if (z.Status != ZaposlenikStatus.Active)
+        {
+            return Fail("This therapist profile is not active. Activate the profile before sending an invite.");
         }
 
         var email = (emailOverride ?? z.Email ?? "").Trim();
@@ -201,6 +207,15 @@ public class TherapistAccountService : ITherapistAccountService
         var z = await _context.Zaposlenici.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == invite.ZaposlenikId);
 
+        if (z == null || z.Status != ZaposlenikStatus.Active)
+        {
+            return new ValidateInviteTokenDto
+            {
+                Valid = false,
+                Message = "This invitation link is invalid or has expired.",
+            };
+        }
+
         return new ValidateInviteTokenDto
         {
             Valid = true,
@@ -229,6 +244,13 @@ public class TherapistAccountService : ITherapistAccountService
         if (invite == null)
         {
             return (false, "This invitation link is invalid or has expired.", null);
+        }
+
+        var therapist = invite.Zaposlenik
+            ?? await _context.Zaposlenici.FirstOrDefaultAsync(x => x.Id == invite.ZaposlenikId);
+        if (therapist == null || therapist.Status != ZaposlenikStatus.Active)
+        {
+            return (false, "This therapist profile is not active. Contact your spa administrator.", null);
         }
 
         var user = await _userManager.FindByIdAsync(invite.KorisnikId.ToString());

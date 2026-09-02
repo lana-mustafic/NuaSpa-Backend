@@ -30,6 +30,7 @@ public class AuthService : IAuthService
     private readonly ITherapistAccountService _therapistAccountService;
     private readonly INotificationPublisher _notificationPublisher;
     private readonly IRefreshTokenService _refreshTokenService;
+    private readonly ISessionEligibilityService _sessionEligibility;
     private readonly PasswordResetOptions _passwordResetOptions;
     private readonly NuaSpaContext _context;
 
@@ -40,6 +41,7 @@ public class AuthService : IAuthService
         ITherapistAccountService therapistAccountService,
         INotificationPublisher notificationPublisher,
         IRefreshTokenService refreshTokenService,
+        ISessionEligibilityService sessionEligibility,
         IOptions<PasswordResetOptions> passwordResetOptions,
         NuaSpaContext context)
     {
@@ -49,6 +51,7 @@ public class AuthService : IAuthService
         _therapistAccountService = therapistAccountService;
         _notificationPublisher = notificationPublisher;
         _refreshTokenService = refreshTokenService;
+        _sessionEligibility = sessionEligibility;
         _passwordResetOptions = passwordResetOptions.Value;
         _context = context;
     }
@@ -91,21 +94,6 @@ public class AuthService : IAuthService
 
         await _userManager.ResetAccessFailedCountAsync(user);
 
-        // Ako je user terapeut, dodatna provjera statusa terapeuta.
-        if (await _userManager.IsInRoleAsync(user, RoleConstants.Zaposlenik) && user.ZaposlenikId is > 0)
-        {
-            var zStatus = await _context.Zaposlenici.AsNoTracking()
-                .Where(z => z.Id == user.ZaposlenikId)
-                .Select(z => z.Status)
-                .FirstOrDefaultAsync(ct);
-
-            if (zStatus != ZaposlenikStatus.Active)
-            {
-                throw new UnauthorizedException(
-                    "Your therapist profile is not active. Contact your spa administrator.");
-            }
-        }
-
         var roles = await _userManager.GetRolesAsync(user);
         return await CreateSessionAsync(user, roles, ct);
     }
@@ -126,7 +114,22 @@ public class AuthService : IAuthService
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null || !user.Status)
         {
+            if (user != null)
+            {
+                await _refreshTokenService.RevokeAllForUserAsync(user.Id, ct);
+            }
+
             throw new UnauthorizedException("Session expired. Please sign in again.");
+        }
+
+        try
+        {
+            await _sessionEligibility.EnsureEligibleForSessionAsync(user, ct);
+        }
+        catch (UnauthorizedException)
+        {
+            await _refreshTokenService.RevokeAllForUserAsync(user.Id, ct);
+            throw;
         }
 
         var roles = await _userManager.GetRolesAsync(user);
@@ -280,6 +283,8 @@ public class AuthService : IAuthService
             throw new BusinessRuleException("Trenutna lozinka nije ispravna.");
         }
 
+        await _sessionEligibility.EnsureEligibleForSessionAsync(user, ct);
+
         var result = await _userManager.ChangePasswordAsync(
             user, dto.StaraLozinka, dto.NovaLozinka);
         if (!result.Succeeded)
@@ -323,7 +328,10 @@ public class AuthService : IAuthService
 
         var email = dto.Email.Trim();
         var user = await _userManager.FindByEmailAsync(email);
-        if (user == null || !user.Status || !await _userManager.HasPasswordAsync(user))
+        if (user == null
+            || !user.Status
+            || !await _userManager.HasPasswordAsync(user)
+            || !await _sessionEligibility.IsEligibleForSessionAsync(user, ct))
         {
             return response;
         }
@@ -384,6 +392,11 @@ public class AuthService : IAuthService
             throw new BusinessRuleException("Account is deactivated. Contact your spa administrator.");
         }
 
+        if (!await _sessionEligibility.IsEligibleForSessionAsync(user, ct))
+        {
+            throw new BusinessRuleException(SessionEligibilityService.TherapistNotEligibleMessage);
+        }
+
         var result = await _userManager.ResetPasswordAsync(user, dto.Token, dto.Password);
         if (!result.Succeeded)
         {
@@ -416,6 +429,8 @@ public class AuthService : IAuthService
         IList<string> roles,
         CancellationToken ct)
     {
+        await _sessionEligibility.EnsureEligibleForSessionAsync(user, ct);
+
         var issued = _tokenService.CreateToken(user, roles);
         var refresh = await _refreshTokenService.IssueAsync(user.Id, familyId: null, ct);
 
