@@ -48,7 +48,6 @@ public static class DevelopmentDataSeeder
         var therapists = await EnsureTherapistsAsync(context, catMassage, catFacial, catBody, cancellationToken);
         var servicesList = await EnsureUslugeAsync(context, seedImageUrl, catMassage, catFacial, catBody, cancellationToken);
         var clients = await EnsureExtraClientsAsync(userManager, context, cancellationToken);
-        await EnsureProizvodiAsync(context, cancellationToken);
         await EnsureRezervacijeAndRecenzijeAsync(
             context, clients, therapists, servicesList, cancellationToken);
         await EnsurePlacanjaAsync(context, cancellationToken);
@@ -380,48 +379,6 @@ public static class DevelopmentDataSeeder
         }
 
         return clients.DistinctBy(c => c.Id).ToList();
-    }
-
-    private static async Task EnsureProizvodiAsync(NuaSpaContext context, CancellationToken ct)
-    {
-        if (await context.Proizvodi.AnyAsync(ct))
-        {
-            return;
-        }
-
-        var seedDate = DateTime.UtcNow;
-        var products = new[]
-        {
-            ("NS-OL-001", "Lavanda ulje 50ml", 24.90m),
-            ("NS-CR-002", "Hidratantna krema", 32.00m),
-            ("NS-SC-003", "Piling za tijelo", 28.50m),
-            ("NS-TE-004", "Čaj za relaks", 12.00m),
-            ("NS-GF-005", "Poklon set", 89.00m),
-        };
-
-        foreach (var (sifra, naziv, cijena) in products)
-        {
-            var p = new Proizvod
-            {
-                Sifra = sifra,
-                Naziv = naziv,
-                Cijena = cijena,
-                Opis = naziv,
-                CreatedAt = seedDate,
-                IsDeleted = false,
-            };
-            context.Proizvodi.Add(p);
-            context.Skladista.Add(new Skladiste
-            {
-                Proizvod = p,
-                KolicinaNaStanju = 20,
-                Lokacija = "Glavno skladište",
-                CreatedAt = seedDate,
-                IsDeleted = false,
-            });
-        }
-
-        await context.SaveChangesAsync(ct);
     }
 
     private static async Task EnsureRezervacijeAndRecenzijeAsync(

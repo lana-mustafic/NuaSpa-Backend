@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using NuaSpa.Application.Common;
@@ -20,5 +19,13 @@ namespace NuaSpa.Application.Interfaces
             int page = 1,
             int pageSize = PaginationConstants.DefaultPageSize,
             CancellationToken ct = default);
+
+        Task<DrzavaLookupDto> CreateDrzavaAsync(DrzavaWriteDto dto, CancellationToken ct);
+        Task<DrzavaLookupDto> UpdateDrzavaAsync(int id, DrzavaWriteDto dto, CancellationToken ct);
+        Task DeleteDrzavaAsync(int id, CancellationToken ct);
+
+        Task<GradLookupDto> CreateGradAsync(GradWriteDto dto, CancellationToken ct);
+        Task<GradLookupDto> UpdateGradAsync(int id, GradWriteDto dto, CancellationToken ct);
+        Task DeleteGradAsync(int id, CancellationToken ct);
     }
 }

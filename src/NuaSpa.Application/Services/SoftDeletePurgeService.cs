@@ -37,16 +37,13 @@ public sealed class SoftDeletePurgeService
         total += await _context.Rezervacije.IgnoreQueryFilters()
             .Where(x => x.IsDeleted).ExecuteDeleteAsync(cancellationToken);
 
-        total += await _context.NarudzbeProizvoda.IgnoreQueryFilters()
-            .Where(x => x.IsDeleted).ExecuteDeleteAsync(cancellationToken);
-
-        total += await _context.Skladista.IgnoreQueryFilters()
-            .Where(x => x.IsDeleted).ExecuteDeleteAsync(cancellationToken);
-
         total += await _context.Usluge.IgnoreQueryFilters()
             .Where(x => x.IsDeleted).ExecuteDeleteAsync(cancellationToken);
 
-        total += await _context.Proizvodi.IgnoreQueryFilters()
+        total += await _context.Gradovi.IgnoreQueryFilters()
+            .Where(x => x.IsDeleted).ExecuteDeleteAsync(cancellationToken);
+
+        total += await _context.Drzave.IgnoreQueryFilters()
             .Where(x => x.IsDeleted).ExecuteDeleteAsync(cancellationToken);
 
         total += await _context.KategorijeUsluga.IgnoreQueryFilters()

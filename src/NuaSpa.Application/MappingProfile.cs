@@ -20,8 +20,6 @@ namespace NuaSpa.Application
                 .ForMember(dest => dest.SlikaUrl, opt => opt.MapFrom(src => src.SlikaUrl));
             CreateMap<UslugaDTO, Usluga>()
                 .ForMember(dest => dest.KategorijaUsluga, opt => opt.Ignore());
-            CreateMap<Proizvod, ProizvodDTO>().ReverseMap();
-            CreateMap<Popust, PopustDTO>().ReverseMap();
             CreateMap<Zaposlenik, ZaposlenikDTO>()
                 .ForMember(dest => dest.KategorijaUslugaNaziv,
                     opt => opt.MapFrom(src =>
@@ -29,7 +27,6 @@ namespace NuaSpa.Application
             CreateMap<ZaposlenikDTO, Zaposlenik>()
                 .ForMember(dest => dest.KategorijaUsluga, opt => opt.Ignore())
                 .ForMember(dest => dest.DatumZaposlenja, opt => opt.Ignore());
-            CreateMap<Skladiste, SkladisteDTO>().ReverseMap();
             CreateMap<KategorijaUslugaDTO, KategorijaUsluga>().ReverseMap();
             CreateMap<SpaCentar, SpaCentarDTO>().ReverseMap();
             CreateMap<Prostorija, ProstorijaDTO>().ReverseMap();
@@ -82,10 +79,6 @@ namespace NuaSpa.Application
                     }).ToList()
                 ))
                 .ForMember(dest => dest.PremiumKlijent, opt => opt.Ignore());
-
-            // Mapiranje Skladišta (Izvlačenje naziva proizvoda)
-            CreateMap<Skladiste, SkladisteDTO>()
-                .ForMember(dest => dest.ProizvodNaziv, opt => opt.MapFrom(src => src.Proizvod.Naziv));
 
             // Mapiranje Recenzije (maskirano ime klijenta za javni prikaz)
             CreateMap<Recenzija, RecenzijaDTO>()

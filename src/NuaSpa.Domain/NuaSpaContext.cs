@@ -50,12 +50,8 @@ namespace NuaSpa.Domain
         public DbSet<KorisnikAktivnost> KorisnikAktivnosti { get; set; } = null!;
         public DbSet<SistemskaNotifikacija> SistemskaNotifikacije { get; set; } = null!;
         public DbSet<Obavijest> Obavijesti { get; set; } = null!;
-        public DbSet<Proizvod> Proizvodi { get; set; } = null!;
-        public DbSet<Skladiste> Skladista { get; set; } = null!;
-        public DbSet<NarudzbaProizvoda> NarudzbeProizvoda { get; set; } = null!;
         public DbSet<Placanje> Placanja { get; set; } = null!;
         public DbSet<StripeWebhookEvent> StripeWebhookEvents { get; set; } = null!;
-        public DbSet<Popust> Popusti { get; set; } = null!;
 
         public DbSet<SpaCentar> SpaCentri { get; set; } = null!;
         public DbSet<RadnoVrijeme> RadnaVremena { get; set; } = null!;
