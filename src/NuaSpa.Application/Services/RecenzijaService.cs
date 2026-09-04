@@ -90,7 +90,7 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Zaposlenik)
                 .Where(r =>
                     !r.IsDeleted
-                    && !r.IsOtkazana
+                    && r.Status != RezervacijaStatus.Cancelled
                     && r.KorisnikId == korisnikId
                     && r.UslugaId == uslugaId
                     && r.Status == RezervacijaStatus.Completed
@@ -184,7 +184,7 @@ namespace NuaSpa.Application.Services
                 .FirstOrDefaultAsync(r =>
                     r.Id == dto.RezervacijaId
                     && !r.IsDeleted
-                    && !r.IsOtkazana
+                    && r.Status != RezervacijaStatus.Cancelled
                     && r.Status == RezervacijaStatus.Completed);
 
             if (rezervacija == null)
@@ -506,7 +506,7 @@ namespace NuaSpa.Application.Services
             var visitCounts = await _context.Rezervacije.AsNoTracking()
                 .Where(r =>
                     korisnikIds.Contains(r.KorisnikId)
-                    && !r.IsOtkazana
+                    && r.Status != RezervacijaStatus.Cancelled
                     && !r.IsDeleted
                     && r.Status == RezervacijaStatus.Completed)
                 .GroupBy(r => new { r.KorisnikId, r.UslugaId })
@@ -544,7 +544,7 @@ namespace NuaSpa.Application.Services
                 var kIds = needFallback.Select(r => r.KorisnikId).Distinct().ToList();
                 var rezData = await _context.Rezervacije.AsNoTracking()
                     .Where(r =>
-                        !r.IsOtkazana
+                        r.Status != RezervacijaStatus.Cancelled
                         && !r.IsDeleted
                         && r.Status == RezervacijaStatus.Completed
                         && kIds.Contains(r.KorisnikId))

@@ -6,6 +6,7 @@ namespace NuaSpa.Application.DTOs;
 public class ResourceAvailabilityDTO
 {
     public DateTime Slot { get; set; }
+    public int DurationMinutes { get; set; }
     public List<ProstorijaDTO> FreeRooms { get; set; } = new();
     public List<OpremaAvailabilityDTO> Equipment { get; set; } = new();
 }

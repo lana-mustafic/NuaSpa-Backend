@@ -182,7 +182,7 @@ public class AuthService : IAuthService
             if (roles.Contains(RoleConstants.Klijent))
             {
                 var visitStats = await _context.Rezervacije.AsNoTracking()
-                    .Where(r => !r.IsOtkazana && r.KorisnikId == userId)
+                    .Where(r => r.Status != RezervacijaStatus.Cancelled && r.KorisnikId == userId)
                     .GroupBy(_ => 1)
                     .Select(g => new
                     {

@@ -135,7 +135,7 @@ namespace NuaSpa.Application.Services
             var favSet = favIds.ToHashSet();
 
             var bookingCats = await _context.Rezervacije.AsNoTracking()
-                .Where(r => r.KorisnikId == korisnikId && !r.IsOtkazana)
+                .Where(r => r.KorisnikId == korisnikId && r.Status != RezervacijaStatus.Cancelled)
                 .Join(_context.Usluge, r => r.UslugaId, u => u.Id, (r, u) => u.KategorijaUslugaId)
                 .ToListAsync();
 
@@ -148,7 +148,7 @@ namespace NuaSpa.Application.Services
                 .ToDictionaryAsync(k => k.Id, k => k.Naziv);
 
             var popularity = await _context.Rezervacije.AsNoTracking()
-                .Where(r => !r.IsOtkazana)
+                .Where(r => r.Status != RezervacijaStatus.Cancelled)
                 .GroupBy(r => r.UslugaId)
                 .Select(g => new { UslugaId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.UslugaId, x => x.Count);

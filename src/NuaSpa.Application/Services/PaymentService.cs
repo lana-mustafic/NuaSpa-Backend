@@ -299,7 +299,7 @@ public class PaymentService : IPaymentService
             .FirstOrDefaultAsync(r => r.Id == rezervacijaId && !r.IsDeleted, ct)
             ?? throw new NotFoundException("Reservation not found.");
 
-        if (rez.IsOtkazana)
+        if (rez.Status == RezervacijaStatus.Cancelled)
         {
             throw new BusinessRuleException("Cannot record payment for a cancelled reservation.");
         }

@@ -11,6 +11,31 @@ namespace NuaSpa.Domain
     {
         public NuaSpaContext(DbContextOptions<NuaSpaContext> options) : base(options) { }
 
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            SyncReservationLegacyFlags();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess,
+            CancellationToken cancellationToken = default)
+        {
+            SyncReservationLegacyFlags();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void SyncReservationLegacyFlags()
+        {
+            foreach (var entry in ChangeTracker.Entries<Rezervacija>())
+            {
+                if (entry.State is EntityState.Added or EntityState.Modified)
+                {
+                    entry.Entity.SyncLegacyFlagsFromStatus();
+                }
+            }
+        }
+
         public DbSet<Drzava> Drzave { get; set; } = null!;
         public DbSet<Grad> Gradovi { get; set; } = null!;
         public DbSet<KategorijaUsluga> KategorijeUsluga { get; set; } = null!;

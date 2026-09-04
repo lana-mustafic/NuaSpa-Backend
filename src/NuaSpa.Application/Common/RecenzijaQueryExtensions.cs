@@ -22,7 +22,6 @@ public static class RecenzijaQueryExtensions
                 && rez.KorisnikId == rev.KorisnikId
                 && rez.UslugaId == rev.UslugaId
                 && rez.Status == RezervacijaStatus.Completed
-                && !rez.IsOtkazana
                 && !rez.IsDeleted)));
     }
 }

@@ -36,33 +36,6 @@ public static class RezervacijaStateMachine
         SyncLegacyFlags(entity);
     }
 
-    public static void SyncLegacyFlags(Rezervacija entity)
-    {
-        switch (entity.Status)
-        {
-            case RezervacijaStatus.Pending:
-                entity.IsPotvrdjena = false;
-                entity.IsOtkazana = false;
-                break;
-            case RezervacijaStatus.Confirmed:
-                entity.IsPotvrdjena = true;
-                entity.IsOtkazana = false;
-                break;
-            case RezervacijaStatus.Cancelled:
-                entity.IsPotvrdjena = false;
-                entity.IsOtkazana = true;
-                break;
-            case RezervacijaStatus.Completed:
-                entity.IsPotvrdjena = true;
-                entity.IsOtkazana = false;
-                break;
-        }
-    }
-
-    public static RezervacijaStatus ResolveTarget(bool isPotvrdjena, bool isOtkazana)
-    {
-        if (isOtkazana) return RezervacijaStatus.Cancelled;
-        if (isPotvrdjena) return RezervacijaStatus.Confirmed;
-        return RezervacijaStatus.Pending;
-    }
+    public static void SyncLegacyFlags(Rezervacija entity) =>
+        entity.SyncLegacyFlagsFromStatus();
 }

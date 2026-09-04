@@ -119,7 +119,7 @@ namespace NuaSpa.Application.Services
 
             if (!includeOtkazane)
             {
-                query = query.Where(r => !r.IsOtkazana);
+                query = query.Where(r => r.Status != RezervacijaStatus.Cancelled);
             }
 
             if (korisnikId is int id)
@@ -142,7 +142,18 @@ namespace NuaSpa.Application.Services
 
             if (isPotvrdjena.HasValue)
             {
-                query = query.Where(r => r.IsPotvrdjena == isPotvrdjena.Value);
+                if (isPotvrdjena.Value)
+                {
+                    query = query.Where(r =>
+                        r.Status == RezervacijaStatus.Confirmed
+                        || r.Status == RezervacijaStatus.Completed);
+                }
+                else
+                {
+                    query = query.Where(r =>
+                        r.Status != RezervacijaStatus.Confirmed
+                        && r.Status != RezervacijaStatus.Completed);
+                }
             }
 
             return query;
@@ -231,9 +242,7 @@ namespace NuaSpa.Application.Services
                 ZaposlenikId = dto.ZaposlenikId,
                 DatumRezervacije = startUtc,
                 Status = RezervacijaStatus.Pending,
-                IsPotvrdjena = false,
                 IsPlacena = false,
-                IsOtkazana = false,
                 SnimakCijena = chargeAmount,
                 SnimakTrajanjeMinuta = durationMinutes,
                 ProstorijaId = dto.ProstorijaId,
@@ -900,16 +909,9 @@ namespace NuaSpa.Application.Services
             int durationMinutes,
             int? excludeRezervacijaId)
         {
-            var utcStart = BookingClock.ToUtc(start);
-            var utcEnd = utcStart.AddMinutes(durationMinutes);
             var hasOverlap = await _context.Rezervacije.AsNoTracking()
-                .AnyAsync(r =>
-                    r.KorisnikId == korisnikId &&
-                    r.Status != RezervacijaStatus.Cancelled &&
-                    (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value) &&
-                    r.DatumRezervacije < utcEnd &&
-                    r.DatumRezervacije.AddMinutes(
-                        r.SnimakTrajanjeMinuta > 0 ? r.SnimakTrajanjeMinuta : 60) > utcStart);
+                .WhereOverlapping(start, durationMinutes, excludeRezervacijaId)
+                .AnyAsync(r => r.KorisnikId == korisnikId);
 
             if (hasOverlap)
             {
@@ -924,14 +926,9 @@ namespace NuaSpa.Application.Services
             int durationMinutes,
             int? excludeRezervacijaId)
         {
-            var end = start.AddMinutes(durationMinutes);
             var hasOverlap = await _context.Rezervacije.AsNoTracking()
-                .AnyAsync(r =>
-                    r.ProstorijaId == prostorijaId &&
-                    r.Status != RezervacijaStatus.Cancelled &&
-                    (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value) &&
-                    r.DatumRezervacije < end &&
-                    r.DatumRezervacije.AddMinutes(r.SnimakTrajanjeMinuta > 0 ? r.SnimakTrajanjeMinuta : 60) > start);
+                .WhereOverlapping(start, durationMinutes, excludeRezervacijaId)
+                .AnyAsync(r => r.ProstorijaId == prostorijaId);
 
             if (hasOverlap)
             {
@@ -957,14 +954,9 @@ namespace NuaSpa.Application.Services
                 throw new BusinessRuleException("Some equipment is not available.");
             }
 
-            var end = start.AddMinutes(durationMinutes);
             var overlappingIds = await _context.Rezervacije
                 .AsNoTracking()
-                .Where(r =>
-                    r.Status != RezervacijaStatus.Cancelled &&
-                    (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value) &&
-                    r.DatumRezervacije < end &&
-                    r.DatumRezervacije.AddMinutes(r.SnimakTrajanjeMinuta > 0 ? r.SnimakTrajanjeMinuta : 60) > start)
+                .WhereOverlapping(start, durationMinutes, excludeRezervacijaId)
                 .Select(r => r.Id)
                 .ToListAsync();
 
@@ -1098,7 +1090,7 @@ namespace NuaSpa.Application.Services
 
             if (!includeOtkazane)
             {
-                query = query.Where(r => !r.IsOtkazana);
+                query = query.Where(r => r.Status != RezervacijaStatus.Cancelled);
             }
 
             if (zaposlenikId.HasValue)
@@ -1151,9 +1143,10 @@ namespace NuaSpa.Application.Services
                 {
                     Id = r.Id,
                     DatumRezervacije = r.DatumRezervacije,
-                    IsPotvrdjena = r.IsPotvrdjena,
+                    IsPotvrdjena = r.Status == RezervacijaStatus.Confirmed
+                        || r.Status == RezervacijaStatus.Completed,
                     IsPlacena = r.IsPlacena,
-                    IsOtkazana = r.IsOtkazana,
+                    IsOtkazana = r.Status == RezervacijaStatus.Cancelled,
                     Status = r.Status.ToString(),
                     ZaposlenikId = r.ZaposlenikId,
                     ZaposlenikIme = r.Zaposlenik.Ime + " " + r.Zaposlenik.Prezime,
@@ -1215,9 +1208,10 @@ namespace NuaSpa.Application.Services
                     Id = r.Id,
                     DatumRezervacije = r.DatumRezervacije,
                     UslugaNaziv = r.Usluga.Naziv,
-                    IsPotvrdjena = r.IsPotvrdjena,
+                    IsPotvrdjena = r.Status == RezervacijaStatus.Confirmed
+                        || r.Status == RezervacijaStatus.Completed,
                     IsPlacena = r.IsPlacena,
-                    IsOtkazana = r.IsOtkazana,
+                    IsOtkazana = r.Status == RezervacijaStatus.Cancelled,
                     Status = r.Status.ToString(),
                 })
                 .ToListAsync();
@@ -1248,7 +1242,7 @@ namespace NuaSpa.Application.Services
             var ids = dtos.Select(d => d.KorisnikId).Distinct().ToList();
             var premiumIds = await _context.Rezervacije
                 .AsNoTracking()
-                .Where(r => ids.Contains(r.KorisnikId) && r.IsPlacena && !r.IsOtkazana)
+                .Where(r => ids.Contains(r.KorisnikId) && r.IsPlacena && r.Status != RezervacijaStatus.Cancelled)
                 .GroupBy(r => r.KorisnikId)
                 .Where(g => g.Count() >= 3)
                 .Select(g => g.Key)

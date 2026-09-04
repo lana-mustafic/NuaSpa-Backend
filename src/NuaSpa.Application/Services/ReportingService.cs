@@ -244,8 +244,10 @@ public class ReportingService : IReportingService
             {
                 Datum = g.Key,
                 Count = g.Count(),
-                Potvrdjeni = g.Count(r => r.IsPotvrdjena && !r.IsOtkazana),
-                Otkazani = g.Count(r => r.IsOtkazana),
+                Potvrdjeni = g.Count(r =>
+                    r.Status == RezervacijaStatus.Confirmed
+                    || r.Status == RezervacijaStatus.Completed),
+                Otkazani = g.Count(r => r.Status == RezervacijaStatus.Cancelled),
             })
             .ToListAsync();
 
@@ -378,15 +380,15 @@ public class ReportingService : IReportingService
             var guest = r.Korisnik != null
                 ? $"{r.Korisnik.Ime} {r.Korisnik.Prezime}".Trim()
                 : "—";
-            string naslov;
-            if (r.IsOtkazana)
-                naslov = $"Cancelled · {svc}";
-            else if (r.IsPotvrdjena)
-                naslov = $"Confirmed · {svc}";
-            else
-                naslov = $"Pending · {svc}";
+            string naslov = r.Status switch
+            {
+                RezervacijaStatus.Cancelled => $"Cancelled · {svc}",
+                RezervacijaStatus.Completed => $"Completed · {svc}",
+                RezervacijaStatus.Confirmed => $"Confirmed · {svc}",
+                _ => $"Pending · {svc}",
+            };
 
-            var at = r.IsOtkazana && r.OtkazanaAt.HasValue
+            var at = r.Status == RezervacijaStatus.Cancelled && r.OtkazanaAt.HasValue
                 ? r.OtkazanaAt!.Value
                 : r.DatumRezervacije;
 

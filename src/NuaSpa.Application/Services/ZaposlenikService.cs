@@ -505,11 +505,10 @@ namespace NuaSpa.Application.Services
                 .Where(r => r.ZaposlenikId == zaposlenikId);
 
             var allTimeCompleted = await reservationBase.CountAsync(r =>
-                !r.IsOtkazana && r.Status == RezervacijaStatus.Completed);
+                r.Status == RezervacijaStatus.Completed);
 
             var completedMonth = await reservationBase.CountAsync(r =>
-                !r.IsOtkazana
-                && r.Status == RezervacijaStatus.Completed
+                r.Status == RezervacijaStatus.Completed
                 && r.DatumRezervacije >= monthStart
                 && r.DatumRezervacije < monthEnd);
 
@@ -522,7 +521,7 @@ namespace NuaSpa.Application.Services
             var eligibleCount = await CountEligibleServicesAsync(entity);
 
             var next = await reservationBase
-                .Where(r => !r.IsOtkazana && r.DatumRezervacije >= now)
+                .Where(r => r.Status != RezervacijaStatus.Cancelled && r.DatumRezervacije >= now)
                 .OrderBy(r => r.DatumRezervacije)
                 .Select(r => new TherapistProfileNextAppointmentDto
                 {
@@ -650,7 +649,6 @@ namespace NuaSpa.Application.Services
                     r.ZaposlenikId == zaposlenikId
                     && r.UslugaId == uslugaId
                     && !r.IsDeleted
-                    && !r.IsOtkazana
                     && r.Status == RezervacijaStatus.Completed);
 
             var reviewQuery = TherapistReviewQuery(zaposlenikId)
@@ -717,7 +715,7 @@ namespace NuaSpa.Application.Services
             var bookingCounts = await _context.Rezervacije
                 .AsNoTracking()
                 .Where(r =>
-                    !r.IsOtkazana
+                    r.Status != RezervacijaStatus.Cancelled
                     && r.DatumRezervacije >= week
                     && r.DatumRezervacije < weekEnd)
                 .GroupBy(r => new
@@ -932,7 +930,7 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Usluga)
                 .Include(r => r.Korisnik)
                 .Include(r => r.Prostorija)
-                .Where(r => r.ZaposlenikId == zaposlenikId && !r.IsOtkazana);
+                .Where(r => r.ZaposlenikId == zaposlenikId && r.Status != RezervacijaStatus.Cancelled);
 
             var todaySchedule = await activeQuery
                 .Where(r => r.DatumRezervacije >= dayStart && r.DatumRezervacije < dayEnd)
@@ -942,8 +940,9 @@ namespace NuaSpa.Application.Services
                     Id = r.Id,
                     DatumRezervacije = r.DatumRezervacije,
                     Status = r.Status.ToString(),
-                    IsPotvrdjena = r.IsPotvrdjena,
-                    IsOtkazana = r.IsOtkazana,
+                    IsPotvrdjena = r.Status == RezervacijaStatus.Confirmed
+                        || r.Status == RezervacijaStatus.Completed,
+                    IsOtkazana = r.Status == RezervacijaStatus.Cancelled,
                     KorisnikIme = r.Korisnik == null
                         ? null
                         : (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Trim(),
@@ -965,8 +964,9 @@ namespace NuaSpa.Application.Services
                     Id = r.Id,
                     DatumRezervacije = r.DatumRezervacije,
                     Status = r.Status.ToString(),
-                    IsPotvrdjena = r.IsPotvrdjena,
-                    IsOtkazana = r.IsOtkazana,
+                    IsPotvrdjena = r.Status == RezervacijaStatus.Confirmed
+                        || r.Status == RezervacijaStatus.Completed,
+                    IsOtkazana = r.Status == RezervacijaStatus.Cancelled,
                     KorisnikIme = r.Korisnik == null
                         ? null
                         : (r.Korisnik.Ime + " " + r.Korisnik.Prezime).Trim(),
@@ -985,7 +985,7 @@ namespace NuaSpa.Application.Services
             var completedMonth = await _context.Rezervacije.AsNoTracking()
                 .Where(r =>
                     r.ZaposlenikId == zaposlenikId
-                    && !r.IsOtkazana
+                    && r.Status != RezervacijaStatus.Cancelled
                     && r.Status == RezervacijaStatus.Completed
                     && r.DatumRezervacije >= monthStart
                     && r.DatumRezervacije < monthEnd)
@@ -1080,14 +1080,15 @@ namespace NuaSpa.Application.Services
             }
 
             var upcomingCount = await baseQuery.CountAsync(r =>
-                !r.IsOtkazana && r.DatumRezervacije >= dayEnd);
+                r.Status != RezervacijaStatus.Cancelled && r.DatumRezervacije >= dayEnd);
             var todayCount = await baseQuery.CountAsync(r =>
-                !r.IsOtkazana
+                r.Status != RezervacijaStatus.Cancelled
                 && r.DatumRezervacije >= dayStart
                 && r.DatumRezervacije < dayEnd);
             var completedCount = await baseQuery.CountAsync(r =>
-                !r.IsOtkazana && r.Status == RezervacijaStatus.Completed);
-            var cancelledCount = await baseQuery.CountAsync(r => r.IsOtkazana);
+                r.Status == RezervacijaStatus.Completed);
+            var cancelledCount = await baseQuery.CountAsync(r =>
+                r.Status == RezervacijaStatus.Cancelled);
 
             var itemsQuery = baseQuery.AsQueryable();
 
@@ -1096,35 +1097,38 @@ namespace NuaSpa.Application.Services
             {
                 case "today":
                     itemsQuery = itemsQuery.Where(r =>
-                        !r.IsOtkazana
+                        r.Status != RezervacijaStatus.Cancelled
                         && r.DatumRezervacije >= dayStart
                         && r.DatumRezervacije < dayEnd);
                     break;
                 case "completed":
                     itemsQuery = itemsQuery.Where(r =>
-                        !r.IsOtkazana && r.Status == RezervacijaStatus.Completed);
+                        r.Status == RezervacijaStatus.Completed);
                     break;
                 case "cancelled":
-                    itemsQuery = itemsQuery.Where(r => r.IsOtkazana);
+                    itemsQuery = itemsQuery.Where(r =>
+                        r.Status == RezervacijaStatus.Cancelled);
                     break;
                 default:
                     itemsQuery = itemsQuery.Where(r =>
-                        !r.IsOtkazana && r.DatumRezervacije >= dayEnd);
+                        r.Status != RezervacijaStatus.Cancelled && r.DatumRezervacije >= dayEnd);
                     break;
             }
 
             var statusNorm = (statusFilter ?? "all").Trim().ToLowerInvariant();
             if (statusNorm == "confirmed")
             {
-                itemsQuery = itemsQuery.Where(r => r.IsPotvrdjena && !r.IsOtkazana);
+                itemsQuery = itemsQuery.Where(r =>
+                    r.Status == RezervacijaStatus.Confirmed
+                    || r.Status == RezervacijaStatus.Completed);
             }
             else if (statusNorm == "pending")
             {
-                itemsQuery = itemsQuery.Where(r => !r.IsPotvrdjena && !r.IsOtkazana);
+                itemsQuery = itemsQuery.Where(r => r.Status == RezervacijaStatus.Pending);
             }
             else if (statusNorm == "cancelled")
             {
-                itemsQuery = itemsQuery.Where(r => r.IsOtkazana);
+                itemsQuery = itemsQuery.Where(r => r.Status == RezervacijaStatus.Cancelled);
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -1147,7 +1151,7 @@ namespace NuaSpa.Application.Services
             await ApplyPremiumFlagsForAppointmentRowsAsync(rows).ConfigureAwait(false);
 
             var next = await baseQuery
-                .Where(r => !r.IsOtkazana && r.DatumRezervacije >= now)
+                .Where(r => r.Status != RezervacijaStatus.Cancelled && r.DatumRezervacije >= now)
                 .OrderBy(r => r.DatumRezervacije)
                 .Select(MapTherapistAppointmentRow)
                 .FirstOrDefaultAsync();
@@ -1214,7 +1218,7 @@ namespace NuaSpa.Application.Services
             var next = await _context.Rezervacije.AsNoTracking()
                 .Where(r =>
                     r.ZaposlenikId == zaposlenikId
-                    && !r.IsOtkazana
+                    && r.Status != RezervacijaStatus.Cancelled
                     && r.DatumRezervacije >= now)
                 .OrderBy(r => r.DatumRezervacije)
                 .Select(MapTherapistAppointmentRow)
@@ -1226,12 +1230,16 @@ namespace NuaSpa.Application.Services
                     new List<TherapistAppointmentRowDto> { next }).ConfigureAwait(false);
             }
 
-            var active = dayRows.Where(r => !r.IsOtkazana).ToList();
+            var active = dayRows
+                .Where(r => r.Status != nameof(RezervacijaStatus.Cancelled))
+                .ToList();
             var overview = new TherapistScheduleDayOverviewDto
             {
                 Total = active.Count,
-                Confirmed = active.Count(r => r.IsPotvrdjena),
-                Pending = active.Count(r => !r.IsPotvrdjena),
+                Confirmed = active.Count(r =>
+                    r.Status == nameof(RezervacijaStatus.Confirmed)
+                    || r.Status == nameof(RezervacijaStatus.Completed)),
+                Pending = active.Count(r => r.Status == nameof(RezervacijaStatus.Pending)),
                 HoursBooked = active.Sum(r => r.UslugaTrajanjeMinuta) / 60.0,
             };
 
@@ -1272,9 +1280,10 @@ namespace NuaSpa.Application.Services
                 Id = r.Id,
                 DatumRezervacije = r.DatumRezervacije,
                 Status = r.Status.ToString(),
-                IsPotvrdjena = r.IsPotvrdjena,
+                IsPotvrdjena = r.Status == RezervacijaStatus.Confirmed
+                    || r.Status == RezervacijaStatus.Completed,
                 IsPlacena = r.IsPlacena,
-                IsOtkazana = r.IsOtkazana,
+                IsOtkazana = r.Status == RezervacijaStatus.Cancelled,
                 RazlogOtkaza = r.RazlogOtkaza,
                 OtkazanaAt = r.OtkazanaAt,
                 IsVip = r.IsVip,
@@ -1304,7 +1313,7 @@ namespace NuaSpa.Application.Services
             var ids = rows.Select(d => d.KorisnikId).Distinct().ToList();
             var premiumIds = await _context.Rezervacije
                 .AsNoTracking()
-                .Where(r => ids.Contains(r.KorisnikId) && r.IsPlacena && !r.IsOtkazana)
+                .Where(r => ids.Contains(r.KorisnikId) && r.IsPlacena && r.Status != RezervacijaStatus.Cancelled)
                 .GroupBy(r => r.KorisnikId)
                 .Where(g => g.Count() >= 3)
                 .Select(g => g.Key)
@@ -1346,7 +1355,7 @@ namespace NuaSpa.Application.Services
                 .Include(r => r.Usluga)
                 .Where(r =>
                     r.ZaposlenikId == zaposlenikId
-                    && !r.IsOtkazana
+                    && r.Status != RezervacijaStatus.Cancelled
                     && r.DatumRezervacije >= weekStart
                     && r.DatumRezervacije < weekEnd)
                 .Select(r => new DayAppointment(
@@ -1427,7 +1436,7 @@ namespace NuaSpa.Application.Services
                 from r in _context.Rezervacije.AsNoTracking()
                 join u in _context.Usluge.AsNoTracking() on r.UslugaId equals u.Id
                 where r.ZaposlenikId == zaposlenikId
-                      && !r.IsOtkazana
+                      && r.Status != RezervacijaStatus.Cancelled
                       && r.DatumRezervacije >= periodStart
                       && r.DatumRezervacije < endExclusive
                 group r by u.Naziv
@@ -1463,9 +1472,14 @@ namespace NuaSpa.Application.Services
                     && r.DatumRezervacije < endExclusive);
 
             var ukupno = await rezQuery.CountAsync();
-            var potvrdjene = await rezQuery.Where(r => r.IsPotvrdjena && !r.IsOtkazana).CountAsync();
-            var otkazane = await rezQuery.Where(r => r.IsOtkazana).CountAsync();
-            var placene = await rezQuery.Where(r => r.IsPlacena && !r.IsOtkazana).CountAsync();
+            var potvrdjene = await rezQuery.Where(r =>
+                    r.Status == RezervacijaStatus.Confirmed
+                    || r.Status == RezervacijaStatus.Completed)
+                .CountAsync();
+            var otkazane = await rezQuery.Where(r => r.Status == RezervacijaStatus.Cancelled).CountAsync();
+            var placene = await rezQuery.Where(r =>
+                    r.IsPlacena && r.Status != RezervacijaStatus.Cancelled)
+                .CountAsync();
 
             var prihod = await _context.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)

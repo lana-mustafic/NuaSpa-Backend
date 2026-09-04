@@ -9,6 +9,7 @@ using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
 using NuaSpa.Domain;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Application.Services.Booking;
 
 namespace NuaSpa.Application.Services;
 
@@ -185,8 +186,24 @@ public class ResursiService : IResursiService
             throw new NotFoundException("Prostorija nije pronađena.");
         }
 
-        _context.Prostorije.Remove(e);
-        await _context.SaveChangesAsync(ct);
+        var used = await _context.Rezervacije.AsNoTracking()
+            .AnyAsync(r => r.ProstorijaId == id, ct);
+        if (used)
+        {
+            throw new ConflictException(
+                "Prostorija je već korištena na rezervacijama i ne može biti obrisana. Deaktivirajte je da historija termina ostane sačuvana.");
+        }
+
+        try
+        {
+            _context.Prostorije.Remove(e);
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            throw new ConflictException(
+                "Prostorija se ne može obrisati jer je povezana s postojećim rezervacijama.");
+        }
     }
 
     public async Task<List<OpremaDTO>> GetOpremaAsync(CancellationToken ct)
@@ -267,22 +284,42 @@ public class ResursiService : IResursiService
             throw new NotFoundException("Oprema nije pronađena.");
         }
 
-        _context.Oprema.Remove(e);
-        await _context.SaveChangesAsync(ct);
+        var used = await _context.RezervacijeOprema.AsNoTracking()
+            .AnyAsync(x => x.OpremaId == id, ct);
+        if (used)
+        {
+            throw new ConflictException(
+                "Oprema je već korištena na rezervacijama i ne može biti obrisana. Označite je neispravnom da historija termina ostane sačuvana.");
+        }
+
+        try
+        {
+            _context.Oprema.Remove(e);
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            throw new ConflictException(
+                "Oprema se ne može obrisati jer je povezana s postojećim rezervacijama.");
+        }
     }
 
     public async Task<ResourceAvailabilityDTO> GetAvailabilityAsync(
         DateTime slot,
+        int? uslugaId,
+        int? durationMinutes,
         int? excludeRezervacijaId,
         CancellationToken ct)
     {
-        var takenRoomIds = await _context.Rezervacije
+        var startUtc = BookingClock.ToUtc(slot);
+        var duration = await ResolveAvailabilityDurationAsync(uslugaId, durationMinutes, ct);
+
+        var overlapping = _context.Rezervacije
             .AsNoTracking()
-            .Where(r =>
-                !r.IsOtkazana &&
-                r.ProstorijaId != null &&
-                r.DatumRezervacije == slot &&
-                (!excludeRezervacijaId.HasValue || r.Id != excludeRezervacijaId.Value))
+            .WhereOverlapping(startUtc, duration, excludeRezervacijaId);
+
+        var takenRoomIds = await overlapping
+            .Where(r => r.ProstorijaId != null)
             .Select(r => r.ProstorijaId!.Value)
             .Distinct()
             .ToListAsync(ct);
@@ -305,12 +342,13 @@ public class ResursiService : IResursiService
             })
             .ToListAsync(ct);
 
+        var overlappingIds = await overlapping
+            .Select(r => r.Id)
+            .ToListAsync(ct);
+
         var reserved = await _context.RezervacijeOprema
             .AsNoTracking()
-            .Where(x =>
-                !x.Rezervacija.IsOtkazana &&
-                x.Rezervacija.DatumRezervacije == slot &&
-                (!excludeRezervacijaId.HasValue || x.RezervacijaId != excludeRezervacijaId.Value))
+            .Where(x => overlappingIds.Contains(x.RezervacijaId))
             .GroupBy(x => x.OpremaId)
             .Select(g => new { OpremaId = g.Key, Qty = g.Sum(x => x.Kolicina) })
             .ToListAsync(ct);
@@ -342,10 +380,39 @@ public class ResursiService : IResursiService
 
         return new ResourceAvailabilityDTO
         {
-            Slot = slot,
+            Slot = startUtc,
+            DurationMinutes = duration,
             FreeRooms = freeRooms,
             Equipment = equipmentDtos
         };
+    }
+
+    private async Task<int> ResolveAvailabilityDurationAsync(
+        int? uslugaId,
+        int? durationMinutes,
+        CancellationToken ct)
+    {
+        if (uslugaId is > 0)
+        {
+            var catalogMinutes = await _context.Usluge.AsNoTracking()
+                .Where(u => u.Id == uslugaId && !u.IsDeleted)
+                .Select(u => (int?)u.TrajanjeMinuta)
+                .FirstOrDefaultAsync(ct);
+            if (catalogMinutes is null)
+            {
+                throw new BusinessRuleException("Service not found.");
+            }
+
+            return RezervacijaPricing.ResolveDurationMinutes(catalogMinutes.Value);
+        }
+
+        if (durationMinutes is > 0)
+        {
+            return RezervacijaPricing.ResolveDurationMinutes(durationMinutes.Value);
+        }
+
+        throw new BusinessRuleException(
+            "Provide uslugaId or durationMinutes so availability uses the same interval as booking.");
     }
 }
 

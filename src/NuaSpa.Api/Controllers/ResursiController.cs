@@ -85,10 +85,14 @@ public class ResursiController : ControllerBase
     [HttpGet("availability")]
     public async Task<ActionResult<ResourceAvailabilityDTO>> GetAvailability(
         [FromQuery] DateTime slot,
+        [FromQuery] int? uslugaId = null,
+        [FromQuery] int? durationMinutes = null,
         [FromQuery] int? excludeRezervacijaId = null)
     {
         var availability = await _service.GetAvailabilityAsync(
             slot,
+            uslugaId,
+            durationMinutes,
             excludeRezervacijaId,
             HttpContext.RequestAborted);
 

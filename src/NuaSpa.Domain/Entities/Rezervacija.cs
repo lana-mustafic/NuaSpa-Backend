@@ -16,13 +16,27 @@ namespace NuaSpa.Domain.Entities
         [Required]
         public RezervacijaStatus Status { get; set; } = RezervacijaStatus.Pending;
 
+        /// <summary>
+        /// Legacy mirror of <see cref="Status"/> (Confirmed or Completed).
+        /// Always synced from Status — do not assign independently.
+        /// </summary>
         [Required]
         public bool IsPotvrdjena { get; set; }
 
         [Required]
         public bool IsPlacena { get; set; }
 
+        /// <summary>
+        /// Legacy mirror of <see cref="Status"/> (Cancelled).
+        /// Always synced from Status — do not assign independently.
+        /// </summary>
         public bool IsOtkazana { get; set; }
+
+        public void SyncLegacyFlagsFromStatus()
+        {
+            IsOtkazana = RezervacijaStatusRules.LegacyIsOtkazana(Status);
+            IsPotvrdjena = RezervacijaStatusRules.LegacyIsPotvrdjena(Status);
+        }
 
         /// <summary>Snimak cijene usluge u trenutku kreiranja rezervacije.</summary>
         [Required]

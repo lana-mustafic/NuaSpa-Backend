@@ -35,7 +35,7 @@ public sealed class NotificationPublisher : INotificationPublisher
             TerapeutIme = rezervacija.ZaposlenikIme ?? "Terapeut",
             DatumRezervacije = rezervacija.DatumRezervacije,
             Cijena = rezervacija.UslugaCijena,
-            IsPotvrdjena = rezervacija.IsPotvrdjena,
+            IsPotvrdjena = rezervacija.Status is "Confirmed" or "Completed",
         };
 
         return _publisher.PublishAsync(NuaSpaMessageTypes.RezervacijaPotvrda, message, cancellationToken);

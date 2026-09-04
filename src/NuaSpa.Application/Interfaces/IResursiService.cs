@@ -28,6 +28,8 @@ namespace NuaSpa.Application.Interfaces
 
         Task<ResourceAvailabilityDTO> GetAvailabilityAsync(
             DateTime slot,
+            int? uslugaId,
+            int? durationMinutes,
             int? excludeRezervacijaId,
             CancellationToken ct);
     }

@@ -96,7 +96,7 @@ public class AdminKlijentService : IAdminKlijentService
         CancellationToken ct)
     {
         var visitMap = await _context.Rezervacije.AsNoTracking()
-            .Where(r => !r.IsOtkazana && ids.Contains(r.KorisnikId))
+            .Where(r => r.Status != RezervacijaStatus.Cancelled && ids.Contains(r.KorisnikId))
             .GroupBy(r => r.KorisnikId)
             .Select(g => new
             {
@@ -139,7 +139,7 @@ public class AdminKlijentService : IAdminKlijentService
         {
             UkupnoKlijenata = await baseQuery.CountAsync(ct),
             UkupnoPosjeta = await _context.Rezervacije.AsNoTracking()
-                .Where(r => !r.IsOtkazana && idsQuery.Contains(r.KorisnikId))
+                .Where(r => r.Status != RezervacijaStatus.Cancelled && idsQuery.Contains(r.KorisnikId))
                 .CountAsync(ct),
             UkupnaPotrosnja = await _context.Placanja.AsNoTracking()
                 .Where(p => !p.IsDeleted)
@@ -152,7 +152,7 @@ public class AdminKlijentService : IAdminKlijentService
         };
 
         var perClientVisits = await _context.Rezervacije.AsNoTracking()
-            .Where(r => !r.IsOtkazana && idsQuery.Contains(r.KorisnikId))
+            .Where(r => r.Status != RezervacijaStatus.Cancelled && idsQuery.Contains(r.KorisnikId))
             .GroupBy(r => r.KorisnikId)
             .Select(g => new { KorisnikId = g.Key, Visits = g.Count() })
             .ToListAsync(ct);
@@ -366,7 +366,7 @@ public class AdminKlijentService : IAdminKlijentService
             var hasUpcoming = await _context.Rezervacije.AsNoTracking()
                 .AnyAsync(r =>
                     r.KorisnikId == id &&
-                    !r.IsOtkazana &&
+                    r.Status != RezervacijaStatus.Cancelled &&
                     r.DatumRezervacije > DateTime.UtcNow, ct);
 
             if (hasUpcoming)

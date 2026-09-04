@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using NuaSpa.Domain.Entities;
+using NuaSpa.Domain.Enums;
 using NuaSpa.Application.DTOs;
 
 namespace NuaSpa.Application
@@ -52,6 +53,11 @@ namespace NuaSpa.Application
             CreateMap<Rezervacija, RezervacijaDTO>()
                 .ForMember(dest => dest.KorisnikId, opt => opt.MapFrom(src => src.KorisnikId))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+                .ForMember(dest => dest.IsPotvrdjena, opt => opt.MapFrom(src =>
+                    src.Status == RezervacijaStatus.Confirmed
+                    || src.Status == RezervacijaStatus.Completed))
+                .ForMember(dest => dest.IsOtkazana, opt => opt.MapFrom(src =>
+                    src.Status == RezervacijaStatus.Cancelled))
                 .ForMember(dest => dest.KorisnikTelefon, opt => opt.MapFrom(src => src.Korisnik.PhoneNumber))
                 .ForMember(dest => dest.KorisnikEmail, opt => opt.MapFrom(src => src.Korisnik.Email))
                 .ForMember(dest => dest.NapomenaZaTerapeuta,
