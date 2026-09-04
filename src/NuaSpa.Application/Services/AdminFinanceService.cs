@@ -244,6 +244,7 @@ namespace NuaSpa.Application.Services
             public decimal UkupniPrihod { get; set; }
             public int PlaceneRezervacije { get; set; }
             public int NeplaceneRezervacije { get; set; }
+            public int PendingPaymentPokusaji { get; set; }
             public decimal IznosRefundacija { get; set; }
             public int BrojPlacanjaZaProsjek { get; set; }
         }
@@ -272,11 +273,15 @@ namespace NuaSpa.Application.Services
                 .Where(p => p.RefundedAtUtc >= from && p.RefundedAtUtc < toExclusive)
                 .SumAsync(p => p.NaplaceniIznos ?? p.Iznos, ct);
 
-            // Payment-date aligned counts (consistent with transaction table filters).
-            var placeneRez = await placanjaQ
-                .CountAsync(p => p.Status == PlacanjeStatus.Completed, ct);
+            // Paid KPI stays payment-date aligned with revenue. Unpaid is a
+            // reservation fact: confirmed/pending visits with no collected
+            // payment, including those that never opened PaymentSheet.
+            var placeneRez = paidTx;
 
-            var neplaceneRez = await placanjaQ
+            var neplaceneRez = await UnpaidReservationsInPeriod(from, toExclusive)
+                .CountAsync(ct);
+
+            var pendingAttempts = await placanjaQ
                 .CountAsync(p => p.Status == PlacanjeStatus.Pending, ct);
 
             return new KpiSnapshot
@@ -284,10 +289,27 @@ namespace NuaSpa.Application.Services
                 UkupniPrihod = revenue,
                 PlaceneRezervacije = placeneRez,
                 NeplaceneRezervacije = neplaceneRez,
+                PendingPaymentPokusaji = pendingAttempts,
                 IznosRefundacija = refunds,
                 BrojPlacanjaZaProsjek = paidTx,
             };
         }
+
+        private IQueryable<Rezervacija> ReservationsInPeriod(DateTime from, DateTime toExclusive) =>
+            _db.Rezervacije.AsNoTracking()
+                .Where(r => !r.IsDeleted)
+                .Where(r => r.Status != RezervacijaStatus.Cancelled)
+                .Where(r => r.DatumRezervacije >= from && r.DatumRezervacije < toExclusive);
+
+        private IQueryable<Rezervacija> UnpaidReservationsInPeriod(DateTime from, DateTime toExclusive) =>
+            ReservationsInPeriod(from, toExclusive)
+                .Where(r =>
+                    !r.IsPlacena
+                    && !_db.Placanja.Any(p =>
+                        !p.IsDeleted
+                        && p.RezervacijaId == r.Id
+                        && (p.Status == PlacanjeStatus.Completed
+                            || p.Status == PlacanjeStatus.Refunded)));
 
         private static AdminFinanceKpiDto BuildKpiDto(KpiSnapshot cur, KpiSnapshot prev)
         {
@@ -308,6 +330,8 @@ namespace NuaSpa.Application.Services
                 PostotakPromjeneProsjecnaVrijednost = PctChange(avgCur, avgPrev),
                 NeplaceneRezervacije = cur.NeplaceneRezervacije,
                 PostotakPromjeneNeplaceneRezervacije = PctChangeI(cur.NeplaceneRezervacije, prev.NeplaceneRezervacije),
+                PendingPaymentPokusaji = cur.PendingPaymentPokusaji,
+                PostotakPromjenePendingPaymentPokusaji = PctChangeI(cur.PendingPaymentPokusaji, prev.PendingPaymentPokusaji),
                 IznosRefundacija = cur.IznosRefundacija,
                 PostotakPromjeneRefundacija = PctChange(cur.IznosRefundacija, prev.IznosRefundacija),
             };

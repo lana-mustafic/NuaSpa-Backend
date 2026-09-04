@@ -29,6 +29,10 @@ public class AdminFinanceKpiDto
     public int NeplaceneRezervacije { get; set; }
     public double? PostotakPromjeneNeplaceneRezervacije { get; set; }
 
+    /// <summary>Stripe PaymentSheet attempts that are still Pending — not the same as unpaid reservations.</summary>
+    public int PendingPaymentPokusaji { get; set; }
+    public double? PostotakPromjenePendingPaymentPokusaji { get; set; }
+
     public decimal IznosRefundacija { get; set; }
     public double? PostotakPromjeneRefundacija { get; set; }
 }
