@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NuaSpa.Application.Common;
 
 namespace NuaSpa.Api.Controllers;
 
@@ -24,59 +23,12 @@ public class FilesController : ControllerBase
     [ResponseCache(Duration = 3600)]
     public IActionResult GetUslugaImage(string fileName)
     {
-        if (!TryResolveUslugaFile(fileName, out var physical, out var contentType))
+        if (!TryResolveUploadedFile("usluge", fileName, out var physical, out var contentType))
         {
             return NotFound();
         }
 
         return PhysicalFile(physical, contentType);
-    }
-
-    private bool TryResolveUslugaFile(string fileName, out string physicalPath, out string contentType)
-    {
-        physicalPath = string.Empty;
-        contentType = "application/octet-stream";
-
-        if (string.IsNullOrWhiteSpace(fileName) ||
-            fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
-            fileName.Contains("..", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var safeName = Path.GetFileName(fileName);
-        if (!string.Equals(safeName, fileName, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var ext = Path.GetExtension(safeName).ToLowerInvariant();
-        contentType = ext switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".gif" => "image/gif",
-            _ => string.Empty,
-        };
-
-        if (string.IsNullOrEmpty(contentType))
-        {
-            return false;
-        }
-
-        var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-        physicalPath = Path.GetFullPath(Path.Combine(webRoot, "uploads", "usluge", safeName));
-        var root = Path.GetFullPath(Path.Combine(webRoot, "uploads", "usluge"));
-
-        if (!physicalPath.StartsWith(root, StringComparison.OrdinalIgnoreCase) ||
-            !System.IO.File.Exists(physicalPath))
-        {
-            _logger.LogDebug("Tražena slika usluge nije pronađena: {File}", safeName);
-            return false;
-        }
-
-        return true;
     }
 
     [AllowAnonymous]
@@ -84,7 +36,7 @@ public class FilesController : ControllerBase
     [ResponseCache(Duration = 3600)]
     public IActionResult GetTherapistAvatar(string fileName)
     {
-        if (!TryResolveTherapistFile(fileName, out var physical, out var contentType))
+        if (!TryResolveUploadedFile("terapeuti", fileName, out var physical, out var contentType))
         {
             return NotFound();
         }
@@ -92,7 +44,24 @@ public class FilesController : ControllerBase
         return PhysicalFile(physical, contentType);
     }
 
-    private bool TryResolveTherapistFile(string fileName, out string physicalPath, out string contentType)
+    [AllowAnonymous]
+    [HttpGet("obavijesti/{fileName}")]
+    [ResponseCache(Duration = 3600)]
+    public IActionResult GetObavijestImage(string fileName)
+    {
+        if (!TryResolveUploadedFile("obavijesti", fileName, out var physical, out var contentType))
+        {
+            return NotFound();
+        }
+
+        return PhysicalFile(physical, contentType);
+    }
+
+    private bool TryResolveUploadedFile(
+        string folder,
+        string fileName,
+        out string physicalPath,
+        out string contentType)
     {
         physicalPath = string.Empty;
         contentType = "application/octet-stream";
@@ -126,17 +95,16 @@ public class FilesController : ControllerBase
         }
 
         var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-        physicalPath = Path.GetFullPath(Path.Combine(webRoot, "uploads", "terapeuti", safeName));
-        var root = Path.GetFullPath(Path.Combine(webRoot, "uploads", "terapeuti"));
+        physicalPath = Path.GetFullPath(Path.Combine(webRoot, "uploads", folder, safeName));
+        var root = Path.GetFullPath(Path.Combine(webRoot, "uploads", folder));
 
         if (!physicalPath.StartsWith(root, StringComparison.OrdinalIgnoreCase) ||
             !System.IO.File.Exists(physicalPath))
         {
-            _logger.LogDebug("Therapist avatar not found: {File}", safeName);
+            _logger.LogDebug("Tražena slika nije pronađena: {Folder}/{File}", folder, safeName);
             return false;
         }
 
         return true;
     }
 }
-

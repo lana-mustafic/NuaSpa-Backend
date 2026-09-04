@@ -29,6 +29,7 @@ public static class DevelopmentDataSeeder
         await RemoveLegacyBeautyCatalogAsync(context, logger, cancellationToken);
         await SyncTherapistServiceSpecializationsAsync(context, logger, cancellationToken);
         await AlignReservationLegacyFlagsAsync(context, cancellationToken);
+        await EnsureObavijestiAsync(context, seedImageUrl, cancellationToken);
 
         if (await context.Usluge.CountAsync(cancellationToken) >= 8)
         {
@@ -585,5 +586,42 @@ public static class DevelopmentDataSeeder
             .ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.IsPotvrdjena, false)
                 .SetProperty(r => r.IsOtkazana, true), ct);
+    }
+
+    private static async Task EnsureObavijestiAsync(
+        NuaSpaContext context,
+        string? seedImageUrl,
+        CancellationToken ct)
+    {
+        if (await context.Obavijesti.IgnoreQueryFilters().AnyAsync(ct))
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        context.Obavijesti.AddRange(
+            new Obavijest
+            {
+                Naslov = "Autumn wellness week",
+                Tekst =
+                    "This week we are extending evening hours and offering complimentary herbal tea after every treatment. "
+                    + "Book a massage or facial by Friday to enjoy the seasonal ritual.",
+                SlikaUrl = string.IsNullOrWhiteSpace(seedImageUrl) ? null : seedImageUrl,
+                DatumObjave = now.AddDays(-4),
+                Aktivna = true,
+                CreatedAt = now.AddDays(-4),
+            },
+            new Obavijest
+            {
+                Naslov = "New signature facial",
+                Tekst =
+                    "Our therapists now offer a 75-minute hydrating facial with lymphatic massage. "
+                    + "Ask at reception or book it from the service catalog.",
+                DatumObjave = now.AddDays(-1),
+                Aktivna = true,
+                CreatedAt = now.AddDays(-1),
+            });
+
+        await context.SaveChangesAsync(ct);
     }
 }

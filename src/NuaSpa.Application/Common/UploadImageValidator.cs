@@ -63,7 +63,7 @@ public static class UploadImageValidator
                 return false;
             }
 
-            return ext switch
+            var matches = ext switch
             {
                 ".jpg" or ".jpeg" => header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF,
                 ".png" => header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47,
@@ -73,6 +73,13 @@ public static class UploadImageValidator
                            header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50,
                 _ => false,
             };
+
+            if (!matches)
+            {
+                error = "Sadržaj datoteke ne odgovara navedenom formatu slike.";
+            }
+
+            return matches;
         }
         finally
         {

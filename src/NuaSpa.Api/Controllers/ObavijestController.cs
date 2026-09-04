@@ -116,23 +116,39 @@ public class ObavijestController : ControllerBase
             return BadRequest(new { message = "Datoteka nije poslana." });
         }
 
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (ext is not (".jpg" or ".jpeg" or ".png" or ".webp"))
+        if (file.Length > 5_000_000)
         {
-            return BadRequest(new { message = "Dozvoljeni formati: jpg, png, webp." });
+            return BadRequest(new { message = "Datoteka je prevelika (maks. 5 MB)." });
         }
 
+        await using var readStream = file.OpenReadStream();
+        if (!UploadImageValidator.TryValidate(
+                file.FileName,
+                file.ContentType,
+                readStream,
+                out var validationError))
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
         var dir = Path.Combine(webRoot, "uploads", "obavijesti");
         Directory.CreateDirectory(dir);
 
-        var fileName = $"{Guid.NewGuid():N}{ext}";
-        var path = Path.Combine(dir, fileName);
-        await using (var stream = System.IO.File.Create(path))
+        var safeName = $"{Guid.NewGuid():N}{ext}";
+        var physical = Path.Combine(dir, safeName);
+
+        if (readStream.CanSeek)
         {
-            await file.CopyToAsync(stream, ct);
+            readStream.Position = 0;
         }
 
-        return Ok(new { url = $"/uploads/obavijesti/{fileName}" });
+        await using (var outStream = System.IO.File.Create(physical))
+        {
+            await readStream.CopyToAsync(outStream, ct);
+        }
+
+        return Ok(new { url = $"/api/files/obavijesti/{safeName}" });
     }
 }
