@@ -90,6 +90,15 @@ public class AccountController : ControllerBase
     }
 
     [Authorize]
+    [HttpPut("me")]
+    public async Task<ActionResult<AccountProfileDto>> UpdateMe([FromBody] AccountProfileUpdateDto dto)
+    {
+        var userId = User.GetNuaSpaUserId();
+        var profile = await _authService.UpdateMeAsync(userId, dto, HttpContext.RequestAborted);
+        return Ok(profile);
+    }
+
+    [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout([FromBody] LogoutRequestDto? dto)
     {

@@ -24,6 +24,9 @@ public class AccountProfileDto
     /// <summary>Contact phone (Identity PhoneNumber).</summary>
     public string? Phone { get; set; }
 
+    /// <summary>Home city id when assigned.</summary>
+    public int? GradId { get; set; }
+
     /// <summary>Home city name when available.</summary>
     public string? CityName { get; set; }
 

@@ -176,6 +176,7 @@ public class AuthService : IAuthService
         if (korisnik != null)
         {
             dto.Phone = korisnik.PhoneNumber;
+            dto.GradId = korisnik.GradId;
             dto.CityName = korisnik.Grad?.Naziv;
             dto.MemberSince = korisnik.DatumRegistracije;
 
@@ -209,6 +210,65 @@ public class AuthService : IAuthService
         }
 
         return dto;
+    }
+
+    public async Task<AccountProfileDto> UpdateMeAsync(
+        int userId,
+        AccountProfileUpdateDto dto,
+        CancellationToken ct)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+        {
+            throw new NotFoundException("Korisnik nije pronađen.");
+        }
+
+        user.Ime = dto.FirstName.Trim();
+        user.Prezime = dto.LastName.Trim();
+
+        var email = dto.Email.Trim();
+        if (string.IsNullOrEmpty(email))
+        {
+            throw new BusinessRuleException("Email ne može biti prazan.");
+        }
+
+        var existingMail = await _userManager.FindByEmailAsync(email);
+        if (existingMail != null && existingMail.Id != user.Id)
+        {
+            throw new ConflictException("Email je već registriran.");
+        }
+
+        if (!string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            var setMail = await _userManager.SetEmailAsync(user, email);
+            if (!setMail.Succeeded)
+            {
+                throw new BusinessRuleException(
+                    string.Join("; ", setMail.Errors.Select(e => e.Description)));
+            }
+        }
+
+        user.PhoneNumber = string.IsNullOrWhiteSpace(dto.Phone) ? null : dto.Phone.Trim();
+
+        if (dto.GradId.HasValue)
+        {
+            var cityExists = await _context.Gradovi.AsNoTracking()
+                .AnyAsync(g => g.Id == dto.GradId.Value, ct);
+            if (!cityExists)
+            {
+                throw new BusinessRuleException("Grad nije pronađen.");
+            }
+
+            user.GradId = dto.GradId.Value;
+        }
+
+        var upd = await _userManager.UpdateAsync(user);
+        if (!upd.Succeeded)
+        {
+            throw new BusinessRuleException(string.Join("; ", upd.Errors.Select(e => e.Description)));
+        }
+
+        return await GetMeAsync(userId, ct);
     }
 
     public async Task LogoutAsync(
