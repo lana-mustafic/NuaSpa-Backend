@@ -8,15 +8,25 @@ using RabbitMQ.Client;
 
 namespace NuaSpa.Application.Services.Messaging;
 
-public sealed class RabbitMqPublisher : IRabbitMqPublisher
+/// <summary>
+/// Long-lived RabbitMQ connection/channel (singleton). Opening a full
+/// connection per publish overloads the broker and the API process.
+/// </summary>
+public sealed class RabbitMqPublisher : IRabbitMqPublisher, IAsyncDisposable
 {
     private readonly RabbitMqOptions _options;
     private readonly ILogger<RabbitMqPublisher> _logger;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly ConnectionFactory _factory;
+
+    private IConnection? _connection;
+    private IChannel? _channel;
 
     public RabbitMqPublisher(IOptions<RabbitMqOptions> options, ILogger<RabbitMqPublisher> logger)
     {
         _options = options.Value;
         _logger = logger;
+        _factory = RabbitMqRetry.CreateFactory(_options);
     }
 
     public async Task PublishAsync(string messageType, object payload, CancellationToken cancellationToken = default)
@@ -29,53 +39,134 @@ public sealed class RabbitMqPublisher : IRabbitMqPublisher
             CorrelationId = Guid.NewGuid().ToString("N"),
         };
 
-        var factory = new ConnectionFactory
-        {
-            HostName = _options.Host,
-            Port = _options.Port,
-            UserName = _options.UserName,
-            Password = _options.Password,
-        };
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(envelope));
+        Exception? lastError = null;
 
+        for (var attempt = 1; attempt <= RabbitMqRetry.MaxAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await _gate.WaitAsync(cancellationToken);
+            try
+            {
+                await EnsureChannelAsync(cancellationToken);
+                await _channel!.BasicPublishAsync(
+                    exchange: string.Empty,
+                    routingKey: _options.NotificationsQueue,
+                    body: body,
+                    cancellationToken: cancellationToken);
+
+                _logger.LogInformation(
+                    "RabbitMQ publish uspješan Type={Type} Queue={Queue} Host={Host}:{Port} CorrelationId={CorrelationId}",
+                    messageType,
+                    _options.NotificationsQueue,
+                    _options.Host,
+                    _options.Port,
+                    envelope.CorrelationId);
+                return;
+            }
+            catch (Exception ex) when (attempt < RabbitMqRetry.MaxAttempts)
+            {
+                lastError = ex;
+                await ResetChannelAsync();
+                var delay = RabbitMqRetry.DelayBeforeRetry(attempt);
+                _logger.LogWarning(
+                    ex,
+                    "RabbitMQ publish neuspješan (pokušaj {Attempt}/{Max}). Ponovni pokušaj za {Delay}s. Type={Type} CorrelationId={CorrelationId}",
+                    attempt,
+                    RabbitMqRetry.MaxAttempts,
+                    delay.TotalSeconds,
+                    messageType,
+                    envelope.CorrelationId);
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+            }
+            finally
+            {
+                _gate.Release();
+            }
+
+            if (attempt < RabbitMqRetry.MaxAttempts)
+            {
+                await Task.Delay(RabbitMqRetry.DelayBeforeRetry(attempt), cancellationToken);
+            }
+        }
+
+        _logger.LogError(
+            lastError,
+            "RabbitMQ publish NIJE USPIO Type={Type} Queue={Queue} Host={Host}:{Port} CorrelationId={CorrelationId}",
+            messageType,
+            _options.NotificationsQueue,
+            _options.Host,
+            _options.Port,
+            envelope.CorrelationId);
+        throw lastError ?? new InvalidOperationException("RabbitMQ publish failed.");
+    }
+
+    private async Task EnsureChannelAsync(CancellationToken cancellationToken)
+    {
+        if (_connection is { IsOpen: true } && _channel is { IsOpen: true })
+        {
+            return;
+        }
+
+        await ResetChannelAsync();
+
+        _connection = await _factory.CreateConnectionAsync(cancellationToken);
+        _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+
+        await _channel.QueueDeclareAsync(
+            queue: _options.NotificationsQueue,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null,
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task ResetChannelAsync()
+    {
+        if (_channel != null)
+        {
+            try
+            {
+                await _channel.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "RabbitMQ channel dispose");
+            }
+
+            _channel = null;
+        }
+
+        if (_connection != null)
+        {
+            try
+            {
+                await _connection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "RabbitMQ connection dispose");
+            }
+
+            _connection = null;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _gate.WaitAsync();
         try
         {
-            await using var connection = await factory.CreateConnectionAsync(cancellationToken);
-            await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
-
-            await channel.QueueDeclareAsync(
-                queue: _options.NotificationsQueue,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: null,
-                cancellationToken: cancellationToken);
-
-            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(envelope));
-            await channel.BasicPublishAsync(
-                exchange: string.Empty,
-                routingKey: _options.NotificationsQueue,
-                body: body,
-                cancellationToken: cancellationToken);
-
-            _logger.LogInformation(
-                "RabbitMQ publish uspješan Type={Type} Queue={Queue} Host={Host}:{Port} CorrelationId={CorrelationId}",
-                messageType,
-                _options.NotificationsQueue,
-                _options.Host,
-                _options.Port,
-                envelope.CorrelationId);
+            await ResetChannelAsync();
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.LogError(
-                ex,
-                "RabbitMQ publish NIJE USPIO Type={Type} Queue={Queue} Host={Host}:{Port} CorrelationId={CorrelationId}",
-                messageType,
-                _options.NotificationsQueue,
-                _options.Host,
-                _options.Port,
-                envelope.CorrelationId);
-            throw;
+            _gate.Release();
+            _gate.Dispose();
         }
     }
 }

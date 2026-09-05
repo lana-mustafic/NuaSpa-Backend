@@ -231,7 +231,7 @@ builder.Services.AddAutoMapper(
 NuaSpa.Application.Configuration.ConfigurationValidator.RequireRabbitMq(builder.Configuration);
 builder.Services.Configure<NuaSpa.Application.Messaging.RabbitMqOptions>(
     builder.Configuration.GetSection(NuaSpa.Application.Messaging.RabbitMqOptions.SectionName));
-builder.Services.AddScoped<NuaSpa.Application.Interfaces.Messaging.IRabbitMqPublisher,
+builder.Services.AddSingleton<NuaSpa.Application.Interfaces.Messaging.IRabbitMqPublisher,
     NuaSpa.Application.Services.Messaging.RabbitMqPublisher>();
 builder.Services.AddScoped<NuaSpa.Application.Interfaces.Messaging.INotificationPublisher,
     NuaSpa.Application.Services.Messaging.NotificationPublisher>();
