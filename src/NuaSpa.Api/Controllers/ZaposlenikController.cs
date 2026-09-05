@@ -122,24 +122,34 @@ namespace NuaSpa.Api.Controllers
 
         [HttpGet("for-service/{uslugaId:int}")]
         [Authorize(Roles = RoleConstants.AdminKlijent)]
-        public async Task<ActionResult<IEnumerable<ZaposlenikDTO>>> GetForService(
+        public async Task<ActionResult<PagedResult<ZaposlenikDTO>>> GetForService(
             int uslugaId,
-            [FromQuery] bool bookableOnly = true)
+            [FromQuery] bool bookableOnly = true,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = PaginationConstants.DefaultPageSize)
         {
-            var list = await _zaposlenikService.GetForServiceAsync(uslugaId, bookableOnly);
-            return Ok(list);
+            var pageResult = await _zaposlenikService.GetForServiceAsync(
+                uslugaId,
+                bookableOnly,
+                page,
+                pageSize);
+            return Ok(pageResult);
         }
 
         [HttpGet("for-category/{kategorijaUslugaId:int}")]
         [Authorize(Roles = RoleConstants.AdminKlijent)]
-        public async Task<ActionResult<IEnumerable<ZaposlenikDTO>>> GetForCategory(
+        public async Task<ActionResult<PagedResult<ZaposlenikDTO>>> GetForCategory(
             int kategorijaUslugaId,
-            [FromQuery] bool bookableOnly = true)
+            [FromQuery] bool bookableOnly = true,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = PaginationConstants.DefaultPageSize)
         {
-            var list = await _zaposlenikService.GetForCategoryAsync(
+            var pageResult = await _zaposlenikService.GetForCategoryAsync(
                 kategorijaUslugaId,
-                bookableOnly);
-            return Ok(list);
+                bookableOnly,
+                page,
+                pageSize);
+            return Ok(pageResult);
         }
 
         [HttpGet("me")]

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.SearchObjects;
 
@@ -28,14 +29,20 @@ namespace NuaSpa.Application.Interfaces
 
         Task<bool> UpdateInternaNapomenaAsync(int zaposlenikId, string? napomena);
 
-        Task<IEnumerable<ZaposlenikDTO>> GetForServiceAsync(int uslugaId, bool bookableOnly = true);
+        Task<PagedResult<ZaposlenikDTO>> GetForServiceAsync(
+            int uslugaId,
+            bool bookableOnly = true,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize);
 
         /// <summary>Whether the therapist is allowed to perform the given service (category + specialization).</summary>
         Task<bool> IsEligibleForServiceAsync(int zaposlenikId, int uslugaId, bool requireActive = true);
 
-        Task<IEnumerable<ZaposlenikDTO>> GetForCategoryAsync(
+        Task<PagedResult<ZaposlenikDTO>> GetForCategoryAsync(
             int kategorijaUslugaId,
-            bool bookableOnly = true);
+            bool bookableOnly = true,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize);
 
         Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId);
 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using NuaSpa.Application.Common;
 using NuaSpa.Application.DTOs;
 using NuaSpa.Application.Exceptions;
 using NuaSpa.Application.Interfaces;
@@ -108,9 +109,12 @@ public class ResursiService : IResursiService
         return await GetRadnoVrijemeAsync(ct);
     }
 
-    public async Task<List<ProstorijaDTO>> GetProstorijeAsync(CancellationToken ct)
+    public async Task<PagedResult<ProstorijaDTO>> GetProstorijeAsync(
+        int page,
+        int pageSize,
+        CancellationToken ct)
     {
-        return await _context.Prostorije
+        var query = _context.Prostorije
             .AsNoTracking()
             .Where(x => x.SpaCentarId == DefaultSpaCentarId)
             .OrderByDescending(x => x.IsAktivna)
@@ -123,8 +127,9 @@ public class ResursiService : IResursiService
                 Opis = x.Opis,
                 Kapacitet = x.Kapacitet,
                 IsAktivna = x.IsAktivna
-            })
-            .ToListAsync(ct);
+            });
+
+        return await PaginationHelper.ToPagedAsync(query, page, pageSize, ct);
     }
 
     public async Task<ProstorijaDTO> CreateProstorijaAsync(ProstorijaDTO dto, CancellationToken ct)
@@ -206,9 +211,12 @@ public class ResursiService : IResursiService
         }
     }
 
-    public async Task<List<OpremaDTO>> GetOpremaAsync(CancellationToken ct)
+    public async Task<PagedResult<OpremaDTO>> GetOpremaAsync(
+        int page,
+        int pageSize,
+        CancellationToken ct)
     {
-        return await _context.Oprema
+        var query = _context.Oprema
             .AsNoTracking()
             .Where(x => x.SpaCentarId == DefaultSpaCentarId)
             .OrderByDescending(x => x.IsIspravna)
@@ -221,8 +229,9 @@ public class ResursiService : IResursiService
                 Napomena = x.Napomena,
                 Kolicina = x.Kolicina,
                 IsIspravna = x.IsIspravna
-            })
-            .ToListAsync(ct);
+            });
+
+        return await PaginationHelper.ToPagedAsync(query, page, pageSize, ct);
     }
 
     public async Task<OpremaDTO> CreateOpremaAsync(OpremaDTO dto, CancellationToken ct)

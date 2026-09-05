@@ -48,10 +48,15 @@ public class ResursiController : ControllerBase
     }
 
     [HttpGet("prostorije")]
-    public async Task<ActionResult<List<ProstorijaDTO>>> GetProstorije()
+    public async Task<ActionResult<PagedResult<ProstorijaDTO>>> GetProstorije(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationConstants.DefaultPageSize)
     {
-        var list = await _service.GetProstorijeAsync(HttpContext.RequestAborted);
-        return Ok(list);
+        var pageResult = await _service.GetProstorijeAsync(
+            page,
+            pageSize,
+            HttpContext.RequestAborted);
+        return Ok(pageResult);
     }
 
     [HttpPost("prostorije")]
@@ -76,10 +81,15 @@ public class ResursiController : ControllerBase
     }
 
     [HttpGet("oprema")]
-    public async Task<ActionResult<List<OpremaDTO>>> GetOprema()
+    public async Task<ActionResult<PagedResult<OpremaDTO>>> GetOprema(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PaginationConstants.DefaultPageSize)
     {
-        var list = await _service.GetOpremaAsync(HttpContext.RequestAborted);
-        return Ok(list);
+        var pageResult = await _service.GetOpremaAsync(
+            page,
+            pageSize,
+            HttpContext.RequestAborted);
+        return Ok(pageResult);
     }
 
     [HttpGet("availability")]

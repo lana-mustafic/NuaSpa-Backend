@@ -400,12 +400,22 @@ namespace NuaSpa.Application.Services
             return dto;
         }
 
-        public async Task<IEnumerable<ZaposlenikDTO>> GetForServiceAsync(int uslugaId, bool bookableOnly = true)
+        public async Task<PagedResult<ZaposlenikDTO>> GetForServiceAsync(
+            int uslugaId,
+            bool bookableOnly = true,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize)
         {
             var usluga = await _context.Usluge
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == uslugaId && !u.IsDeleted);
-            if (usluga == null) return Array.Empty<ZaposlenikDTO>();
+            if (usluga == null)
+            {
+                return PaginationHelper.ToPaged(
+                    Array.Empty<ZaposlenikDTO>(),
+                    page,
+                    pageSize);
+            }
 
             var query = _context.Zaposlenici
                 .AsNoTracking()
@@ -422,10 +432,12 @@ namespace NuaSpa.Application.Services
                 .ThenBy(z => z.Ime)
                 .ToListAsync();
 
-            return list
+            var mapped = list
                 .Where(z => TherapistServiceEligibility.Matches(usluga, z, bookableOnly))
                 .Select(MapToDto)
                 .ToList();
+
+            return PaginationHelper.ToPaged(mapped, page, pageSize);
         }
 
         public async Task<bool> IsEligibleForServiceAsync(
@@ -446,13 +458,18 @@ namespace NuaSpa.Application.Services
             return TherapistServiceEligibility.Matches(usluga, therapist, requireActive);
         }
 
-        public async Task<IEnumerable<ZaposlenikDTO>> GetForCategoryAsync(
+        public async Task<PagedResult<ZaposlenikDTO>> GetForCategoryAsync(
             int kategorijaUslugaId,
-            bool bookableOnly = true)
+            bool bookableOnly = true,
+            int page = 1,
+            int pageSize = PaginationConstants.DefaultPageSize)
         {
             if (kategorijaUslugaId <= 0)
             {
-                return Array.Empty<ZaposlenikDTO>();
+                return PaginationHelper.ToPaged(
+                    Array.Empty<ZaposlenikDTO>(),
+                    page,
+                    pageSize);
             }
 
             var query = _context.Zaposlenici
@@ -465,12 +482,18 @@ namespace NuaSpa.Application.Services
                 query = query.Where(z => z.Status == ZaposlenikStatus.Active);
             }
 
-            var list = await query
+            query = query
                 .OrderBy(z => z.Prezime)
-                .ThenBy(z => z.Ime)
-                .ToListAsync();
+                .ThenBy(z => z.Ime);
 
-            return list.Select(MapToDto).ToList();
+            var paged = await PaginationHelper.ToPagedAsync(query, page, pageSize);
+            return new PagedResult<ZaposlenikDTO>
+            {
+                Ukupno = paged.Ukupno,
+                Stranica = paged.Stranica,
+                VelicinaStranice = paged.VelicinaStranice,
+                Items = paged.Items.Select(MapToDto).ToList(),
+            };
         }
 
         public async Task<ZaposlenikDTO?> GetMeAsync(int zaposlenikId)

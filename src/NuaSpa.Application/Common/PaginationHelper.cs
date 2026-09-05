@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +42,27 @@ public static class PaginationHelper
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
+
+        return new PagedResult<T>
+        {
+            Ukupno = total,
+            Stranica = page,
+            VelicinaStranice = pageSize,
+            Items = items,
+        };
+    }
+
+    public static PagedResult<T> ToPaged<T>(
+        IReadOnlyList<T> all,
+        int page,
+        int pageSize)
+    {
+        (page, pageSize) = Normalize(page, pageSize);
+        var total = all.Count;
+        var items = all
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
 
         return new PagedResult<T>
         {

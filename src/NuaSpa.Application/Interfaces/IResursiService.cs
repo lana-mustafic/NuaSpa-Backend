@@ -16,12 +16,18 @@ namespace NuaSpa.Application.Interfaces
             List<RadnoVrijemeDTO> items,
             CancellationToken ct);
 
-        Task<List<ProstorijaDTO>> GetProstorijeAsync(CancellationToken ct);
+        Task<PagedResult<ProstorijaDTO>> GetProstorijeAsync(
+            int page,
+            int pageSize,
+            CancellationToken ct);
         Task<ProstorijaDTO> CreateProstorijaAsync(ProstorijaDTO dto, CancellationToken ct);
         Task UpdateProstorijaAsync(int id, ProstorijaDTO dto, CancellationToken ct);
         Task DeleteProstorijaAsync(int id, CancellationToken ct);
 
-        Task<List<OpremaDTO>> GetOpremaAsync(CancellationToken ct);
+        Task<PagedResult<OpremaDTO>> GetOpremaAsync(
+            int page,
+            int pageSize,
+            CancellationToken ct);
         Task<OpremaDTO> CreateOpremaAsync(OpremaDTO dto, CancellationToken ct);
         Task UpdateOpremaAsync(int id, OpremaDTO dto, CancellationToken ct);
         Task DeleteOpremaAsync(int id, CancellationToken ct);
