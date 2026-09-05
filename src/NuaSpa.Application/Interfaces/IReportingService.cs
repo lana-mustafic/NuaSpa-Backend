@@ -6,6 +6,8 @@ namespace NuaSpa.Application.Interfaces
     {
         Task<byte[]> GenerateTopUslugeReport(DateTime from, DateTime to);
 
+        Task<byte[]> GenerateRevenueReport(DateTime from, DateTime to);
+
         Task<AdminKpiDTO> GetAdminKpisAsync(DateTime date);
 
         /// <summary>Procjena prihoda za dan + broj novih klijenta (admin).</summary>

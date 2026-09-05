@@ -127,6 +127,94 @@ public class ReportingService : IReportingService
         return document.GeneratePdf();
     }
 
+    public async Task<byte[]> GenerateRevenueReport(DateTime from, DateTime to)
+    {
+        var series = await GetRevenueSeriesAsync(from, to);
+        var start = from.Date;
+        var rangeLabel = $"{start:dd.MM.yyyy} – {to.Date:dd.MM.yyyy}";
+        var totalRevenue = series.Sum(x => x.Prihod);
+        var totalPayments = series.Sum(x => x.BrojPlacanja);
+        var totalBookings = series.Sum(x => x.BrojRezervacija);
+        var totalConfirmed = series.Sum(x => x.BrojPotvrdjenih);
+        var totalCancelled = series.Sum(x => x.BrojOtkazanih);
+        var rows = series
+            .Where(x => x.Prihod != 0 || x.BrojRezervacija != 0 || x.BrojPlacanja != 0)
+            .ToList();
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(1, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(11));
+
+                page.Header().Column(col =>
+                {
+                    col.Item().Text("NuaSpa - Revenue Report")
+                        .SemiBold().FontSize(20).FontColor(Colors.Blue.Medium);
+                    col.Item().Text($"Period: {rangeLabel}")
+                        .FontSize(11).FontColor(Colors.Grey.Darken2);
+                });
+
+                page.Content().PaddingVertical(10).Column(col =>
+                {
+                    col.Item().PaddingBottom(10).Text(
+                        $"Revenue: {totalRevenue:0.00} KM   ·   Payments: {totalPayments}   ·   " +
+                        $"Bookings: {totalBookings}   ·   Confirmed: {totalConfirmed}   ·   Cancelled: {totalCancelled}");
+
+                    if (rows.Count == 0)
+                    {
+                        col.Item().Text("No paid or booked activity in this period.");
+                        return;
+                    }
+
+                    col.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(1.2f);
+                            columns.RelativeColumn();
+                            columns.RelativeColumn();
+                            columns.RelativeColumn();
+                            columns.RelativeColumn();
+                            columns.RelativeColumn(1.2f);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Text("Date").SemiBold();
+                            header.Cell().AlignRight().Text("Bookings").SemiBold();
+                            header.Cell().AlignRight().Text("Confirmed").SemiBold();
+                            header.Cell().AlignRight().Text("Cancelled").SemiBold();
+                            header.Cell().AlignRight().Text("Payments").SemiBold();
+                            header.Cell().AlignRight().Text("Revenue (KM)").SemiBold();
+                        });
+
+                        foreach (var item in rows)
+                        {
+                            table.Cell().Text(item.Datum.ToString("dd.MM.yyyy"));
+                            table.Cell().AlignRight().Text(item.BrojRezervacija.ToString());
+                            table.Cell().AlignRight().Text(item.BrojPotvrdjenih.ToString());
+                            table.Cell().AlignRight().Text(item.BrojOtkazanih.ToString());
+                            table.Cell().AlignRight().Text(item.BrojPlacanja.ToString());
+                            table.Cell().AlignRight().Text($"{item.Prihod:0.00}");
+                        }
+                    });
+                });
+
+                page.Footer().AlignCenter().Text(x =>
+                {
+                    x.Span("Stranica ");
+                    x.CurrentPageNumber();
+                });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
     public async Task<AdminKpiDTO> GetAdminKpisAsync(DateTime date)
     {
         var day = date.Date;

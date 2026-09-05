@@ -51,6 +51,34 @@ namespace NuaSpa.Api.Controllers
             }
         }
 
+        /// <summary>
+        /// PDF prihoda i rezervacija za raspon datuma (isti podaci kao JSON /revenue).
+        /// </summary>
+        [HttpGet("prihod")]
+        [Produces(MediaTypeNames.Application.Pdf)]
+        public async Task<IActionResult> GetRevenueReport(
+            [FromQuery] DateTime from,
+            [FromQuery] DateTime to)
+        {
+            if (!ReportDateRangeValidator.TryValidate(from, to, out var rangeError))
+            {
+                return BadRequest(rangeError);
+            }
+
+            try
+            {
+                var pdfBytes = await _reportingService.GenerateRevenueReport(from, to);
+                return File(pdfBytes, MediaTypeNames.Application.Pdf, "Prihod_Izvjestaj.pdf");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Greška pri generisanju PDF izvještaja prihod.");
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "Greška pri generisanju izvještaja. Pokušajte ponovo ili kontaktirajte administratora.");
+            }
+        }
+
         [HttpGet("kpi")]
         [ProducesResponseType(typeof(AdminKpiDTO), StatusCodes.Status200OK)]
         public async Task<ActionResult<AdminKpiDTO>> GetKpis([FromQuery] DateTime? date = null)
